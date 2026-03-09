@@ -7,9 +7,22 @@ import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 
 export default function Home() {
+    // Función para agregar dígitos al PIN
+    const handleKeypad = (num: string) => {
+      if (pin.length < 4) {
+        setPin(pin + num);
+      }
+    };
   const [pin, setPin] = useState('');
   const [error, setError] = useState('');
   const router = useRouter();
+
+  // Función para borrar el último dígito del PIN
+  const handleDelete = () => {
+    if (pin.length > 0) {
+      setPin(pin.slice(0, -1));
+    }
+  };
 
   // Login automático al ingresar 4 dígitos
   React.useEffect(() => {
@@ -75,157 +88,98 @@ export default function Home() {
         return;
       }
       setError('PIN incorrecto.');
-      setTimeout(() => setPin(''), 600);
     })();
   };
 
-  const handleKeypad = (num: string) => {
-    if (pin.length < 4) {
-      setPin(pin + num);
-      setError('');
-    }
-  };
-  const handleDelete = () => {
-    setPin(pin.slice(0, -1));
-    setError('');
-  };
-
   return (
-    <div style={{ position: 'relative', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+    <div className="min-h-screen relative flex items-center justify-center font-sans overflow-hidden bg-slate-900">
+      {/* Video de fondo */}
       <video
         autoPlay
         loop
         muted
         playsInline
-        style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          width: '100vw',
-          height: '100vh',
-          objectFit: 'cover',
-          zIndex: 0,
-          opacity: 0.7
-        }}
+        className="absolute inset-0 w-full h-full object-cover z-0 opacity-70"
       >
         <source src="/fondo-login.mp4" type="video/mp4" />
         Tu navegador no soporta el video de fondo.
       </video>
-      <form
-        onSubmit={handleSubmit}
-        style={{
-          background: '#eee',
-          padding: '28px 18px',
-          border: '2px solid #444',
-          width: '100%',
-          maxWidth: 340,
-          minWidth: 220,
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          position: 'relative',
-          zIndex: 1,
-          boxSizing: 'border-box',
-        }}
-      >
-        <Image src="/logoconquis.png" alt="Logo Conquistadores" width={80} height={80} style={{ marginBottom: 16, border: '2px solid #444', background: '#fff', padding: 4 }} />
-        <h2 style={{ marginBottom: 8, color: '#222', fontWeight: 'bold', fontFamily: 'monospace', fontSize: 20 }}>Iniciar Sesión</h2>
-        <div style={{ marginBottom: 16, color: '#444', fontFamily: 'monospace', fontSize: 18, fontWeight: 'bold', letterSpacing: 1 }}>Club "Caleb"</div>
-        <div
-          style={{
-            display: 'flex',
-            gap: 12,
-            marginBottom: 18,
-            justifyContent: 'center',
-          }}
-        >
-          {[0, 1, 2, 3].map(i => (
-            <div
-              key={i}
-              style={{
-                width: 38,
-                height: 44,
-                borderBottom: '2.5px solid #444',
-                textAlign: 'center',
-                fontSize: 24,
-                fontFamily: 'monospace',
-                background: '#fafafa',
-              }}
-            >
-              {pin[i] ? '•' : ''}
+      {/* Overlay para glassmorphism */}
+      <div className="absolute inset-0 bg-gradient-to-b from-slate-900/40 via-indigo-900/60 to-slate-900/90 z-0" />
+      {/* Contenido principal */}
+      <div className="relative z-10 w-full max-w-md px-6 py-8 flex flex-col items-center">
+        {/* Logo y encabezado */}
+        <div className="mb-8 text-center animate-in fade-in slide-in-from-bottom-4 duration-700">
+          <div className="bg-white/20 backdrop-blur-xl p-4 rounded-[2rem] border border-white/30 inline-flex mb-4 shadow-2xl shadow-indigo-500/20">
+            <Image src="/logoconquis.png" alt="Logo Conquistadores" width={80} height={80} className="w-20 h-20" />
+          </div>
+          <h1 className="text-white text-3xl font-black tracking-tight mb-1">
+            CLUB <span className="text-indigo-400">CALEB</span>
+          </h1>
+          <p className="text-indigo-100/80 font-medium text-sm tracking-wide">
+            CENTRO DE COMANDO
+          </p>
+        </div>
+        {/* Contenedor del teclado / input */}
+        <div className="w-full bg-white/10 backdrop-blur-2xl rounded-[3rem] p-8 border border-white/20 shadow-2xl relative">
+          <div className="text-center mb-8">
+            <h2 className="text-white text-lg font-bold mb-4">Ingresa tu PIN</h2>
+            {/* Visualizador de PIN (dots) */}
+            <div className="flex justify-center gap-4 mb-2">
+              {[...Array(4)].map((_, i) => (
+                <div
+                  key={i}
+                  className={`w-4 h-4 rounded-full border-2 transition-all duration-300 ${
+                    pin.length > i
+                      ? 'bg-white border-white scale-110 shadow-[0_0_15px_rgba(255,255,255,0.8)]'
+                      : 'bg-transparent border-white/30'
+                  }`}
+                />
+              ))}
             </div>
-          ))}
-        </div>
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(3, 1fr)',
-            gap: 10,
-            marginBottom: 14,
-            width: '100%',
-            maxWidth: 260,
-            marginLeft: 'auto',
-            marginRight: 'auto',
-          }}
-        >
-          {[1,2,3,4,5,6,7,8,9].map(n => (
+          </div>
+          {/* Teclado numérico estilo pro */}
+          <div className="grid grid-cols-3 gap-4">
+            {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((num) => (
+              <button
+                key={num}
+                onClick={() => handleKeypad(num.toString())}
+                className="w-full aspect-square flex items-center justify-center rounded-2xl bg-white/5 hover:bg-white/20 active:bg-white/30 text-white text-2xl font-bold border border-white/10 transition-all active:scale-95"
+              >
+                {num}
+              </button>
+            ))}
+            <div className="flex items-center justify-center">
+              <button className="text-white/40 hover:text-white transition-colors">
+                {/* Icono de candado, puedes usar lucide-react si lo tienes */}
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 17v1m-6 2a2 2 0 002 2h8a2 2 0 002-2V11a2 2 0 00-2-2h-1V7a5 5 0 00-10 0v2H6a2 2 0 00-2 2v8z" /></svg>
+              </button>
+            </div>
             <button
-              type="button"
-              key={n}
-              onClick={() => handleKeypad(String(n))}
-              style={{
-                height: 44,
-                fontSize: 20,
-                background: '#fff',
-                border: '1.5px solid #444',
-                borderRadius: 10,
-                fontFamily: 'monospace',
-                cursor: 'pointer',
-                width: '100%',
-                minWidth: 0,
-              }}
+              onClick={() => handleKeypad('0')}
+              className="w-full aspect-square flex items-center justify-center rounded-2xl bg-white/5 hover:bg-white/20 active:bg-white/30 text-white text-2xl font-bold border border-white/10 transition-all active:scale-95"
             >
-              {n}
+              0
             </button>
-          ))}
-          <div></div>
-          <button
-            type="button"
-            onClick={() => handleKeypad('0')}
-            style={{
-              height: 44,
-              fontSize: 20,
-              background: '#fff',
-              border: '1.5px solid #444',
-              borderRadius: 10,
-              fontFamily: 'monospace',
-              cursor: 'pointer',
-              width: '100%',
-              minWidth: 0,
-            }}
-          >
-            0
+            <button
+              onClick={handleDelete}
+              className="w-full aspect-square flex items-center justify-center rounded-2xl bg-red-500/10 hover:bg-red-500/20 active:bg-red-500/30 text-red-400 border border-red-500/20 transition-all active:scale-95"
+            >
+              {/* Icono de borrar, puedes usar lucide-react si lo tienes */}
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+            </button>
+          </div>
+          {/* Enlace de ayuda */}
+          <button className="w-full mt-8 text-indigo-200/50 text-xs font-bold uppercase tracking-widest hover:text-white transition-colors">
+            ¿Olvidaste tu PIN?
           </button>
-          <button
-            type="button"
-            onClick={handleDelete}
-            style={{
-              height: 44,
-              fontSize: 20,
-              background: '#fff',
-              border: '1.5px solid #444',
-              borderRadius: 10,
-              fontFamily: 'monospace',
-              cursor: 'pointer',
-              width: '100%',
-              minWidth: 0,
-            }}
-          >
-            ⌫
-          </button>
+          {error && <div className="text-red-400 mt-4 text-center font-bold text-sm animate-pulse">{error}</div>}
         </div>
-        {error && <div style={{ color: '#a00', marginBottom: 12, fontFamily: 'monospace', fontSize: 14 }}>{error}</div>}
-      </form>
+        {/* Footer */}
+        <p className="mt-12 text-white/40 text-[10px] font-bold uppercase tracking-widest text-center">
+          Preparados para servir • {new Date().getFullYear()}
+        </p>
+      </div>
     </div>
   );
 }

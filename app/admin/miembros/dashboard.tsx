@@ -7,6 +7,18 @@ import { Trophy, Calendar, Star, BookOpen, LogOut, Bell, ChevronRight, Medal, Ma
 import { especialidadesBase } from '@/src/data/especialidades';
 
 export default function MiembroDashboard({ miembroId }: { miembroId: string }) {
+		// Handler para cerrar sesión
+		const handleLogout = async () => {
+			try {
+				// Si usas Firebase Auth
+				const { getAuth, signOut } = await import('firebase/auth');
+				const auth = getAuth();
+				await signOut(auth);
+			} catch (e) {
+				// Si no hay auth, solo redirige
+			}
+			window.location.href = '/';
+		};
 	const [miembro, setMiembro] = useState<any>(null);
 	const [loading, setLoading] = useState(true);
 
@@ -61,7 +73,7 @@ export default function MiembroDashboard({ miembroId }: { miembroId: string }) {
 			<div className="absolute top-0 left-0 w-full h-64 bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-500 -z-0 opacity-90" />
 
 			{/* Navbar Transparente */}
-			<nav className="relative z-10 max-w-7xl mx-auto px-6 py-6 flex items-center justify-between">
+			<nav className="relative z-10 max-w-7xl mx-auto px-4 md:px-6 py-4 md:py-6 flex flex-col md:flex-row items-center md:justify-between gap-4">
 				<div className="flex items-center gap-3">
 					<div className="bg-white/20 backdrop-blur-md p-2 rounded-2xl border border-white/30">
 						<Trophy className="text-white w-6 h-6" />
@@ -73,7 +85,7 @@ export default function MiembroDashboard({ miembroId }: { miembroId: string }) {
 						<Bell size={20} />
 						<span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border border-white"></span>
 					</button>
-					<button className="flex items-center gap-2 bg-white/10 backdrop-blur-md text-white px-4 py-2 rounded-xl border border-white/20 hover:bg-red-500/80 transition-all text-sm font-semibold">
+					<button onClick={handleLogout} className="flex items-center gap-2 bg-white/10 backdrop-blur-md text-white px-4 py-2 rounded-xl border border-white/20 hover:bg-red-500/80 transition-all text-sm font-semibold">
 						<LogOut size={18} />
 						<span className="hidden md:inline">Cerrar sesión</span>
 					</button>
@@ -104,9 +116,9 @@ export default function MiembroDashboard({ miembroId }: { miembroId: string }) {
 					</div>
 				</div>
 
-				<div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+				<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-8">
 					{/* Columna Izquierda: Progreso y Calificaciones */}
-					<div className="lg:col-span-8 space-y-8">
+					<div className="lg:col-span-8 md:col-span-1 space-y-8">
 						{/* Tarjeta de Progreso de Clase */}
 						<div className="bg-white rounded-[2rem] p-8 shadow-sm border border-slate-200 overflow-hidden relative group">
 							<div className="absolute top-0 right-0 p-8 opacity-5 group-hover:scale-110 transition-transform">
@@ -195,7 +207,7 @@ export default function MiembroDashboard({ miembroId }: { miembroId: string }) {
 						</div>
 					</div>
 					{/* Columna Derecha: Eventos y Sidebar */}
-					<div className="lg:col-span-4 space-y-8">
+					<div className="lg:col-span-4 md:col-span-1 space-y-8">
 						{/* Tarjeta de Próximos Eventos */}
 						<div className="bg-white rounded-[2rem] p-6 shadow-sm border border-slate-200">
 							<h3 className="font-bold text-lg mb-6 flex items-center gap-2">
