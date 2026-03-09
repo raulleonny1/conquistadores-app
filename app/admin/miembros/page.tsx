@@ -1,19 +1,12 @@
-"use client";
+export const dynamic = "force-dynamic";
 
-import { useSearchParams } from "next/navigation";
-import MiembroDashboard from "./dashboard";
+import { Suspense } from "react";
+import MiembrosPageInner from "./MiembrosPageInner";
 
 export default function MiembrosPage() {
-  const searchParams = useSearchParams();
-  const pin = searchParams.get("pin") || "";
-
-  if (!pin) {
-    return (
-      <div className="text-center mt-10 text-lg text-red-700">
-        No se proporcionó PIN.
-      </div>
-    );
-  }
-
-  return <MiembroDashboard miembroId={pin} />;
+  return (
+    <Suspense fallback={<div>Cargando...</div>}>
+      <MiembrosPageInner />
+    </Suspense>
+  );
 }
