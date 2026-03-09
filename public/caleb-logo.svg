@@ -1,0 +1,6 @@
+<svg width="128" height="128" viewBox="0 0 128 128" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <circle cx="64" cy="64" r="64" fill="#FBBF24"/>
+  <path d="M64 24L100 104H28L64 24Z" fill="#3B82F6"/>
+  <circle cx="64" cy="80" r="16" fill="#fff"/>
+  <text x="50%" y="50%" text-anchor="middle" dy=".3em" font-size="24" fill="#3B82F6" font-family="Arial">Caleb</text>
+</svg>
