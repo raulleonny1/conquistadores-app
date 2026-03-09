@@ -8,6 +8,9 @@ import { useRouter } from 'next/navigation';
 // import { db } from "@/src/firebase";
 // import { collection, getDocs } from "firebase/firestore";
 
+// Actualiza la redirección al dashboard de consejero:
+// router.push(`/consejero/${consejeroId}`);
+
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -30,7 +33,9 @@ export default function Login() {
     // Permitir login de consejero con PIN 1902
     if (password === '1902') {
       setError('');
-      router.push('/consejero');
+      // Aquí debes obtener el ID real del consejero
+      const consejeroId = 'ID_DEL_CONSEJERO'; // Reemplaza por el ID real
+      router.push(`/consejero/${consejeroId}`);
       return;
     }
     setError('Correo o contraseña incorrectos.');
