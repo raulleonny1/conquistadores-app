@@ -2,58 +2,49 @@
 import React, { useEffect, useState } from "react";
 import { db } from "../../src/firebase";
 import { collection, getDocs, query, where } from "firebase/firestore";
+import {
+  Users,
+  Award,
+  Calendar,
+  ChevronRight,
+  UserCircle,
+  Bell,
+  LayoutDashboard,
+  LogOut
+} from "lucide-react";
 
 export default function ConsejeroDashboard({ consejeroId }: { consejeroId: string }) {
-  type Unidad = { id: string; nombre: string };
-  type Calificacion = { id: string; unidad: string; nota: string };
-  type Actividad = { id: string; titulo: string; descripcion: string; fecha?: string };
-  type Consejero = { nombre: string; consejeroAsociado?: string };
-  const [consejero, setConsejero] = useState<Consejero | null>(null);
-  const [unidades, setUnidades] = useState<Unidad[]>([]);
-  const [calificaciones, setCalificaciones] = useState<Calificacion[]>([]);
-  const [actividades, setActividades] = useState<Actividad[]>([]);
+  const [consejero, setConsejero] = useState<{ nombre: string; consejeroAsociado?: string } | null>(null);
+  const [unidades, setUnidades] = useState<string[]>([]);
+  const [calificaciones, setCalificaciones] = useState<string[]>([]);
+  const [actividades, setActividades] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showMenu, setShowMenu] = useState(false);
 
   useEffect(() => {
     async function fetchData() {
       setLoading(true);
-      // Consejero
-      const consejeroDoc = await getDocs(query(collection(db, "consejeros"), where("id", "==", consejeroId)));
-      const cData = consejeroDoc.docs[0]?.data();
+      const { getDoc, doc } = await import("firebase/firestore");
+      const docSnap = await getDoc(doc(db, "consejeros", consejeroId));
+      const cData = docSnap.exists() ? docSnap.data() : undefined;
       setConsejero({
         nombre: cData?.nombre || "",
         consejeroAsociado: cData?.consejeroAsociado || undefined
       });
       // Unidades
-      // (Eliminada declaración duplicada)
       const unidadesQuery = await getDocs(query(collection(db, "unidades"), where("consejero", "==", cData?.nombre)));
-      setUnidades(unidadesQuery.docs.map(doc => {
-        const data = doc.data();
-        return {
-          id: doc.id,
-          nombre: data.nombre || ""
-        };
-      }));
+      setUnidades(unidadesQuery.docs.map(doc => doc.data().nombre || ""));
       // Calificaciones
       const califQuery = await getDocs(query(collection(db, "calificaciones"), where("consejeroId", "==", consejeroId)));
       setCalificaciones(califQuery.docs.map(doc => {
         const data = doc.data();
-        return {
-          id: doc.id,
-          unidad: data.unidad || "",
-          nota: data.nota || ""
-        };
+        return `${data.unidad || ""}: ${data.nota || ""}`;
       }));
       // Actividades
       const actsQuery = await getDocs(collection(db, "actividades"));
       setActividades(actsQuery.docs.map(doc => {
         const data = doc.data();
-        return {
-          id: doc.id,
-          titulo: data.titulo || "",
-          descripcion: data.descripcion || "",
-          fecha: data.fecha || undefined
-        };
+        return `${data.titulo || ""}${data.descripcion ? ` - ${data.descripcion}` : ""}${data.fecha ? ` (${new Date(data.fecha).toLocaleString()})` : ""}`;
       }));
       setLoading(false);
     }
@@ -63,37 +54,167 @@ export default function ConsejeroDashboard({ consejeroId }: { consejeroId: strin
   if (loading) return <div className="text-center mt-10 text-lg text-blue-700">Cargando datos reales...</div>;
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-green-200 via-blue-100 to-yellow-100">
-      <div className="bg-white rounded-3xl shadow-2xl p-8 w-full max-w-md flex flex-col items-center">
-        <h2 className="text-4xl font-extrabold text-green-700 mb-4">¡Hola, {consejero?.nombre}!</h2>
-        <p className="text-lg text-blue-700 mb-2">Consejero asociado: <span className="font-bold text-pink-600">{consejero?.consejeroAsociado || "-"}</span></p>
-        <div className="w-full bg-gradient-to-r from-yellow-300 via-green-200 to-blue-200 rounded-xl p-4 mb-6 flex flex-col items-center">
-          <h3 className="text-2xl font-bold text-green-800 mb-2">Tus Unidades</h3>
-          <ul className="mb-4">
-            {unidades.length === 0 ? <li className="text-gray-500">Sin unidades asignadas</li> : unidades.map(u => (
-              <li key={u.id} className="font-semibold text-green-700">{u.nombre}</li>
-            ))}
-          </ul>
-          <h3 className="text-2xl font-bold text-green-800 mb-2">Calificaciones</h3>
-          <ul>
-            {calificaciones.length === 0 ? <li className="text-gray-500">Sin calificaciones</li> : calificaciones.map(c => (
-              <li key={c.id} className="font-semibold text-blue-700">{c.unidad}: {c.nota}</li>
-            ))}
-          </ul>
-          <h3 className="text-2xl font-bold text-pink-700 mb-2 mt-6">Actividades</h3>
-          <ul>
-            {actividades.length === 0 ? <li className="text-gray-500">Sin actividades</li> : actividades.map(act => (
-              <li key={act.id} className="font-semibold text-pink-700 mb-2">
-                <div className="text-lg">{act.titulo}</div>
-                <div className="text-sm text-gray-700">{act.descripcion}</div>
-                <div className="text-xs text-gray-500 mt-1">
-                  {act.fecha ? new Date(act.fecha).toLocaleString() : "Sin fecha"}
+    <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-teal-100 to-sky-200 font-sans text-slate-800">
+      {/* Navbar Superior */}
+      <nav className="bg-white/70 backdrop-blur-md sticky top-0 z-50 border-b border-white/20">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between h-16 items-center">
+            <div className="flex items-center gap-2">
+              <div className="bg-emerald-600 p-2 rounded-lg">
+                <Users className="text-white w-6 h-6" />
+              </div>
+              <span className="font-bold text-xl tracking-tight text-emerald-900 hidden sm:block">
+                Club Caleb
+              </span>
+            </div>
+            <div className="flex items-center gap-4">
+              <button className="p-2 text-slate-500 hover:bg-emerald-100 rounded-full transition-colors">
+                <Bell size={20} />
+              </button>
+              <div className="flex items-center gap-2 pl-4 border-l border-slate-200">
+                <div className="text-right hidden sm:block">
+                  <p className="text-sm font-semibold text-slate-700">{consejero?.nombre}</p>
+                  <p className="text-xs text-slate-500">Miembro Activo</p>
                 </div>
-              </li>
-            ))}
-          </ul>
+                <div className="relative">
+                  <button
+                    className="w-10 h-10 bg-emerald-200 rounded-full flex items-center justify-center border-2 border-white shadow-sm focus:outline-none"
+                    onClick={() => setShowMenu((v) => !v)}
+                    aria-label="Abrir menú de usuario"
+                  >
+                    <UserCircle className="text-emerald-700" size={28} />
+                  </button>
+                  {showMenu && (
+                    <div className="absolute right-0 mt-2 w-40 bg-white rounded-xl shadow-lg border z-50 animate-in fade-in slide-in-from-top-2">
+                      <button
+                        className="w-full text-left px-4 py-2 text-red-600 hover:bg-emerald-50 rounded-xl font-semibold flex items-center gap-2"
+                        onClick={() => {
+                          window.location.href = '/';
+                        }}
+                      >
+                        <LogOut size={18} /> Cerrar sesión
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
+      </nav>
+
+      <main className="max-w-5xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
+        {/* Encabezado de Bienvenida */}
+        <section className="mb-10 animate-in fade-in slide-in-from-bottom-4 duration-700">
+          <h1 className="text-3xl sm:text-4xl font-extrabold text-slate-900 mb-2">
+            ¡Hola, <span className="text-emerald-600">{consejero?.nombre?.split(' ')[0]}</span>! 👋
+          </h1>
+          <div className="flex items-center gap-2 bg-white/50 w-fit px-4 py-2 rounded-full border border-white/40 shadow-sm">
+            <span className="text-sm font-medium text-slate-600">Consejero asociado:</span>
+            <span className="text-sm font-bold text-emerald-700">
+              {consejero?.consejeroAsociado || "Sin asignar"}
+            </span>
+          </div>
+        </section>
+
+        {/* Rejilla de Secciones */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {/* Tarjeta: Unidades */}
+          <SectionCard
+            title="Tus Unidades"
+            description="Gestiona tus equipos y compañeros."
+            icon={<Users className="w-6 h-6" />}
+            items={unidades}
+            emptyMessage="Aún no tienes unidades asignadas."
+            color="emerald"
+          />
+          {/* Tarjeta: Calificaciones */}
+          <SectionCard
+            title="Calificaciones"
+            description="Revisa tu progreso y logros."
+            icon={<Award className="w-6 h-6" />}
+            items={calificaciones}
+            emptyMessage="No hay calificaciones registradas."
+            color="blue"
+          />
+          {/* Tarjeta: Actividades */}
+          <SectionCard
+            title="Actividades"
+            description="Próximos eventos y tareas."
+            icon={<Calendar className="w-6 h-6" />}
+            items={actividades}
+            emptyMessage="No hay actividades pendientes."
+            color="rose"
+          />
+        </div>
+
+        {/* Footer Informativo o Acceso Rápido */}
+        <footer className="mt-12 p-6 rounded-3xl bg-emerald-900 text-emerald-50 overflow-hidden relative">
+          <div className="relative z-10">
+            <h3 className="text-xl font-bold mb-2">¿Necesitas ayuda con algo?</h3>
+            <p className="text-emerald-200/80 mb-4 max-w-md">Contacta a tu consejero o revisa la guía de usuario del club para resolver tus dudas.</p>
+            <button className="bg-white text-emerald-900 px-6 py-2 rounded-xl font-bold hover:bg-emerald-100 transition-all transform hover:scale-105">
+              Contactar Soporte
+            </button>
+          </div>
+          {/* Decoración de fondo */}
+          <div className="absolute top-0 right-0 -translate-y-1/2 translate-x-1/4 w-64 h-64 bg-emerald-700/30 rounded-full blur-3xl"></div>
+        </footer>
+      </main>
+    </div>
+  );
+}
+
+// Sub-componente para las tarjetas de sección
+function SectionCard({ title, description, icon, items, emptyMessage, color }: {
+  title: string;
+  description: string;
+  icon: React.ReactNode;
+  items: string[];
+  emptyMessage: string;
+  color: "emerald" | "blue" | "rose";
+}) {
+  const colors: any = {
+    emerald: "bg-emerald-500 hover:bg-emerald-600 ring-emerald-100",
+    blue: "bg-blue-500 hover:bg-blue-600 ring-blue-100",
+    rose: "bg-rose-500 hover:bg-rose-600 ring-rose-100"
+  };
+  const textColors: any = {
+    emerald: "text-emerald-700",
+    blue: "text-blue-700",
+    rose: "text-rose-700"
+  };
+  return (
+    <div className="group bg-white/80 backdrop-blur-sm rounded-3xl p-6 shadow-xl border border-white hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1">
+      <div className="flex justify-between items-start mb-4">
+        <div className={`p-3 rounded-2xl ${colors[color]} text-white shadow-lg transition-all`}>
+          {icon}
+        </div>
+        <button className="p-2 text-slate-300 group-hover:text-slate-500 transition-colors">
+          <ChevronRight size={20} />
+        </button>
       </div>
+      <h3 className={`text-xl font-bold mb-1 ${textColors[color]}`}>{title}</h3>
+      <p className="text-slate-500 text-sm mb-6 leading-relaxed">
+        {description}
+      </p>
+      <div className="space-y-3">
+        {items.length > 0 ? (
+          items.map((item, idx) => (
+            <div key={idx} className="p-3 bg-slate-50 rounded-xl border border-slate-100">
+              {item}
+            </div>
+          ))
+        ) : (
+          <div className="flex flex-col items-center justify-center py-8 px-4 rounded-2xl border-2 border-dashed border-slate-100 bg-slate-50/50">
+            <LayoutDashboard className="w-8 h-8 text-slate-200 mb-2" />
+            <p className="text-xs text-slate-400 text-center italic">{emptyMessage}</p>
+          </div>
+        )}
+      </div>
+      <button className={`mt-6 w-full py-3 rounded-xl font-bold text-sm transition-all border-2 border-transparent group-hover:border-current ${textColors[color]} bg-slate-50 hover:bg-white`}>
+        Ver Detalles
+      </button>
     </div>
   );
 }

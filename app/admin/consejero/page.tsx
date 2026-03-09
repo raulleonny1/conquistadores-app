@@ -125,11 +125,11 @@ export default function ConsejeroPage() {
   );
 }
 
-type Consejero = { id?: string; nombre: string; unidades: string[] };
+type Consejero = { id?: string; nombre: string; unidades: string[]; consejeroAsociado?: string };
 function ConsejerosList({ refresh }: { refresh: number }) {
   const [consejeros, setConsejeros] = useState<Consejero[]>([]);
   const [editId, setEditId] = useState<string | null>(null);
-  const [editForm, setEditForm] = useState<{ nombre: string; unidades: string[] }>({ nombre: '', unidades: [] });
+  const [editForm, setEditForm] = useState<{ nombre: string; unidades: string[]; consejeroAsociado: string }>({ nombre: '', unidades: [], consejeroAsociado: '' });
   const [unidadesRegistradas, setUnidadesRegistradas] = useState<string[]>([]);
   React.useEffect(() => {
     import('firebase/firestore').then(({ getDocs, collection }) => {
@@ -161,7 +161,7 @@ function ConsejerosList({ refresh }: { refresh: number }) {
 
   const handleEdit = (c: Consejero) => {
     setEditId(c.id || null);
-    setEditForm({ nombre: c.nombre, unidades: c.unidades });
+    setEditForm({ nombre: c.nombre, unidades: c.unidades, consejeroAsociado: c.consejeroAsociado || '' });
   };
 
   const handleEditChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -187,11 +187,12 @@ function ConsejerosList({ refresh }: { refresh: number }) {
       await import('firebase/firestore').then(({ doc, updateDoc }) =>
         updateDoc(doc(db, 'consejeros', editId), {
           nombre: editForm.nombre,
-          unidades: editForm.unidades
+          unidades: editForm.unidades,
+          consejeroAsociado: editForm.consejeroAsociado
         })
       );
       setEditId(null);
-      setEditForm({ nombre: '', unidades: [] });
+      setEditForm({ nombre: '', unidades: [], consejeroAsociado: '' });
       // Refrescar lista
       setConsejeros(consejeros.map(c => c.id === editId ? { ...c, ...editForm } : c));
     } catch {
@@ -213,6 +214,13 @@ function ConsejerosList({ refresh }: { refresh: number }) {
                 onChange={handleEditChange}
                 className="w-full p-2 rounded border"
                 required
+              />
+              <input
+                name="consejeroAsociado"
+                value={editForm.consejeroAsociado}
+                onChange={handleEditChange}
+                placeholder="Consejero asociado"
+                className="w-full p-2 rounded border"
               />
               <div>
                 <label className="block font-semibold mb-2 text-green-700">Unidades:</label>

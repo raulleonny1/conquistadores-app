@@ -1,6 +1,8 @@
 
 "use client";
 import React, { useState } from 'react';
+import { db } from '../src/firebase';
+import { collection, getDocs, query, where } from 'firebase/firestore';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 
@@ -11,15 +13,27 @@ export default function Home() {
 
   // Login automático al ingresar 4 dígitos
   React.useEffect(() => {
-    if (pin.length === 4) {
-      if (pin === '1844') {
-        setError('');
-        router.push('/admin');
-      } else {
+    async function tryLogin() {
+      if (pin.length === 4) {
+        if (pin === '1844') {
+          setError('');
+          router.push('/admin');
+          return;
+        }
+        // Buscar consejero con ese PIN
+        const q = query(collection(db, 'consejeros'), where('pin', '==', pin));
+        const snapshot = await getDocs(q);
+        if (!snapshot.empty) {
+          const consejeroDoc = snapshot.docs[0];
+          setError('');
+          router.push(`/consejero?consejeroId=${consejeroDoc.id}`);
+          return;
+        }
         setError('PIN incorrecto.');
         setTimeout(() => setPin(''), 600);
       }
     }
+    tryLogin();
     // eslint-disable-next-line
   }, [pin]);
 
@@ -34,8 +48,19 @@ export default function Home() {
       router.push('/admin');
       return;
     }
-    setError('PIN incorrecto.');
-    setTimeout(() => setPin(''), 600);
+    // Buscar consejero con ese PIN
+    (async () => {
+      const q = query(collection(db, 'consejeros'), where('pin', '==', pin));
+      const snapshot = await getDocs(q);
+      if (!snapshot.empty) {
+        const consejeroDoc = snapshot.docs[0];
+        setError('');
+        router.push(`/consejero?consejeroId=${consejeroDoc.id}`);
+        return;
+      }
+      setError('PIN incorrecto.');
+      setTimeout(() => setPin(''), 600);
+    })();
   };
 
   const handleKeypad = (num: string) => {

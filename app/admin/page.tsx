@@ -12,9 +12,14 @@ import {
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
+import { collection, getDocs, updateDoc, doc } from 'firebase/firestore';
+import { db } from '../../src/firebase';
 const AdminPage = () => {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<string | null>(null);
+  const [showConfig, setShowConfig] = useState(false);
+  const [resetPins, setResetPins] = useState<{nombre: string, nuevoPin: string}[]>([]);
+  const [loadingPins, setLoadingPins] = useState(false);
 
   const menuItems = [
     {
@@ -78,24 +83,62 @@ const AdminPage = () => {
           };
 
           // Renderiza el contenido según el tab activo
-          const renderTabContent = () => {
-            if (activeTab === 'unidades') {
-              return (
-                <div className="text-center py-8 text-purple-700 font-semibold">Gestión de unidades (próximamente)</div>
-              );
-            }
-            if (activeTab === 'especialidades') {
-              return (
-                <div className="text-center py-8 text-amber-600 font-semibold">Gestión de especialidades (próximamente)</div>
-              );
-            }
-            if (activeTab === 'actividades') {
-              return (
-                <div className="text-center py-8 text-emerald-600 font-semibold">Plan de actividades (próximamente)</div>
-              );
-            }
-            return null;
-          };
+  const handleResetPins = async () => {
+    setLoadingPins(true);
+    const snapshot = await getDocs(collection(db, "consejeros"));
+    const updates: {nombre: string, nuevoPin: string}[] = [];
+    for (const docSnap of snapshot.docs) {
+      const nuevoPin = Math.floor(1000 + Math.random() * 9000).toString();
+      await updateDoc(doc(db, "consejeros", docSnap.id), { pin: nuevoPin });
+      updates.push({ nombre: docSnap.data().nombre || docSnap.id, nuevoPin });
+    }
+    setResetPins(updates);
+    setLoadingPins(false);
+  };
+
+  const renderTabContent = () => {
+    if (activeTab === 'unidades') {
+      return (
+        <div className="text-center py-8 text-purple-700 font-semibold">Gestión de unidades (próximamente)</div>
+      );
+    }
+    if (activeTab === 'especialidades') {
+      return (
+        <div className="text-center py-8 text-amber-600 font-semibold">Gestión de especialidades (próximamente)</div>
+      );
+    }
+    if (activeTab === 'actividades') {
+      return (
+        <div className="text-center py-8 text-emerald-600 font-semibold">Plan de actividades (próximamente)</div>
+      );
+    }
+    if (activeTab === 'configuracion') {
+      return (
+        <div className="max-w-lg mx-auto bg-white border-l-4 border-yellow-500 rounded-xl shadow p-6 flex flex-col items-start mb-4">
+          <h2 className="text-xl font-bold text-yellow-700 mb-2">Configuración</h2>
+          <p className="text-yellow-800 mb-4">Ajustes y opciones generales del sistema.</p>
+          <div className="bg-white border-l-4 border-pink-500 rounded-xl shadow p-6 flex flex-col items-start mb-4 w-full">
+            <h3 className="text-lg font-bold text-pink-700 mb-2">Resetear PIN de Consejeros</h3>
+            <p className="mb-2 text-pink-800">Genera nuevos PINs aleatorios para todos los consejeros. Los nuevos PINs se mostrarán abajo.</p>
+            <button onClick={handleResetPins} className="bg-pink-600 text-white px-4 py-2 rounded font-bold shadow hover:bg-pink-800 transition mb-2" disabled={loadingPins}>
+              {loadingPins ? 'Reseteando...' : 'Resetear PINs'}
+            </button>
+            {resetPins.length > 0 && (
+              <div className="w-full mt-2">
+                <h4 className="font-semibold text-pink-700 mb-1">Nuevos PINs:</h4>
+                <ul className="text-sm">
+                  {resetPins.map((c, i) => (
+                    <li key={i} className="mb-1"><span className="font-bold">{c.nombre}:</span> <span className="font-mono">{c.nuevoPin}</span></li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    }
+    return null;
+  };
 
           return (
             <div className="min-h-screen bg-slate-50 font-sans text-slate-900 overflow-x-hidden">
@@ -116,10 +159,15 @@ const AdminPage = () => {
                   </div>
                   <h1 className="font-bold text-xl tracking-tight text-slate-800">Conquis<span className="text-purple-700">App</span></h1>
                 </div>
-                <button onClick={handleLogout} className="group flex items-center gap-2 bg-slate-100 hover:bg-red-50 text-slate-600 hover:text-red-600 px-4 py-2 rounded-full transition-all duration-300 font-medium text-sm">
-                  <span>Cerrar Sesión</span>
-                  <LogOut className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                </button>
+                <div className="flex items-center gap-4">
+                  <button onClick={() => router.push('/admin/configuracion')} className="group flex items-center justify-center bg-slate-100 hover:bg-yellow-100 text-yellow-600 p-2 rounded-full transition-all duration-300" style={{ position: 'absolute', top: 16, right: 16, zIndex: 50 }}>
+                    <Settings className="w-7 h-7" />
+                  </button>
+                  <button onClick={handleLogout} className="group flex items-center gap-2 bg-slate-100 hover:bg-red-50 text-slate-600 hover:text-red-600 px-4 py-2 rounded-full transition-all duration-300 font-medium text-sm">
+                    <span>Cerrar Sesión</span>
+                    <LogOut className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                  </button>
+                </div>
               </header>
 
               {/* Hero Section */}
@@ -148,6 +196,8 @@ const AdminPage = () => {
                           router.push('/admin/consejero');
                         } else if (item.id === 'especialidades') {
                           router.push('/admin/especialidades');
+                        } else if (item.id === 'calificaciones') {
+                          setActiveTab('configuracion');
                         } else {
                           setActiveTab(item.id);
                         }
@@ -180,19 +230,7 @@ const AdminPage = () => {
                 )}
 
                 {/* Accesos Rápidos Inferiores */}
-                <div className="mt-20 pt-10 border-t border-slate-200">
-                  <h4 className="text-slate-400 font-bold text-xs uppercase tracking-[0.2em] text-center mb-8">Accesos Directos</h4>
-                  <div className="flex flex-wrap justify-center gap-4">
-                    <button className="flex items-center gap-2 bg-white border border-slate-200 px-5 py-3 rounded-2xl text-slate-600 font-medium hover:bg-slate-50 transition-colors shadow-sm">
-                      <ClipboardList className="w-4 h-4 text-purple-500" />
-                      <span>Reporte Mensual</span>
-                    </button>
-                    <button className="flex items-center gap-2 bg-white border border-slate-200 px-5 py-3 rounded-2xl text-slate-600 font-medium hover:bg-slate-50 transition-colors shadow-sm">
-                      <Settings className="w-4 h-4 text-slate-400" />
-                      <span>Configuración</span>
-                    </button>
-                  </div>
-                </div>
+
               </main>
 
               {/* Footer / Nota */}
