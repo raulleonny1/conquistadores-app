@@ -26,7 +26,7 @@ export default function Home() {
         if (!snapshot.empty) {
           const consejeroDoc = snapshot.docs[0];
           setError('');
-          router.push(`/consejero?consejeroId=${consejeroDoc.id}`);
+          router.push(`/consejero/${consejeroDoc.id}`);
           return;
         }
         setError('PIN incorrecto.');
@@ -55,7 +55,7 @@ export default function Home() {
       if (!snapshot.empty) {
         const consejeroDoc = snapshot.docs[0];
         setError('');
-        router.push(`/consejero?consejeroId=${consejeroDoc.id}`);
+        router.push(`/consejero/${consejeroDoc.id}`);
         return;
       }
       setError('PIN incorrecto.');

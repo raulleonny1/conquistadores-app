@@ -9,7 +9,6 @@ import { useRouter } from 'next/navigation';
 // import { collection, getDocs } from "firebase/firestore";
 
 // Actualiza la redirección al dashboard de consejero:
-// router.push(`/consejero/${consejeroId}`);
 
 
 export default function Login() {

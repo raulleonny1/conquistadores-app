@@ -1,5 +1,4 @@
 // Si tienes enlaces a consejero, usa:
-// <Link href={`/consejero/${consejeroId}`}>Ir al dashboard</Link>
 "use client";
 // Unidades registradas (debería venir de la página de unidades)
 const unidadesRegistradas = [

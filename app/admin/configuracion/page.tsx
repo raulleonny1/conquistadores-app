@@ -1,5 +1,4 @@
 // Si tienes enlaces a consejero, usa:
-// <Link href={`/consejero/${consejeroId}`}>Ir al dashboard</Link>
 "use client";
 import React, { useState } from "react";
 import { db } from "../../../src/firebase";
