@@ -4,9 +4,8 @@
 import React, { useState } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
-// Importa Firestore solo si lo vas a usar:
-// import { db } from "@/src/firebase";
-// import { collection, getDocs } from "firebase/firestore";
+import { db } from "../../src/firebase";
+import { collection, query, where, getDocs } from "firebase/firestore";
 
 // Actualiza la redirección al dashboard de consejero:
 
@@ -17,10 +16,10 @@ export default function Login() {
   const [error, setError] = useState('');
   const router = useRouter();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email || !password) {
-      setError('Por favor, ingresa correo y contraseña.');
+      setError('Por favor, ingresa correo y contraseña o PIN.');
       return;
     }
     // Lógica de autenticación para admin
@@ -37,6 +36,22 @@ export default function Login() {
       router.push(`/consejero/${consejeroId}`);
       return;
     }
+    // Login de miembro por PIN
+    // El usuario puede poner su PIN en el campo contraseña
+    if (password.length === 4 && /^[0-9]{4}$/.test(password)) {
+      // Buscar miembro con ese PIN
+      const q = query(collection(db, 'conquistadores'), where('pin', '==', password));
+      const snap = await getDocs(q);
+      if (!snap.empty) {
+        setError('');
+        // Redirigir al dashboard de miembros, pasando el PIN
+        router.push(`/miembros/dashboard?pin=${password}`);
+        return;
+      } else {
+        setError('PIN incorrecto o no registrado.');
+        return;
+      }
+    }
     setError('Correo o contraseña incorrectos.');
   };
 
@@ -46,15 +61,15 @@ export default function Login() {
         <Image src="/logoconquis.png" alt="Logo Conquistadores" width={120} height={120} style={{ marginBottom: 24 }} />
         <h2 style={{ marginBottom: 24, color: '#222' }}>Iniciar Sesión</h2>
         <input
-          type="email"
-          placeholder="Correo electrónico"
+          type="text"
+          placeholder="Correo electrónico o deja vacío para PIN"
           value={email}
           onChange={e => setEmail(e.target.value)}
           style={{ marginBottom: 16, padding: 10, borderRadius: 6, border: '1px solid #ccc', width: '100%' }}
         />
         <input
           type="password"
-          placeholder="Contraseña"
+          placeholder="Contraseña o PIN de 4 dígitos"
           value={password}
           onChange={e => setPassword(e.target.value)}
           style={{ marginBottom: 16, padding: 10, borderRadius: 6, border: '1px solid #ccc', width: '100%' }}

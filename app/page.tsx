@@ -21,12 +21,20 @@ export default function Home() {
           return;
         }
         // Buscar consejero con ese PIN
-        const q = query(collection(db, 'consejeros'), where('pin', '==', pin));
-        const snapshot = await getDocs(q);
-        if (!snapshot.empty) {
-          const consejeroDoc = snapshot.docs[0];
+        const qConsejero = query(collection(db, 'consejeros'), where('pin', '==', pin));
+        const snapshotConsejero = await getDocs(qConsejero);
+        if (!snapshotConsejero.empty) {
+          const consejeroDoc = snapshotConsejero.docs[0];
           setError('');
           router.push(`/consejero/${consejeroDoc.id}`);
+          return;
+        }
+        // Buscar miembro conquistador con ese PIN
+        const qMiembro = query(collection(db, 'conquistadores'), where('pin', '==', pin));
+        const snapshotMiembro = await getDocs(qMiembro);
+        if (!snapshotMiembro.empty) {
+          setError('');
+          router.push(`/miembros/dashboard?pin=${pin}`);
           return;
         }
         setError('PIN incorrecto.');
@@ -48,14 +56,22 @@ export default function Home() {
       router.push('/admin');
       return;
     }
-    // Buscar consejero con ese PIN
     (async () => {
-      const q = query(collection(db, 'consejeros'), where('pin', '==', pin));
-      const snapshot = await getDocs(q);
-      if (!snapshot.empty) {
-        const consejeroDoc = snapshot.docs[0];
+      // Buscar consejero con ese PIN
+      const qConsejero = query(collection(db, 'consejeros'), where('pin', '==', pin));
+      const snapshotConsejero = await getDocs(qConsejero);
+      if (!snapshotConsejero.empty) {
+        const consejeroDoc = snapshotConsejero.docs[0];
         setError('');
         router.push(`/consejero/${consejeroDoc.id}`);
+        return;
+      }
+      // Buscar miembro conquistador con ese PIN
+      const qMiembro = query(collection(db, 'conquistadores'), where('pin', '==', pin));
+      const snapshotMiembro = await getDocs(qMiembro);
+      if (!snapshotMiembro.empty) {
+        setError('');
+        router.push(`/miembros/dashboard?pin=${pin}`);
         return;
       }
       setError('PIN incorrecto.');
