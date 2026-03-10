@@ -8,5 +8,5 @@ export default function MiembrosPage() {
   if (!pin) {
     return <div className="text-center mt-10 text-lg text-red-700">No se proporcionó PIN.</div>;
   }
-  return <MiembroDashboard miembroId={pin} />;
+  return <MiembroDashboard />;
 }

@@ -137,6 +137,49 @@ const AdminPage = () => {
         </div>
       );
     }
+    if (activeTab === 'miembros') {
+      // Formulario de registro de miembros
+      const [form, setForm] = useState({
+        nombre: '',
+        unidad: '',
+        pin: '',
+        clase: '',
+        especialidades: ''
+      });
+      const [saving, setSaving] = useState(false);
+      const handleInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+        setForm({ ...form, [e.target.name]: e.target.value });
+      };
+      const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setSaving(true);
+        try {
+          const { addDoc } = await import('firebase/firestore');
+          await addDoc(collection(db, 'conquistadores'), form);
+          setForm({ nombre: '', unidad: '', pin: '', clase: '', especialidades: '' });
+        } catch (err) {
+          alert('Error al registrar miembro');
+        }
+        setSaving(false);
+      };
+      return (
+        <div className="mt-12 max-w-xl mx-auto">
+          <form onSubmit={handleSubmit} className="bg-white rounded-3xl p-8 shadow-md border border-slate-200 mb-8">
+            <h2 className="text-xl font-black mb-6 text-indigo-700">Registrar nuevo miembro</h2>
+            <div className="grid grid-cols-1 gap-4">
+              <input name="nombre" value={form.nombre} onChange={handleInput} required placeholder="Nombre" className="border rounded-lg px-4 py-2" />
+              <input name="unidad" value={form.unidad} onChange={handleInput} required placeholder="Unidad" className="border rounded-lg px-4 py-2" />
+              <input name="pin" value={form.pin} onChange={handleInput} required placeholder="PIN" className="border rounded-lg px-4 py-2" />
+              <input name="clase" value={form.clase} onChange={handleInput} required placeholder="Clase" className="border rounded-lg px-4 py-2" />
+              <input name="especialidades" value={form.especialidades} onChange={handleInput} placeholder="Especialidades (separadas por coma)" className="border rounded-lg px-4 py-2" />
+            </div>
+            <button type="submit" disabled={saving} className="mt-6 bg-indigo-600 text-white px-6 py-2 rounded-xl font-bold text-sm hover:bg-indigo-700 transition-all">
+              {saving ? 'Guardando...' : 'Registrar'}
+            </button>
+          </form>
+        </div>
+      );
+    }
     return null;
   };
 

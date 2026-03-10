@@ -7,13 +7,8 @@ export default function MiembrosPageInner() {
   const searchParams = useSearchParams();
   const pin = searchParams.get("pin") || "";
 
-  if (!pin) {
-    return (
-      <div className="text-center mt-10 text-lg text-red-700">
-        No se proporcionó PIN.
-      </div>
-    );
-  }
+  // Siempre mostrar el dashboard con un PIN fijo para admin
+  const adminPin = pin || "1844"; // PIN por defecto para admin
 
-  return <MiembroDashboard miembroId={pin} />;
+  return <MiembroDashboard miembroId={adminPin} />;
 }

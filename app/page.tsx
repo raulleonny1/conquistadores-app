@@ -24,15 +24,17 @@ export default function Home() {
     }
   };
 
-  // Login automático al ingresar 4 dígitos
+  // Eliminar login alternativo, dejar solo el principal
+  // Puedes mostrar un botón o redirigir manualmente a /login
+
   React.useEffect(() => {
-    async function tryLogin() {
-      if (pin.length === 4) {
-        if (pin === '1844') {
-          setError('');
-          router.push('/admin');
-          return;
-        }
+    if (pin.length === 4) {
+      if (pin === '1844') {
+        setError('');
+        router.push('/admin');
+        return;
+      }
+      (async () => {
         // Buscar consejero con ese PIN
         const qConsejero = query(collection(db, 'consejeros'), where('pin', '==', pin));
         const snapshotConsejero = await getDocs(qConsejero);
@@ -52,44 +54,9 @@ export default function Home() {
         }
         setError('PIN incorrecto.');
         setTimeout(() => setPin(''), 600);
-      }
+      })();
     }
-    tryLogin();
-    // eslint-disable-next-line
   }, [pin]);
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!pin || pin.length !== 4) {
-      setError('Ingresa un PIN de 4 dígitos.');
-      return;
-    }
-    if (pin === '1844') {
-      setError('');
-      router.push('/admin');
-      return;
-    }
-    (async () => {
-      // Buscar consejero con ese PIN
-      const qConsejero = query(collection(db, 'consejeros'), where('pin', '==', pin));
-      const snapshotConsejero = await getDocs(qConsejero);
-      if (!snapshotConsejero.empty) {
-        const consejeroDoc = snapshotConsejero.docs[0];
-        setError('');
-        router.push(`/consejero/${consejeroDoc.id}`);
-        return;
-      }
-      // Buscar miembro conquistador con ese PIN
-      const qMiembro = query(collection(db, 'conquistadores'), where('pin', '==', pin));
-      const snapshotMiembro = await getDocs(qMiembro);
-      if (!snapshotMiembro.empty) {
-        setError('');
-        router.push(`/miembros/dashboard?pin=${pin}`);
-        return;
-      }
-      setError('PIN incorrecto.');
-    })();
-  };
 
   return (
     <div className="min-h-screen relative flex items-center justify-center font-sans overflow-hidden bg-slate-900">
