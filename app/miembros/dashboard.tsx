@@ -46,7 +46,7 @@ const App = () => {
 		}
 		const fetchUser = async () => {
 			try {
-				const q = query(collection(db, 'conquistadores'), where('pin', '==', pin));
+				const q = query(collection(db, 'RegistroConquis'), where('pin', '==', pin));
 				const snap = await getDocs(q);
 				console.log('Consulta Firestore:', q);
 				console.log('Docs encontrados:', snap.docs.map(doc => doc.data()));

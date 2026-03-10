@@ -1,6 +1,6 @@
 "use client";
 import { useSearchParams } from "next/navigation";
-import MiembroDashboard from "../miembros/dashboard";
+import MiembroDashboard from "../../miembros/dashboard";
 
 export default function MiembrosDashboardPage() {
   const searchParams = useSearchParams();
@@ -14,5 +14,5 @@ export default function MiembrosDashboardPage() {
     );
   }
 
-  return <MiembroDashboard miembroId={pin} />;
+  return <MiembroDashboard />;
 }
