@@ -8,7 +8,8 @@ import {
   ChevronRight,
   ClipboardList,
   Map,
-  Settings
+  Settings,
+  Calendar
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
@@ -23,8 +24,8 @@ const AdminPage = () => {
 
   const menuItems = [
     {
-      id: 'miembros',
-      title: 'Miembros del Club',
+      id: 'RegistroConquis',
+      title: 'RegistroConquis',
       description: 'Inscribir y gestionar datos de los conquistadores.',
       icon: <Users className="w-8 h-8" />,
       color: 'border-blue-500 text-blue-600',
@@ -68,10 +69,10 @@ const AdminPage = () => {
       hoverColor: 'hover:shadow-pink-200'
     },
     {
-      id: 'actividades',
-      title: 'Plan de Actividades',
-      description: 'Calendario de campamentos y reuniones.',
-      icon: <Map className="w-8 h-8" />, 
+      id: 'calendario',
+      title: 'Calendario de Actividades',
+      description: 'Gestiona y consulta el calendario de eventos, campamentos y reuniones.',
+      icon: <Calendar className="w-8 h-8 text-emerald-600" />,
       color: 'border-emerald-500 text-emerald-600',
       bgColor: 'bg-emerald-50',
       hoverColor: 'hover:shadow-emerald-200'
@@ -137,48 +138,9 @@ const AdminPage = () => {
         </div>
       );
     }
-    if (activeTab === 'miembros') {
-      // Formulario de registro de miembros
-      const [form, setForm] = useState({
-        nombre: '',
-        unidad: '',
-        pin: '',
-        clase: '',
-        especialidades: ''
-      });
-      const [saving, setSaving] = useState(false);
-      const handleInput = (e: React.ChangeEvent<HTMLInputElement>) => {
-        setForm({ ...form, [e.target.name]: e.target.value });
-      };
-      const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        setSaving(true);
-        try {
-          const { addDoc } = await import('firebase/firestore');
-          await addDoc(collection(db, 'conquistadores'), form);
-          setForm({ nombre: '', unidad: '', pin: '', clase: '', especialidades: '' });
-        } catch (err) {
-          alert('Error al registrar miembro');
-        }
-        setSaving(false);
-      };
-      return (
-        <div className="mt-12 max-w-xl mx-auto">
-          <form onSubmit={handleSubmit} className="bg-white rounded-3xl p-8 shadow-md border border-slate-200 mb-8">
-            <h2 className="text-xl font-black mb-6 text-indigo-700">Registrar nuevo miembro</h2>
-            <div className="grid grid-cols-1 gap-4">
-              <input name="nombre" value={form.nombre} onChange={handleInput} required placeholder="Nombre" className="border rounded-lg px-4 py-2" />
-              <input name="unidad" value={form.unidad} onChange={handleInput} required placeholder="Unidad" className="border rounded-lg px-4 py-2" />
-              <input name="pin" value={form.pin} onChange={handleInput} required placeholder="PIN" className="border rounded-lg px-4 py-2" />
-              <input name="clase" value={form.clase} onChange={handleInput} required placeholder="Clase" className="border rounded-lg px-4 py-2" />
-              <input name="especialidades" value={form.especialidades} onChange={handleInput} placeholder="Especialidades (separadas por coma)" className="border rounded-lg px-4 py-2" />
-            </div>
-            <button type="submit" disabled={saving} className="mt-6 bg-indigo-600 text-white px-6 py-2 rounded-xl font-bold text-sm hover:bg-indigo-700 transition-all">
-              {saving ? 'Guardando...' : 'Registrar'}
-            </button>
-          </form>
-        </div>
-      );
+    if (activeTab === 'RegistroConquis') {
+      router.push('/admin/RegistroConquis');
+      return null;
     }
     return null;
   };
@@ -231,8 +193,8 @@ const AdminPage = () => {
                     <div
                       key={item.id}
                       onClick={() => {
-                        if (item.id === 'miembros') {
-                          router.push('/admin/miembros');
+                        if (item.id === 'RegistroConquis') {
+                          router.push('/admin/RegistroConquis');
                         } else if (item.id === 'unidades') {
                           router.push('/admin/unidades');
                         } else if (item.id === 'consejero') {
@@ -241,6 +203,8 @@ const AdminPage = () => {
                           router.push('/admin/especialidades');
                         } else if (item.id === 'calificaciones') {
                           setActiveTab('configuracion');
+                        } else if (item.id === 'calendario') {
+                          router.push('/admin/calendario');
                         } else {
                           setActiveTab(item.id);
                         }

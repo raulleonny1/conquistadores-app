@@ -69,7 +69,7 @@ export default function RegistroConquistador() {
 
   // Leer miembros en tiempo real
   useEffect(() => {
-    const unsub = onSnapshot(collection(db, 'conquistadores'), (snapshot) => {
+    const unsub = onSnapshot(collection(db, 'RegistroConquis'), (snapshot) => {
       setMiembros(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
     return () => unsub();
@@ -84,7 +84,7 @@ export default function RegistroConquistador() {
     e.preventDefault();
     try {
       const pin = generarPin();
-      await addDoc(collection(db, 'conquistadores'), { ...form, pin });
+      await addDoc(collection(db, 'RegistroConquis'), { ...form, pin });
       alert('Registro guardado en Firebase. PIN: ' + pin);
       setForm({
         nombre: '',
@@ -104,7 +104,7 @@ export default function RegistroConquistador() {
   // Eliminar miembro
   const eliminarMiembro = async (id: string) => {
     if (window.confirm('¿Eliminar este miembro?')) {
-      await deleteDoc(doc(db, 'conquistadores', id));
+      await deleteDoc(doc(db, 'RegistroConquis', id));
     }
   };
 
@@ -119,7 +119,7 @@ export default function RegistroConquistador() {
   };
   const guardarEdicion = async () => {
     const { id, ...rest } = editForm;
-    await updateDoc(doc(db, 'conquistadores', id), rest);
+    await updateDoc(doc(db, 'RegistroConquis', id), rest);
     setEditandoId(null);
     setEditForm({});
   };

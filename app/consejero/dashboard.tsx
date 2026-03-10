@@ -1,5 +1,6 @@
 "use client";
 import React, { useEffect, useState } from "react";
+import EventosSidebar from './EventosSidebar';
 import { db } from "../../src/firebase";
 import { collection, getDocs, query, where } from "firebase/firestore";
 import {
@@ -17,7 +18,9 @@ export default function ConsejeroDashboard({ consejeroId }: { consejeroId: strin
   const [consejero, setConsejero] = useState<{ nombre: string; consejeroAsociado?: string } | null>(null);
   const [unidades, setUnidades] = useState<string[]>([]);
   const [calificaciones, setCalificaciones] = useState<string[]>([]);
-  const [actividades, setActividades] = useState<string[]>([]);
+  const [actividades, setActividades] = useState<any[]>([]);
+  const [eventoSeleccionado, setEventoSeleccionado] = useState<any | null>(null);
+  const [showModal, setShowModal] = useState(false);
   const [loading, setLoading] = useState(true);
   const [showMenu, setShowMenu] = useState(false);
 
@@ -40,12 +43,9 @@ export default function ConsejeroDashboard({ consejeroId }: { consejeroId: strin
         const data = doc.data();
         return `${data.unidad || ""}: ${data.nota || ""}`;
       }));
-      // Actividades
-      const actsQuery = await getDocs(collection(db, "actividades"));
-      setActividades(actsQuery.docs.map(doc => {
-        const data = doc.data();
-        return `${data.titulo || ""}${data.descripcion ? ` - ${data.descripcion}` : ""}${data.fecha ? ` (${new Date(data.fecha).toLocaleString()})` : ""}`;
-      }));
+      // Actividades: usar eventos reales de Firebase
+      const eventosQuery = await getDocs(collection(db, "eventos"));
+      setActividades(eventosQuery.docs.map(doc => ({ id: doc.id, ...doc.data() })));
       setLoading(false);
     }
     if (consejeroId) fetchData();
@@ -137,15 +137,75 @@ export default function ConsejeroDashboard({ consejeroId }: { consejeroId: strin
             emptyMessage="No hay calificaciones registradas."
             color="blue"
           />
-          {/* Tarjeta: Actividades */}
-          <SectionCard
-            title="Actividades"
-            description="Próximos eventos y tareas."
-            icon={<Calendar className="w-6 h-6" />}
-            items={actividades}
-            emptyMessage="No hay actividades pendientes."
-            color="rose"
-          />
+          {/* Tarjeta: Actividades conectada a eventos reales */}
+          <div className="group bg-white/80 backdrop-blur-sm rounded-3xl p-6 shadow-xl border border-white hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1">
+            <div className="flex justify-between items-start mb-4">
+              <div className="p-3 rounded-2xl bg-rose-500 hover:bg-rose-600 ring-rose-100 text-white shadow-lg transition-all">
+                <Calendar className="w-6 h-6" />
+              </div>
+              <button className="p-2 text-slate-300 group-hover:text-slate-500 transition-colors">
+                <ChevronRight size={20} />
+              </button>
+            </div>
+            <h3 className="text-xl font-bold mb-1 text-rose-700">Actividades</h3>
+            <p className="text-slate-500 text-sm mb-6 leading-relaxed">Próximos eventos y tareas.</p>
+            <div className="space-y-3">
+              {actividades.length > 0 ? (
+                actividades.map((evento: any) => (
+                  <div key={evento.id} className="p-3 bg-slate-50 rounded-xl border border-slate-100">
+                    <div className="font-bold text-rose-700 mb-1">{evento.nombre}</div>
+                    <div className="text-xs text-slate-600 mb-1">Fecha: {evento.fecha}</div>
+                    <div className="text-xs text-slate-600 mb-1">Lugar: {evento.lugar}</div>
+                    <div className="text-xs text-slate-400">{evento.observacion}</div>
+                  </div>
+                ))
+              ) : (
+                <div className="flex flex-col items-center justify-center py-8 px-4 rounded-2xl border-2 border-dashed border-slate-100 bg-slate-50/50">
+                  <LayoutDashboard className="w-8 h-8 text-slate-200 mb-2" />
+                  <p className="text-xs text-slate-400 text-center italic">No hay actividades pendientes.</p>
+                </div>
+              )}
+            </div>
+            <button
+              className="mt-6 w-full py-3 rounded-xl font-bold text-sm transition-all border-2 border-transparent group-hover:border-current text-rose-700 bg-slate-50 hover:bg-white"
+              onClick={() => {
+                if (actividades.length > 0) {
+                  setEventoSeleccionado(actividades[0]);
+                  setShowModal(true);
+                }
+              }}
+            >
+              Ver Detalles
+            </button>
+          </div>
+
+          {/* Modal flotante para detalles de actividad */}
+          {showModal && eventoSeleccionado && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-20 backdrop-blur-sm">
+              <div className="bg-white rounded-3xl shadow-2xl p-8 max-w-md w-full relative animate-in fade-in slide-in-from-top-4">
+                <button
+                  className="absolute top-4 right-4 text-rose-500 hover:text-rose-700 text-xl font-bold"
+                  onClick={() => setShowModal(false)}
+                  aria-label="Cerrar"
+                >
+                  ×
+                </button>
+                <h2 className="text-2xl font-bold text-rose-700 mb-4">Detalles de Actividad</h2>
+                <div className="mb-2">
+                  <span className="font-semibold text-slate-700">Nombre:</span> {eventoSeleccionado.nombre}
+                </div>
+                <div className="mb-2">
+                  <span className="font-semibold text-slate-700">Fecha:</span> {eventoSeleccionado.fecha}
+                </div>
+                <div className="mb-2">
+                  <span className="font-semibold text-slate-700">Lugar:</span> {eventoSeleccionado.lugar}
+                </div>
+                <div className="mb-2">
+                  <span className="font-semibold text-slate-700">Observación:</span> {eventoSeleccionado.observacion}
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Footer Informativo o Acceso Rápido */}

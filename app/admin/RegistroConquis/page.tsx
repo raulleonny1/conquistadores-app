@@ -1,12 +1,12 @@
 export const dynamic = "force-dynamic";
 
 import { Suspense } from "react";
-import MiembrosPageInner from "./MiembrosPageInner";
+import RegistroConquisPageInner from "./RegistroConquisPageInner";
 
-export default function MiembrosPage() {
+export default function RegistroConquisPage() {
   return (
     <Suspense fallback={<div>Cargando...</div>}>
-      <MiembrosPageInner />
+      <RegistroConquisPageInner />
     </Suspense>
   );
 }
