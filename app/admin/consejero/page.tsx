@@ -75,7 +75,7 @@ export default function ConsejeroPage() {
   return (
     <div className="bg-white rounded-2xl shadow-xl p-8 w-full max-w-md flex flex-col items-center mx-auto mt-12">
       <button
-        onClick={() => window.location.href = '/admin'}
+        onClick={() => window.location.href = '/admin/registros'}
         className="mb-4 bg-green-700 text-white px-6 py-2 rounded-full font-semibold shadow hover:bg-green-900 transition self-start"
       >
         Regresar al menú principal

@@ -35,95 +35,50 @@ const AdminPage = () => {
   const [loadingPins, setLoadingPins] = useState(false);
 
   const [menuItems, setMenuItems] = useState([
-                    {
-                      id: 'directiva',
-                      title: 'Directiva del club',
-                      description: 'Gestión y registro de la directiva del club.',
-                      icon: <Users className="w-8 h-8 text-fuchsia-600" />,
-                      color: 'border-fuchsia-500 text-fuchsia-600',
-                      bgColor: 'bg-fuchsia-50',
-                      hoverColor: 'hover:shadow-fuchsia-200'
-                    },
-            {
-              id: 'especialidadesEnCurso',
-              title: 'Especialidades en curso',
-              description: 'Visualiza y gestiona las especialidades que están en proceso.',
-              icon: <ShieldCheck className="w-8 h-8 text-indigo-600" />,
-              color: 'border-indigo-500 text-indigo-600',
-              bgColor: 'bg-indigo-50',
-              hoverColor: 'hover:shadow-indigo-200'
-            },
-        {
-          id: 'rankin',
-          title: 'Rankin',
-          description: 'Consulta el ranking de miembros, unidades o actividades.',
-          icon: <Settings className="w-8 h-8 text-yellow-500" />,
-          color: 'border-yellow-500 text-yellow-500',
-          bgColor: 'bg-yellow-50',
-          hoverColor: 'hover:shadow-yellow-200'
-        },
-        {
-          id: 'frases',
-          title: 'Frases para la semana',
-          description: 'Inspira a tu club con frases motivadoras cada semana.',
-          icon: <Calendar className="w-8 h-8 text-cyan-600" />,
-          color: 'border-cyan-500 text-cyan-600',
-          bgColor: 'bg-cyan-50',
-          hoverColor: 'hover:shadow-cyan-200'
-        },
     {
-      id: 'aspirante',
-      title: 'Aspirante a Guía Mayor',
-      description: 'Gestiona y registra el avance de aspirantes hacia Guía Mayor.',
-      icon: <UserCircle className="w-8 h-8 text-orange-600" />,
-      color: 'border-orange-500 text-orange-600',
-      bgColor: 'bg-orange-50',
-      hoverColor: 'hover:shadow-orange-200'
+      id: 'registros',
+      title: 'Registros',
+      description: 'Tarjeta para guardar y visualizar todos los registros.',
+      icon: <ClipboardList className="w-8 h-8 text-teal-600" />,
+      color: 'border-teal-500 text-teal-600',
+      bgColor: 'bg-teal-50',
+      hoverColor: 'hover:shadow-teal-200'
     },
     {
-      id: 'RegistroConquis',
-      title: 'RegistroConquis',
-      description: 'Inscribir y gestionar datos de los conquistadores.',
-      icon: <Users className="w-8 h-8" />,
-      color: 'border-blue-500 text-blue-600',
-      bgColor: 'bg-blue-50',
-      hoverColor: 'hover:shadow-blue-200'
+      id: 'directiva',
+      title: 'Directiva del club',
+      description: 'Gestión y registro de la directiva del club.',
+      icon: <Users className="w-8 h-8 text-fuchsia-600" />,
+      color: 'border-fuchsia-500 text-fuchsia-600',
+      bgColor: 'bg-fuchsia-50',
+      hoverColor: 'hover:shadow-fuchsia-200'
     },
     {
-      id: 'unidades',
-      title: 'Unidades',
-      description: 'Gestión de unidades, nombres y liderazgo.',
-      icon: <LayoutGrid className="w-8 h-8" />,
-      color: 'border-purple-500 text-purple-600',
-      bgColor: 'bg-purple-50',
-      hoverColor: 'hover:shadow-purple-200'
+      id: 'especialidadesEnCurso',
+      title: 'Especialidades en curso',
+      description: 'Visualiza y gestiona las especialidades que están en proceso.',
+      icon: <ShieldCheck className="w-8 h-8 text-indigo-600" />,
+      color: 'border-indigo-500 text-indigo-600',
+      bgColor: 'bg-indigo-50',
+      hoverColor: 'hover:shadow-indigo-200'
     },
     {
-      id: 'consejero',
-      title: 'Consejero',
-      description: 'Registrar consejero y asignar clases.',
-      icon: <ClipboardList className="w-8 h-8 text-green-600" />,
-      color: 'border-green-500 text-green-600',
-      bgColor: 'bg-green-50',
-      hoverColor: 'hover:shadow-green-200'
+      id: 'rankin',
+      title: 'Rankin',
+      description: 'Consulta el ranking de miembros, unidades o actividades.',
+      icon: <Settings className="w-8 h-8 text-yellow-500" />,
+      color: 'border-yellow-500 text-yellow-500',
+      bgColor: 'bg-yellow-50',
+      hoverColor: 'hover:shadow-yellow-200'
     },
     {
-      id: 'especialidades',
-      title: 'Registro de especialidades',
-      description: 'Seguimiento de requisitos y parches aprobados.',
-      icon: <ShieldCheck className="w-8 h-8" />,
-      color: 'border-amber-500 text-amber-600',
-      bgColor: 'bg-amber-50',
-      hoverColor: 'hover:shadow-amber-200'
-    },
-    {
-      id: 'calificaciones',
-      title: 'Calificaciones',
-      description: 'Registro y consulta de calificaciones de los miembros.',
-      icon: <Settings className="w-8 h-8 text-pink-600" />,
-      color: 'border-pink-500 text-pink-600',
-      bgColor: 'bg-pink-50',
-      hoverColor: 'hover:shadow-pink-200'
+      id: 'frases',
+      title: 'Frases para la semana',
+      description: 'Inspira a tu club con frases motivadoras cada semana.',
+      icon: <Calendar className="w-8 h-8 text-cyan-600" />,
+      color: 'border-cyan-500 text-cyan-600',
+      bgColor: 'bg-cyan-50',
+      hoverColor: 'hover:shadow-cyan-200'
     },
     {
       id: 'calendario',
@@ -133,7 +88,17 @@ const AdminPage = () => {
       color: 'border-emerald-500 text-emerald-600',
       bgColor: 'bg-emerald-50',
       hoverColor: 'hover:shadow-emerald-200'
+    },
+    {
+      id: 'calificaciones',
+      title: 'Calificaciones',
+      description: 'Registro y consulta de calificaciones de los miembros.',
+      icon: <Settings className="w-8 h-8 text-pink-600" />,
+      color: 'border-pink-500 text-pink-600',
+      bgColor: 'bg-pink-50',
+      hoverColor: 'hover:shadow-pink-200'
     }
+    // Las tarjetas de registro (aspirante, RegistroConquis, unidades, consejero, especialidades, calificaciones, calendario) solo deben aparecer en /admin/registros
   ]);
   // dnd-kit sortable item
   function SortableMenuCard({ item, index }: { item: any, index: number }) {
@@ -154,6 +119,40 @@ const AdminPage = () => {
 
     // Solución: solo navegar si no se está arrastrando
     let dragStarted = false;
+    if (item.id === 'registros') {
+      return (
+        <div
+          ref={setNodeRef}
+          style={style}
+          {...attributes}
+          {...listeners}
+          key={item.id}
+          onPointerDown={() => { dragStarted = false; }}
+          onPointerMove={() => { dragStarted = true; }}
+          onPointerUp={() => {
+            if (!dragStarted) {
+              router.push('/admin/registros');
+            }
+          }}
+          className={`group relative bg-white p-8 rounded-3xl border-2 ${item.color.split(' ')[0]} transition-all duration-500 cursor-pointer overflow-hidden shadow-sm hover:shadow-xl hover:-translate-y-2 flex flex-col items-center text-center`}
+        >
+          <div className={`absolute -bottom-10 -right-10 w-24 h-24 rounded-full ${item.bgColor} opacity-0 group-hover:opacity-100 transition-all duration-500 scale-150`}></div>
+          <div className={`relative z-10 p-4 rounded-2xl ${item.bgColor} ${item.color.split(' ')[1]} mb-6 transition-transform duration-500 group-hover:scale-110 group-hover:rotate-3`}>
+            {item.icon}
+          </div>
+          <h3 className="relative z-10 text-xl font-bold text-slate-800 mb-3">
+            {item.title}
+          </h3>
+          <p className="relative z-10 text-sm text-slate-500 leading-relaxed mb-6">
+            {item.description}
+          </p>
+          <div className={`relative z-10 flex items-center gap-1 font-bold text-xs uppercase tracking-widest ${item.color.split(' ')[1]}`}>
+            Gestionar <ChevronRight className="w-3 h-3" />
+          </div>
+        </div>
+      );
+    }
+    // ...existing code...
     return (
       <div
         ref={setNodeRef}
@@ -179,12 +178,12 @@ const AdminPage = () => {
               router.push('/admin/calificaciones');
             } else if (item.id === 'calendario') {
               router.push('/admin/calendario');
-                } else if (item.id === 'aspirante') {
-                  router.push('/admin/aspirante');
-                } else if (item.id === 'directiva') {
-                  router.push('/admin/directiva');
-                } else {
-                  setActiveTab(item.id);
+            } else if (item.id === 'aspirante') {
+              router.push('/admin/aspirante');
+            } else if (item.id === 'directiva') {
+              router.push('/admin/directiva');
+            } else {
+              setActiveTab(item.id);
             }
           }
         }}
@@ -232,6 +231,13 @@ const AdminPage = () => {
         <div className="text-center py-8 text-purple-700 font-semibold">Gestión de unidades (próximamente)</div>
       );
     }
+    // Eliminado: las tarjetas de registro ahora están en /admin/registros
+    // ...existing code...
+    if (activeTab === 'unidades') {
+      return (
+        <div className="text-center py-8 text-purple-700 font-semibold">Gestión de unidades (próximamente)</div>
+      );
+    }
     if (activeTab === 'especialidades') {
       return (
         <div className="text-center py-8 text-amber-600 font-semibold">Gestión de especialidades (próximamente)</div>
@@ -271,6 +277,7 @@ const AdminPage = () => {
       router.push('/admin/RegistroConquis');
       return null;
     }
+    // Las tarjetas de registro han sido removidas de este panel. Ahora solo están en /admin/registros.
     return null;
   };
 
@@ -341,7 +348,7 @@ const AdminPage = () => {
                 </DndContext>
 
                 {/* Contenido del tab activo */}
-                {activeTab && activeTab !== 'miembros' && (
+                {activeTab && activeTab !== 'miembros' && activeTab !== 'registros' && (
                   <div className="mt-12">
                     {renderTabContent()}
                   </div>

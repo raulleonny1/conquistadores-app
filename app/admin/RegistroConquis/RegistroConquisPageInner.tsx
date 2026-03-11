@@ -126,7 +126,7 @@ export default function RegistroConquisPageInner() {
       <h2 className="text-2xl font-black mb-6 text-indigo-700 text-center">RegistroConquis</h2>
       <div className="mb-6 flex justify-center">
         <button
-          onClick={() => window.location.href = "/admin"}
+          onClick={() => window.location.href = "/admin/registros"}
           className="bg-blue-600 text-white px-6 py-2 rounded-xl font-bold text-sm hover:bg-blue-700 transition-all shadow-md"
         >
           Regresar al menú

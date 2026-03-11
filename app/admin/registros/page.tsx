@@ -1,0 +1,21 @@
+"use client";
+import { useRouter } from "next/navigation";
+
+export default function RegistrosPage() {
+  const router = useRouter();
+  return (
+    <div className="min-h-screen bg-slate-50 font-sans text-slate-900 flex flex-col items-center justify-center">
+      <div className="max-w-4xl mx-auto bg-white border-l-4 border-teal-500 rounded-xl shadow p-8 flex flex-col items-center mb-4">
+        <h2 className="text-2xl font-bold text-teal-700 mb-6">Registros</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full mb-8">
+          <button onClick={() => router.push('/admin/RegistroConquis')} className="bg-blue-50 border border-blue-500 text-blue-600 rounded-xl p-6 font-bold shadow hover:bg-blue-100 transition-all text-lg">Registro Conquis</button>
+          <button onClick={() => router.push('/admin/aspirante')} className="bg-orange-50 border border-orange-500 text-orange-600 rounded-xl p-6 font-bold shadow hover:bg-orange-100 transition-all text-lg">Aspirante a Guía Mayor</button>
+          <button onClick={() => router.push('/admin/unidades')} className="bg-purple-50 border border-purple-500 text-purple-600 rounded-xl p-6 font-bold shadow hover:bg-purple-100 transition-all text-lg">Unidades</button>
+          <button onClick={() => router.push('/admin/especialidades')} className="bg-amber-50 border border-amber-500 text-amber-600 rounded-xl p-6 font-bold shadow hover:bg-amber-100 transition-all text-lg">Registro de Especialidades</button>
+          <button onClick={() => router.push('/admin/consejero')} className="bg-green-50 border border-green-500 text-green-600 rounded-xl p-6 font-bold shadow hover:bg-green-100 transition-all text-lg">Consejeros</button>
+        </div>
+        <button onClick={() => router.push('/admin')} className="mt-4 bg-teal-600 text-white px-6 py-2 rounded font-bold shadow hover:bg-teal-800 transition">Regresar al menú</button>
+      </div>
+    </div>
+  );
+}

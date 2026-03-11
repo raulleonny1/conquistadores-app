@@ -87,7 +87,7 @@ export default function UnidadesPage() {
       {/* Botón regresar */}
       <div className="w-full max-w-2xl flex justify-end mb-4">
         <button
-          onClick={() => router.push("/admin")}
+          onClick={() => router.push("/admin/registros")}
           className="bg-slate-200 hover:bg-purple-100 text-purple-700 font-semibold px-6 py-2 rounded-full shadow transition"
         >
           Regresar al menú

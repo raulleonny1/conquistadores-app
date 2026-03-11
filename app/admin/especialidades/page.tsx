@@ -143,7 +143,7 @@ export default function Page() {
   return (
     <div className="max-w-xl mx-auto mt-10">
       <button
-        onClick={() => window.location.href = '/admin'}
+        onClick={() => window.location.href = '/admin/registros'}
         className="bg-indigo-600 text-white font-bold px-6 py-2 rounded-xl mb-6 hover:bg-indigo-800 transition-all"
       >
         Retornar a Admin
