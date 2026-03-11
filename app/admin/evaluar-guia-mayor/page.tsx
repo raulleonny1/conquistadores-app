@@ -5,6 +5,14 @@ import { collection, onSnapshot, query, where, addDoc, getDocs, updateDoc, doc }
 import { actividadesBase } from "./actividadesBase";
 import { tarjetaGuiaMayor } from "../../../src/data/tarjetaGuiaMayor";
 
+type TarjetaDoc = {
+  id: string;
+  estado: string;
+  progreso: number;
+  fechaInicio: string;
+  nombre?: string;
+};
+
 const EvaluarGuiaMayorPage = () => {
     // Guardar actividad en evaluacionesGuiaMayor
     const guardarActividad = async (actividad: string, estado: boolean) => {
@@ -31,7 +39,7 @@ const EvaluarGuiaMayorPage = () => {
   const [aspirantes, setAspirantes] = useState<any[]>([]);
   const [aspiranteId, setAspiranteId] = useState("");
   const [evaluador, setEvaluador] = useState("");
-  const [tarjeta, setTarjeta] = useState<any | null>(null);
+  const [tarjeta, setTarjeta] = useState<TarjetaDoc | null>(null);
   const [actividades, setActividades] = useState<any[]>([]);
   const [evaluaciones, setEvaluaciones] = useState<any[]>([]);
 
@@ -53,7 +61,7 @@ const EvaluarGuiaMayorPage = () => {
       // Buscar tarjeta
       const q = query(collection(db, "tarjetaGuiaMayor"), where("aspiranteId", "==", aspiranteId));
       const snap = await getDocs(q);
-      let tarjetaDoc = snap.docs.length > 0 ? { id: snap.docs[0].id, ...snap.docs[0].data() } : null;
+      let tarjetaDoc: TarjetaDoc | null = snap.docs.length > 0 ? { id: snap.docs[0].id, ...snap.docs[0].data() } : null;
       // Si no existe, crearla
       if (!tarjetaDoc) {
         const aspirante = aspirantes.find(a => a.id === aspiranteId);

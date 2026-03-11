@@ -12,6 +12,7 @@ import {
   setDoc
 } from "firebase/firestore";
 import { tarjetaGuiaMayor } from "@/src/data/tarjetaGuiaMayor";
+import { TarjetaGuiaMayor } from "@/src/types";
 import FirmaDigital from "@/src/components/FirmaDigital";
 import { guardarFirma } from "@/src/lib/guardarFirma";
 import { ArrowLeft } from "lucide-react";
@@ -40,6 +41,7 @@ const AspirantePage = () => {
     const [actividades, setActividades] = useState<Array<{nombre:string,completado:boolean,evaluador:string,fecha:string,hora:string,firma:string}>>([]);
     const [firmaIndex, setFirmaIndex] = useState<number | null>(null);
     const [evaluador, setEvaluador] = useState<string>("");
+    let tarjetaDoc: TarjetaGuiaMayor;
       const seleccionarAspirante = async (aspirante:any) => {
         setAspiranteId(aspirante.id);
         setEvaluador(aspirante.evaluador || "");
