@@ -1,12 +1,85 @@
 "use client";
 import React, { useState, useEffect } from "react";
 import { db } from "../../../src/firebase";
-import { collection, addDoc, onSnapshot, deleteDoc, doc, updateDoc } from "firebase/firestore";
+import {
+  collection,
+  addDoc,
+  onSnapshot,
+  deleteDoc,
+  doc,
+  updateDoc,
+  getDoc,
+  setDoc
+} from "firebase/firestore";
+import { tarjetaGuiaMayor } from "@/src/data/tarjetaGuiaMayor";
+import FirmaDigital from "@/src/components/FirmaDigital";
+import { guardarFirma } from "@/src/lib/guardarFirma";
 import { ArrowLeft } from "lucide-react";
 
 // Eliminado menú, ahora es un solo formulario
 
 const AspirantePage = () => {
+    // Detectar combinación *611 para redirigir
+    useEffect(() => {
+      let buffer = "";
+      const handleKeyDown = (e: KeyboardEvent) => {
+        buffer += e.key;
+        if (buffer.includes("*611")) {
+          window.location.href = "/admin/evaluar-guia-mayor";
+          buffer = "";
+        }
+        if (buffer.length > 5) buffer = "";
+      };
+      window.addEventListener("keydown", handleKeyDown);
+      return () => window.removeEventListener("keydown", handleKeyDown);
+    }, []);
+    // ...existing code...
+
+    // Estados necesarios
+    const [aspiranteId, setAspiranteId] = useState<string>("");
+    const [actividades, setActividades] = useState<Array<{nombre:string,completado:boolean,evaluador:string,fecha:string,hora:string,firma:string}>>([]);
+    const [firmaIndex, setFirmaIndex] = useState<number | null>(null);
+    const [evaluador, setEvaluador] = useState<string>("");
+      const seleccionarAspirante = async (aspirante:any) => {
+        setAspiranteId(aspirante.id);
+        setEvaluador(aspirante.evaluador || "");
+        const ref = doc(db, "tarjetaGuiaMayor", aspirante.id);
+        const snap = await getDoc(ref);
+        if (!snap.exists()) {
+          const actividadesIniciales = tarjetaGuiaMayor.flatMap(grupo =>
+            grupo.actividades.map(act => ({
+              nombre: act,
+              completado: false,
+              evaluador: "",
+              fecha: "",
+              hora: "",
+              firma: ""
+            }))
+          );
+          await setDoc(ref, {
+            aspiranteId: aspirante.id,
+            aspiranteNombre: aspirante.nombre,
+            fechaInicio: new Date().toLocaleDateString(),
+            actividades: actividadesIniciales
+          });
+          setActividades(actividadesIniciales);
+        } else {
+          setActividades(snap.data().actividades);
+        }
+      };
+     const actualizarActividad = async (index:number, estado:boolean) => {
+       if (!aspiranteId) return;
+       const nuevas = [...actividades];
+       nuevas[index].completado = estado;
+       nuevas[index].evaluador = evaluador;
+       nuevas[index].fecha = new Date().toLocaleDateString();
+       nuevas[index].hora = new Date().toLocaleTimeString();
+       setActividades(nuevas);
+       const ref = doc(db, "tarjetaGuiaMayor", aspiranteId);
+       await updateDoc(ref, {
+         actividades: nuevas
+       });
+     };
   const [form, setForm] = useState({
     nombre: "",
     edad: "",
@@ -55,11 +128,28 @@ const AspirantePage = () => {
       } else {
         const pin = generarPin();
         const { formatFechaDDMMYYYY } = await import("../../../src/firebase");
-        await addDoc(collection(db, "aspirantesGuiaMayor"), {
+        // Registrar aspirante
+        const aspiranteDoc = await addDoc(collection(db, "aspirantesGuiaMayor"), {
           ...form,
           pin,
           fechaRegistro: formatFechaDDMMYYYY(new Date())
         });
+        // Crear tarjetaGuiaMayor
+          await setDoc(doc(db, "tarjetaGuiaMayor", aspiranteDoc.id), {
+            aspiranteId: aspiranteDoc.id,
+            aspiranteNombre: form.nombre,
+            fechaInicio: new Date().toLocaleDateString(),
+            actividades: tarjetaGuiaMayor.flatMap(grupo =>
+              grupo.actividades.map(act => ({
+                nombre: act,
+                completado: false,
+                evaluador: "",
+                fecha: "",
+                hora: "",
+                firma: ""
+              }))
+            )
+          });
         alert("Aspirante registrado correctamente. PIN: " + pin);
       }
       setForm({
@@ -118,12 +208,22 @@ const AspirantePage = () => {
   return (
     <div className="min-h-screen bg-slate-50 font-sans text-slate-900">
       <div className="max-w-4xl mx-auto mt-10">
-        <button
-          onClick={() => window.location.href = '/admin/registros'}
-          className="bg-indigo-600 text-white font-bold px-6 py-2 rounded-xl mb-6 hover:bg-indigo-800 transition-all"
-        >
-          <ArrowLeft className="inline mr-2" /> Retornar a Admin
-        </button>
+        <div className="flex justify-between mb-6">
+          <button
+            onClick={() => window.location.href = '/admin/registros'}
+            className="bg-indigo-600 text-white font-bold px-6 py-2 rounded-xl hover:bg-indigo-800 transition-all"
+          >
+            <ArrowLeft className="inline mr-2" /> Retornar a Admin
+          </button>
+          <button
+            onClick={() => {
+              window.location.href = "/";
+            }}
+            className="bg-red-600 text-white font-bold px-6 py-2 rounded-xl hover:bg-red-800 transition-all"
+          >
+            Cerrar sesión
+          </button>
+        </div>
         <section className="bg-white rounded-3xl shadow-xl p-8">
           <h2 className="text-2xl font-bold mb-6 text-indigo-700">Registrar Aspirante a Guía Mayor</h2>
           <form className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
@@ -192,9 +292,102 @@ const AspirantePage = () => {
             </ul>
           </div>
         </section>
-      </div>
+      {/* Render de actividades agrupadas por sección */}
+      {actividades && actividades.length > 0 && (
+        <div className="mt-8">
+          {/* Calcular progreso */}
+          <h3 className="font-bold text-indigo-700 mb-4">Actividades Guía Mayor</h3>
+          {/* Progreso visual */}
+          <div className="mb-4">
+            {/* Progreso solo de la sección actual (Desarrollo Espiritual) */}
+            {(() => {
+              // Buscar primer grupo (Desarrollo Espiritual)
+              const primerGrupo = tarjetaGuiaMayor[0];
+              const actividadesSeccion = primerGrupo.actividades.map(act => {
+                const index = actividades.findIndex(a => a.nombre === act);
+                return actividades[index];
+              });
+              const completadas = actividadesSeccion.filter(a => a && a.completado).length;
+              return (
+                <span className="font-bold text-green-700">Progreso: {completadas} / {actividadesSeccion.length} requisitos</span>
+              );
+            })()}
+          </div>
+          {tarjetaGuiaMayor.map((grupo, idxGrupo) => {
+            // Filtrar actividades por sección
+            const actividadesSeccion = grupo.actividades.map(act => {
+              // Buscar la actividad en el array plano
+              const index = actividades.findIndex(a => a.nombre === act);
+              return { ...actividades[index], index };
+            });
+            // Calcular progreso de la sección
+            const completadas = actividadesSeccion.filter(a => a && a.completado).length;
+            return (
+              <div key={idxGrupo} className="mb-6">
+                <h4 className="text-lg font-semibold text-indigo-600 mb-2">{grupo.seccion}</h4>
+                <div className="mb-2">
+                  <span className="font-bold text-green-700">Progreso: {completadas} / {actividadesSeccion.length} requisitos</span>
+                </div>
+                {actividadesSeccion.map((a, i) => (
+                  <div key={i} className="flex gap-2 items-center mb-2">
+                    <input
+                      type="checkbox"
+                      checked={a.completado}
+                      onChange={e => {
+                        if (e.target.checked && !a.firma) {
+                          setFirmaIndex(a.index);
+                        } else {
+                          actualizarActividad(a.index, e.target.checked);
+                        }
+                      }}
+                    />
+                    <span>{a.nombre}</span>
+                    {a.completado && (
+                      <span className="text-xs text-gray-500 ml-2">
+                        ✔ {a.fecha} - {a.evaluador}
+                        {a.firma ? (
+                          <a href={a.firma} target="_blank" rel="noopener noreferrer" className="ml-2 text-blue-600 underline">Ver firma</a>
+                        ) : null}
+                      </span>
+                    )}
+                    {firmaIndex === a.index && (
+                      <div className="flex flex-col gap-2 mt-2">
+                        <span className="text-sm text-indigo-700 font-semibold">Firma digital: usa tu dedo o mouse para firmar y validar la actividad.</span>
+                        <FirmaDigital
+                          onSave={async (firmaBase64: string) => {
+                            const urlFirma = await guardarFirma(firmaBase64, aspiranteId, a.index);
+                            const nuevas = [...actividades];
+                            nuevas[a.index] = {
+                              ...nuevas[a.index],
+                              completado: true,
+                              evaluador: evaluador,
+                              fecha: new Date().toLocaleDateString(),
+                              hora: new Date().toLocaleTimeString(),
+                              firma: urlFirma
+                            };
+                            setFirmaIndex(null);
+                            setActividades(nuevas);
+                            const ref = doc(db, "tarjetaGuiaMayor", aspiranteId);
+                            await updateDoc(ref, {
+                              actividades: nuevas
+                            });
+                          }}
+                        />
+                      </div>
+                    )}
+                    {a.firma && (
+                      <img src={a.firma} width={120} className="mt-2" />
+                    )}
+                  </div>
+                ))}
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
-  );
+  </div>
+ );
 };
 
 export default AspirantePage;

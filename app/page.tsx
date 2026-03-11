@@ -36,7 +36,7 @@ export default function Home() {
       }
       if (pin === '*611') {
         setError('');
-        router.push('/admin/aspirante-avance');
+        router.push('/admin/evaluar-guia-mayor');
         return;
       }
       (async () => {
