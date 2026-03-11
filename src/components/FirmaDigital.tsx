@@ -12,11 +12,11 @@ export default function FirmaDigital({ onSave }: FirmaDigitalProps) {
   const sigRef = useRef(null)
 
   const guardarFirma = () => {
-    const firma = sigRef.current
+    if (!sigRef.current) return;
+    const firma = (sigRef.current as SignatureCanvas)
       .getTrimmedCanvas()
-      .toDataURL("image/png")
-
-    onSave(firma)
+      .toDataURL("image/png");
+    onSave(firma);
   }
 
   return (
