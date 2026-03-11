@@ -44,8 +44,8 @@ export default function Home() {
           router.push(`/consejero/${consejeroDoc.id}`);
           return;
         }
-        // Buscar miembro conquistador con ese PIN
-        const qMiembro = query(collection(db, 'conquistadores'), where('pin', '==', pin));
+        // Buscar miembro conquistador con ese PIN en la colección correcta
+        const qMiembro = query(collection(db, 'RegistroConquis'), where('pin', '==', pin));
         const snapshotMiembro = await getDocs(qMiembro);
         if (!snapshotMiembro.empty) {
           setError('');
@@ -72,12 +72,12 @@ export default function Home() {
         Tu navegador no soporta el video de fondo.
       </video>
       {/* Overlay para glassmorphism */}
-      <div className="absolute inset-0 bg-gradient-to-b from-slate-900/40 via-indigo-900/60 to-slate-900/90 z-0" />
+      <div className="absolute inset-0 bg-linear-to-b from-slate-900/40 via-indigo-900/60 to-slate-900/90 z-0" />
       {/* Contenido principal */}
       <div className="relative z-10 w-full max-w-md px-6 py-8 flex flex-col items-center">
         {/* Logo y encabezado */}
         <div className="mb-8 text-center animate-in fade-in slide-in-from-bottom-4 duration-700">
-          <div className="bg-white/20 backdrop-blur-xl p-4 rounded-[2rem] border border-white/30 inline-flex mb-4 shadow-2xl shadow-indigo-500/20">
+          <div className="bg-white/20 backdrop-blur-xl p-4 rounded-4xl border border-white/30 inline-flex mb-4 shadow-2xl shadow-indigo-500/20">
             <Image src="/logoconquis.png" alt="Logo Conquistadores" width={80} height={80} className="w-20 h-20" />
           </div>
           <h1 className="text-white text-3xl font-black tracking-tight mb-1">

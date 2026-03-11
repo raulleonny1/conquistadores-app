@@ -1,32 +1,52 @@
+"use client";
 import React, { useState, useEffect } from 'react';
+import { onSnapshot, doc } from 'firebase/firestore';
 import EventosSidebar from './EventosSidebar';
 import { db } from '../../src/firebase';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { getAuth, signOut } from 'firebase/auth';
 import { useSearchParams } from 'next/navigation';
-import { 
-	Trophy, 
-	Calendar, 
-	Star, 
-	BookOpen, 
-	LogOut, 
-	Bell, 
-	ChevronRight,
+import {
 	Medal,
+	Trophy,
+	Calendar,
+	Star,
+	BookOpen,
+	LogOut,
+	Bell,
+	ChevronRight,
 	Map,
 	CheckCircle2,
 	Clock,
 	ShieldCheck,
 	TrendingUp
 } from 'lucide-react';
+// Medal se importa solo una vez
+
+// Mapeo simple de especialidades a emojis (puedes expandirlo según tus necesidades)
+const iconosEspecialidades: Record<string, string> = {
+	"Vida al Aire Libre": "🏕️",
+	"Fogatas y Cocina": "🔥",
+	"Nudos y Amarres": "🪢",
+	"Primeros Auxilios": "⛑️",
+	"Exploración": "🧭",
+	"Naturaleza": "🌳",
+	"Cocina": "🍳",
+	"Deportes": "⚽",
+	// ...agrega más según tus especialidades
+};
 
 const App = () => {
+		const [frasesSemana, setFrasesSemana] = useState<any[]>([]);
+		const [fraseHoy, setFraseHoy] = useState<{ frase: string, hora: string } | null>(null);
 	const searchParams = useSearchParams();
 	const pin = searchParams.get('pin') || '';
 
 	const [user, setUser] = useState<any>(null);
+	const [especialidades, setEspecialidades] = useState<string[]>([]);
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState('');
+	const [tipo, setTipo] = useState<string>(""); // 'conquistador' o 'consejero'
 
 	// Simulación de eventos y calificaciones
 	const proximosEventos = [
@@ -38,30 +58,71 @@ const App = () => {
 		{ id: 2, materia: "Primeros Auxilios", nota: "Aprobado", icono: <div className="p-2 bg-emerald-100 text-emerald-600 rounded-lg"><Medal size={20}/></div> }
 	];
 
+
 	useEffect(() => {
+		// Notificación de frases de la semana
+		const frasesDoc = doc(db, 'frasesSemana', 'actual');
+		const unsubFrases = onSnapshot(frasesDoc, (snap) => {
+			const data = snap.data();
+			if (data && Array.isArray(data.frases)) {
+				setFrasesSemana(data.frases);
+				const hoy = new Date();
+				const diaSemana = hoy.getDay();
+				const idx = diaSemana === 0 ? 6 : diaSemana - 1;
+				setFraseHoy(data.frases[idx] || null);
+			}
+		});
+
 		if (!pin) {
 			setError('No se proporcionó PIN');
 			setLoading(false);
 			return;
 		}
+
 		const fetchUser = async () => {
 			try {
-				const q = query(collection(db, 'RegistroConquis'), where('pin', '==', pin));
-				const snap = await getDocs(q);
-				console.log('Consulta Firestore:', q);
-				console.log('Docs encontrados:', snap.docs.map(doc => doc.data()));
-				if (!snap.empty) {
-					setUser(snap.docs[0].data());
-				} else {
-					setError('No existe el conquistador con ese PIN');
+				const qConquis = query(collection(db, 'RegistroConquis'), where('pin', '==', pin));
+				const snapConquis = await getDocs(qConquis);
+				if (!snapConquis.empty) {
+					const data = snapConquis.docs[0].data();
+					setUser(data);
+					setTipo('conquistador');
+					let esp = data.especialidades;
+					if (typeof esp === 'string') {
+						esp = esp.split(',').map((e: string) => e.trim()).filter(Boolean);
+					}
+					setEspecialidades(Array.isArray(esp) ? esp : []);
+					setLoading(false);
+					return;
 				}
+
+				const qConsejero = query(collection(db, 'consejeros'), where('pin', '==', pin));
+				const snapConsejero = await getDocs(qConsejero);
+				if (!snapConsejero.empty) {
+					const data = snapConsejero.docs[0].data();
+					setUser(data);
+					setTipo('consejero');
+					let esp = data.especialidades;
+					if (typeof esp === 'string') {
+						esp = esp.split(',').map((e: string) => e.trim()).filter(Boolean);
+					}
+					setEspecialidades(Array.isArray(esp) ? esp : []);
+					setLoading(false);
+					return;
+				}
+
+				setError('No existe usuario con ese PIN.');
 			} catch (e) {
 				setError('Error al consultar datos');
 				console.error('Error Firestore:', e);
 			}
 			setLoading(false);
 		};
+
 		fetchUser();
+
+		// cleanup SIEMPRE al final
+		return () => unsubFrases();
 	}, [pin]);
 
 	const handleLogout = () => {
@@ -75,11 +136,20 @@ const App = () => {
 		return <div className="text-center mt-10 text-lg text-indigo-700">Cargando datos...</div>;
 	}
 	if (error) {
-		return <div className="text-center mt-10 text-lg text-red-700">{error}</div>;
+		return <div className="text-center mt-10 text-lg text-red-700 font-bold">{error}<br/><span className="text-xs text-slate-500">PIN ingresado: {pin}</span></div>;
 	}
 
 	return (
-		<div className="min-h-screen bg-[#F8FAFC] font-sans text-slate-900 pb-10">
+		<>
+			{/* Notificación de frase de la semana */}
+			{fraseHoy && fraseHoy.frase && (
+				<div className="max-w-2xl mx-auto mt-6 mb-8 bg-cyan-100 border-l-4 border-cyan-500 rounded-xl shadow p-6 flex flex-col items-center animate-in fade-in slide-in-from-top-4">
+					<h3 className="text-xl font-bold text-cyan-700 mb-2">Frase para hoy</h3>
+					<p className="text-cyan-900 text-lg font-semibold text-center mb-2">{fraseHoy.frase}</p>
+					<span className="text-xs text-cyan-600">Se publicará a las {fraseHoy.hora || 'hora no definida'}</span>
+				</div>
+			)}
+			<div className="min-h-screen bg-[#F8FAFC] font-sans text-slate-900 pb-10">
 			{/* Fondo Decorativo - Gradiente Superior dinámico */}
 			<div className="absolute top-0 left-0 w-full h-80 md:h-64 bg-linear-to-br from-indigo-600 via-purple-600 to-pink-500 z-0 opacity-95 rounded-b-4xl md:rounded-none" />
 
@@ -127,11 +197,11 @@ const App = () => {
 							<Star className="text-amber-500 fill-amber-500" size={32} />
 						</div>
 						<div className="text-left">
-							<p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] leading-none mb-1">Tu Rango Actual</p>
-							<p className="text-xl font-black text-slate-800 leading-none mb-1">{user.rango || 'Sin rango'}</p>
-							<div className="flex items-center gap-2 text-indigo-600 font-black">
+							<p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] leading-none mb-1">Tu Rol</p>
+							<p className="text-xl font-black text-slate-800 leading-none mb-1">{tipo === 'conquistador' ? 'Conquistador' : 'Consejero'}</p>
+							<div className="flex items-center gap-2 text-green-600 font-black">
 								<TrendingUp size={16} />
-								<span className="text-sm tracking-tight">{user.puntos ? user.puntos.toLocaleString() : 0} PUNTOS XP</span>
+								<span className="text-sm tracking-tight">{user.puntos ? user.puntos.toLocaleString() : 0} PUNTOS</span>
 							</div>
 						</div>
 					</div>
@@ -151,11 +221,13 @@ const App = () => {
 							<div className="relative z-10">
 								<div className="flex flex-col md:flex-row md:items-center justify-between mb-6 md:mb-10 gap-4">
 									<div>
-										<h3 className="text-2xl md:text-3xl font-black text-slate-800 tracking-tight">Mi Progreso: {user.clase || 'Sin clase'}</h3>
-										<p className="text-slate-500 text-base font-medium">¡Estás dominando los requisitos de este año!</p>
+										<h3 className="text-2xl md:text-3xl font-black text-slate-800 tracking-tight">Mi Unidad: {user.unidad || 'Sin unidad'}</h3>
+										<p className="text-slate-500 text-base font-medium">Gestiona y motiva a tus conquistadores.</p>
 									</div>
-									<div className="bg-indigo-600 text-white px-6 py-2 rounded-2xl shadow-lg shadow-indigo-200">
-										<span className="text-3xl md:text-4xl font-black leading-none">{user.progresoClase || 0}%</span>
+									<div className="bg-green-600 text-white px-6 py-2 rounded-2xl shadow-lg shadow-green-200">
+										<span className="text-3xl md:text-4xl font-black leading-none">
+											{tipo === 'conquistador' ? '1' : tipo === 'consejero' ? (Array.isArray(user.conquistadores) ? user.conquistadores.length : 0) : '0'}
+										</span>
 									</div>
 								</div>
                 
@@ -222,26 +294,43 @@ const App = () => {
 								</div>
 							</div>
 
-							{/* Sección Especialidades */}
-							<div className="bg-white rounded-[2.5rem] p-8 shadow-lg border border-slate-100">
-								<div className="flex items-center justify-between mb-8">
-									<h3 className="font-black text-xl flex items-center gap-3 tracking-tight">
-										<Medal className="text-pink-500" size={24} />
-										Especialidades
-									</h3>
-									<button className="text-pink-500 text-xs font-black uppercase tracking-widest hover:underline">Explorar</button>
-								</div>
-								<div className="flex gap-4 overflow-x-auto pb-4 md:pb-0 scrollbar-hide">
-									  <div className="flex flex-col items-center gap-3 p-5 bg-indigo-50/30 rounded-4xl border border-indigo-100 min-w-32 md:flex-1 shadow-sm hover:shadow-md transition-shadow">
-										 <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center text-3xl shadow-md border-2 border-indigo-50">🏕️</div>
-										 <p className="text-[10px] font-black text-center text-slate-600 uppercase tracking-tighter leading-none">Vida al Aire Libre</p>
+								{/* Sección Especialidades */}
+								<div className="bg-white rounded-[2.5rem] p-8 shadow-lg border border-slate-100">
+									<div className="flex items-center justify-between mb-8">
+										<h3 className="font-black text-xl flex items-center gap-3 tracking-tight">
+											<Medal className="text-pink-500" size={24} />
+											Especialidades
+										</h3>
+										<button className="text-pink-500 text-xs font-black uppercase tracking-widest hover:underline">Explorar</button>
 									</div>
-									  <div className="flex flex-col items-center gap-3 p-5 bg-orange-50/30 rounded-4xl border border-orange-100 min-w-32 md:flex-1 shadow-sm hover:shadow-md transition-shadow">
-										 <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center text-3xl shadow-md border-2 border-orange-50">🔥</div>
-										 <p className="text-[10px] font-black text-center text-slate-600 uppercase tracking-tighter leading-none">Fogatas y Cocina</p>
+									<div className="flex gap-4 overflow-x-auto pb-4 md:pb-0 scrollbar-hide">
+										{especialidades.length === 0 && (
+											<div className="text-slate-400 text-xs">No tienes especialidades registradas.</div>
+										)}
+										{/* Mostrar especialidades como lista si es array de objetos */}
+										{Array.isArray(user.especialidades) && user.especialidades.length > 0 ? (
+											user.especialidades.map((espObj: any, idx: number) => (
+												<div key={idx} className="flex flex-col items-center gap-3 p-5 bg-indigo-50/30 rounded-4xl border border-indigo-100 min-w-32 md:flex-1 shadow-sm hover:shadow-md transition-shadow">
+													<div className="w-16 h-16 bg-white rounded-full flex items-center justify-center text-3xl shadow-md border-2 border-indigo-50">
+														{iconosEspecialidades[espObj.especialidad] || <Medal className="text-pink-400" size={32} />}
+													</div>
+													<p className="text-[10px] font-black text-center text-slate-600 uppercase tracking-tighter leading-none">
+														{espObj.area} &gt; {espObj.categoria} &gt; {espObj.especialidad}
+													</p>
+												</div>
+											))
+										) : (
+											especialidades.map((esp, idx: number) => (
+												<div key={esp + idx} className="flex flex-col items-center gap-3 p-5 bg-indigo-50/30 rounded-4xl border border-indigo-100 min-w-32 md:flex-1 shadow-sm hover:shadow-md transition-shadow">
+													<div className="w-16 h-16 bg-white rounded-full flex items-center justify-center text-3xl shadow-md border-2 border-indigo-50">
+														{iconosEspecialidades[esp] || <Medal className="text-pink-400" size={32} />}
+													</div>
+													<p className="text-[10px] font-black text-center text-slate-600 uppercase tracking-tighter leading-none">{esp}</p>
+												</div>
+											))
+										)}
 									</div>
 								</div>
-							</div>
 						</div>
 					</div>
 
@@ -272,6 +361,7 @@ const App = () => {
 				</div>
 			</main>
 		</div>
+		</>
 	);
 };
 

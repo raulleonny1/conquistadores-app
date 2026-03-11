@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from "react";
 import EventosSidebar from './EventosSidebar';
 import { db } from "../../src/firebase";
-import { collection, getDocs, query, where } from "firebase/firestore";
+import { collection, getDocs, query, where, onSnapshot } from "firebase/firestore";
 import {
   Users,
   Award,
@@ -17,38 +17,70 @@ import {
 export default function ConsejeroDashboard({ consejeroId }: { consejeroId: string }) {
   const [consejero, setConsejero] = useState<{ nombre: string; consejeroAsociado?: string } | null>(null);
   const [unidades, setUnidades] = useState<string[]>([]);
+  const [miembrosPorUnidad, setMiembrosPorUnidad] = useState<Record<string, string[]>>({});
   const [calificaciones, setCalificaciones] = useState<string[]>([]);
   const [actividades, setActividades] = useState<any[]>([]);
   const [eventoSeleccionado, setEventoSeleccionado] = useState<any | null>(null);
   const [showModal, setShowModal] = useState(false);
   const [loading, setLoading] = useState(true);
   const [showMenu, setShowMenu] = useState(false);
+  const [showUnidadModal, setShowUnidadModal] = useState<string|null>(null);
+  const [detallesMiembros, setDetallesMiembros] = useState<Record<string, any[]>>({});
 
   useEffect(() => {
+    let unsubscribeUnidades: (() => void) | null = null;
+    let nombreConsejero = "";
+    let isMounted = true;
     async function fetchData() {
       setLoading(true);
       const { getDoc, doc } = await import("firebase/firestore");
       const docSnap = await getDoc(doc(db, "consejeros", consejeroId));
       const cData = docSnap.exists() ? docSnap.data() : undefined;
+      if (!isMounted) return;
       setConsejero({
         nombre: cData?.nombre || "",
         consejeroAsociado: cData?.consejeroAsociado || undefined
       });
-      // Unidades
-      const unidadesQuery = await getDocs(query(collection(db, "unidades"), where("consejero", "==", cData?.nombre)));
-      setUnidades(unidadesQuery.docs.map(doc => doc.data().nombre || ""));
-      // Calificaciones
+      // Unidades directamente del documento del consejero
+      const unidadesArr = Array.isArray(cData?.unidades) ? cData.unidades : [];
+      setUnidades(unidadesArr);
+      // Buscar miembros de cada unidad
+      if (unidadesArr.length > 0) {
+        const miembrosUnidad: Record<string, string[]> = {};
+        const detallesPorUnidad: Record<string, any[]> = {};
+        const promises = unidadesArr.map(async (unidad: string) => {
+          const q = query(collection(db, "RegistroConquis"), where("unidad", "==", unidad));
+          const snap = await getDocs(q);
+          const miembros = snap.docs.map(doc => doc.data().nombre || "");
+          miembrosUnidad[unidad] = miembros;
+          detallesPorUnidad[unidad] = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        });
+        await Promise.all(promises);
+        setMiembrosPorUnidad(miembrosUnidad);
+        // Guardar detalles para el modal
+        setDetallesMiembros(detallesPorUnidad);
+      } else {
+        setMiembrosPorUnidad({});
+        setDetallesMiembros({});
+      }
+      // Calificaciones (puedes migrar esto a tiempo real si lo deseas)
       const califQuery = await getDocs(query(collection(db, "calificaciones"), where("consejeroId", "==", consejeroId)));
+      if (!isMounted) return;
       setCalificaciones(califQuery.docs.map(doc => {
         const data = doc.data();
         return `${data.unidad || ""}: ${data.nota || ""}`;
       }));
       // Actividades: usar eventos reales de Firebase
       const eventosQuery = await getDocs(collection(db, "eventos"));
+      if (!isMounted) return;
       setActividades(eventosQuery.docs.map(doc => ({ id: doc.id, ...doc.data() })));
       setLoading(false);
     }
     if (consejeroId) fetchData();
+    return () => {
+      isMounted = false;
+      // Elimina la llamada a unsubscribeUnidades porque nunca se asigna
+    };
   }, [consejeroId]);
 
   if (loading) return <div className="text-center mt-10 text-lg text-blue-700">Cargando datos reales...</div>;
@@ -124,14 +156,66 @@ export default function ConsejeroDashboard({ consejeroId }: { consejeroId: strin
             title="Tus Unidades"
             description="Gestiona tus equipos y compañeros."
             icon={<Users className="w-6 h-6" />}
-            items={unidades}
+            items={unidades.map(unidad => {
+              const miembros = miembrosPorUnidad[unidad] || [];
+              return (
+                <div key={unidad}>
+                  <div className="font-bold text-emerald-700">{unidad}</div>
+                  {miembros.length > 0 ? (
+                    <ul className="text-xs text-slate-600 mt-1 list-disc list-inside">
+                      {miembros.map((m, idx) => <li key={idx}>{m}</li>)}
+                    </ul>
+                  ) : (
+                    <div className="text-xs text-slate-400 italic">Sin miembros</div>
+                  )}
+                  <button
+                    className="mt-2 px-3 py-1 rounded-lg border border-emerald-400 text-emerald-700 text-xs font-bold hover:bg-emerald-50"
+                    onClick={() => setShowUnidadModal(unidad)}
+                  >
+                    Ver Detalles
+                  </button>
+                </div>
+              );
+            })}
             emptyMessage="Aún no tienes unidades asignadas."
             color="emerald"
           />
+                {/* Modal de detalles de miembros de la unidad */}
+                {showUnidadModal && detallesMiembros[showUnidadModal] && (
+                  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-30 backdrop-blur-sm">
+                    <div className="bg-white rounded-3xl shadow-2xl p-8 max-w-2xl w-full relative animate-in fade-in slide-in-from-top-4 overflow-y-auto max-h-[90vh]">
+                      <button
+                        className="absolute top-4 right-4 text-emerald-500 hover:text-emerald-700 text-xl font-bold"
+                        onClick={() => setShowUnidadModal(null)}
+                        aria-label="Cerrar"
+                      >
+                        ×
+                      </button>
+                      <h2 className="text-2xl font-bold text-emerald-700 mb-4">Miembros de {showUnidadModal}</h2>
+                      {detallesMiembros[showUnidadModal].length === 0 ? (
+                        <div className="text-slate-400 italic">No hay miembros registrados en esta unidad.</div>
+                      ) : (
+                        <div className="space-y-4">
+                          {detallesMiembros[showUnidadModal].map((miembro: any, idx: number) => (
+                            <div key={miembro.id || idx} className="border rounded-xl p-4 bg-emerald-50/30">
+                              <div className="font-bold text-emerald-800 text-lg">{miembro.nombre}</div>
+                              <div className="text-xs text-slate-600 mb-1">Edad: {miembro.edad || 'N/A'}</div>
+                              <div className="text-xs text-slate-600 mb-1">Clase: {miembro.clase || 'N/A'}</div>
+                              <div className="text-xs text-slate-600 mb-1">PIN: {miembro.pin || 'N/A'}</div>
+                              <div className="text-xs text-slate-600 mb-1">Especialidades: {Array.isArray(miembro.especialidades) ? miembro.especialidades.join(', ') : (miembro.especialidades || 'N/A')}</div>
+                              <div className="text-xs text-slate-600 mb-1">Unidad: {miembro.unidad || 'N/A'}</div>
+                              {/* Agrega aquí más campos si los hay */}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
           {/* Tarjeta: Calificaciones */}
           <SectionCard
             title="Calificaciones"
-            description="Revisa tu progreso y logros."
+            description="Califica el desempeño o actividades de tu unidad."
             icon={<Award className="w-6 h-6" />}
             items={calificaciones}
             emptyMessage="No hay calificaciones registradas."
@@ -140,7 +224,7 @@ export default function ConsejeroDashboard({ consejeroId }: { consejeroId: strin
           {/* Tarjeta: Actividades conectada a eventos reales */}
           <div className="group bg-white/80 backdrop-blur-sm rounded-3xl p-6 shadow-xl border border-white hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1">
             <div className="flex justify-between items-start mb-4">
-              <div className="p-3 rounded-2xl bg-rose-500 hover:bg-rose-600 ring-rose-100 text-white shadow-lg transition-all">
+              <div className="p-3 rounded-2xl bg-rose-500 hover:bg-rose-600  ESTtext-white shadow-lg transition-all">
                 <Calendar className="w-6 h-6" />
               </div>
               <button className="p-2 text-slate-300 group-hover:text-slate-500 transition-colors">
@@ -226,13 +310,14 @@ export default function ConsejeroDashboard({ consejeroId }: { consejeroId: strin
 }
 
 // Sub-componente para las tarjetas de sección
-function SectionCard({ title, description, icon, items, emptyMessage, color }: {
+function SectionCard({ title, description, icon, items, emptyMessage, color, onDetalles }: {
   title: string;
   description: string;
   icon: React.ReactNode;
-  items: string[];
+  items: any[];
   emptyMessage: string;
   color: "emerald" | "blue" | "rose";
+  onDetalles?: (unidad: string) => void;
 }) {
   const colors: any = {
     emerald: "bg-emerald-500 hover:bg-emerald-600 ring-emerald-100",
@@ -272,9 +357,7 @@ function SectionCard({ title, description, icon, items, emptyMessage, color }: {
           </div>
         )}
       </div>
-      <button className={`mt-6 w-full py-3 rounded-xl font-bold text-sm transition-all border-2 border-transparent group-hover:border-current ${textColors[color]} bg-slate-50 hover:bg-white`}>
-        Ver Detalles
-      </button>
+      {/* El botón de detalles ahora está dentro de cada unidad, así que este bloque global se eliminó */}
     </div>
   );
 }

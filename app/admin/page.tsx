@@ -1,5 +1,16 @@
 "use client";
 import React, { useState } from 'react';
+import {
+  DndContext,
+  closestCenter
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  useSortable,
+  verticalListSortingStrategy
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import { 
   Users, 
   LayoutGrid, 
@@ -9,7 +20,8 @@ import {
   ClipboardList,
   Map,
   Settings,
-  Calendar
+  Calendar,
+  UserCircle
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
@@ -22,7 +34,52 @@ const AdminPage = () => {
   const [resetPins, setResetPins] = useState<{nombre: string, nuevoPin: string}[]>([]);
   const [loadingPins, setLoadingPins] = useState(false);
 
-  const menuItems = [
+  const [menuItems, setMenuItems] = useState([
+                    {
+                      id: 'directiva',
+                      title: 'Directiva del club',
+                      description: 'Gestión y registro de la directiva del club.',
+                      icon: <Users className="w-8 h-8 text-fuchsia-600" />,
+                      color: 'border-fuchsia-500 text-fuchsia-600',
+                      bgColor: 'bg-fuchsia-50',
+                      hoverColor: 'hover:shadow-fuchsia-200'
+                    },
+            {
+              id: 'especialidadesEnCurso',
+              title: 'Especialidades en curso',
+              description: 'Visualiza y gestiona las especialidades que están en proceso.',
+              icon: <ShieldCheck className="w-8 h-8 text-indigo-600" />,
+              color: 'border-indigo-500 text-indigo-600',
+              bgColor: 'bg-indigo-50',
+              hoverColor: 'hover:shadow-indigo-200'
+            },
+        {
+          id: 'rankin',
+          title: 'Rankin',
+          description: 'Consulta el ranking de miembros, unidades o actividades.',
+          icon: <Settings className="w-8 h-8 text-yellow-500" />,
+          color: 'border-yellow-500 text-yellow-500',
+          bgColor: 'bg-yellow-50',
+          hoverColor: 'hover:shadow-yellow-200'
+        },
+        {
+          id: 'frases',
+          title: 'Frases para la semana',
+          description: 'Inspira a tu club con frases motivadoras cada semana.',
+          icon: <Calendar className="w-8 h-8 text-cyan-600" />,
+          color: 'border-cyan-500 text-cyan-600',
+          bgColor: 'bg-cyan-50',
+          hoverColor: 'hover:shadow-cyan-200'
+        },
+    {
+      id: 'aspirante',
+      title: 'Aspirante a Guía Mayor',
+      description: 'Gestiona y registra el avance de aspirantes hacia Guía Mayor.',
+      icon: <UserCircle className="w-8 h-8 text-orange-600" />,
+      color: 'border-orange-500 text-orange-600',
+      bgColor: 'bg-orange-50',
+      hoverColor: 'hover:shadow-orange-200'
+    },
     {
       id: 'RegistroConquis',
       title: 'RegistroConquis',
@@ -52,7 +109,7 @@ const AdminPage = () => {
     },
     {
       id: 'especialidades',
-      title: 'Especialidades',
+      title: 'Registro de especialidades',
       description: 'Seguimiento de requisitos y parches aprobados.',
       icon: <ShieldCheck className="w-8 h-8" />,
       color: 'border-amber-500 text-amber-600',
@@ -77,7 +134,79 @@ const AdminPage = () => {
       bgColor: 'bg-emerald-50',
       hoverColor: 'hover:shadow-emerald-200'
     }
-  ];
+  ]);
+  // dnd-kit sortable item
+  function SortableMenuCard({ item, index }: { item: any, index: number }) {
+    const {
+      attributes,
+      listeners,
+      setNodeRef,
+      transform,
+      transition,
+      isDragging
+    } = useSortable({ id: item.id });
+
+    const style = {
+      transform: CSS.Transform.toString(transform),
+      transition,
+      opacity: isDragging ? 0.5 : 1
+    };
+
+    // Solución: solo navegar si no se está arrastrando
+    let dragStarted = false;
+    return (
+      <div
+        ref={setNodeRef}
+        style={style}
+        {...attributes}
+        {...listeners}
+        key={item.id}
+        onPointerDown={() => { dragStarted = false; }}
+        onPointerMove={() => { dragStarted = true; }}
+        onPointerUp={() => {
+          if (!dragStarted) {
+            if (item.id === 'frases') {
+              router.push('/admin/frases');
+            } else if (item.id === 'RegistroConquis') {
+              router.push('/admin/RegistroConquis');
+            } else if (item.id === 'unidades') {
+              router.push('/admin/unidades');
+            } else if (item.id === 'consejero') {
+              router.push('/admin/consejero');
+            } else if (item.id === 'especialidades') {
+              router.push('/admin/especialidades');
+            } else if (item.id === 'calificaciones') {
+              router.push('/admin/calificaciones');
+            } else if (item.id === 'calendario') {
+              router.push('/admin/calendario');
+                } else if (item.id === 'aspirante') {
+                  router.push('/admin/aspirante');
+                } else if (item.id === 'directiva') {
+                  router.push('/admin/directiva');
+                } else {
+                  setActiveTab(item.id);
+            }
+          }
+        }}
+        className={`group relative bg-white p-8 rounded-3xl border-2 ${item.color.split(' ')[0]} transition-all duration-500 cursor-pointer overflow-hidden shadow-sm hover:shadow-xl hover:-translate-y-2 flex flex-col items-center text-center`}
+      >
+        {/* Círculo de fondo que crece en hover */}
+        <div className={`absolute -bottom-10 -right-10 w-24 h-24 rounded-full ${item.bgColor} opacity-0 group-hover:opacity-100 transition-all duration-500 scale-150`}></div>
+        <div className={`relative z-10 p-4 rounded-2xl ${item.bgColor} ${item.color.split(' ')[1]} mb-6 transition-transform duration-500 group-hover:scale-110 group-hover:rotate-3`}>
+          {item.icon}
+        </div>
+        <h3 className="relative z-10 text-xl font-bold text-slate-800 mb-3">
+          {item.title}
+        </h3>
+        <p className="relative z-10 text-sm text-slate-500 leading-relaxed mb-6">
+          {item.description}
+        </p>
+        <div className={`relative z-10 flex items-center gap-1 font-bold text-xs uppercase tracking-widest ${item.color.split(' ')[1]}`}>
+          Gestionar <ChevronRight className="w-3 h-3" />
+        </div>
+      </div>
+    );
+  }
 
           const handleLogout = () => {
             router.push('/');
@@ -154,7 +283,7 @@ const AdminPage = () => {
               </div>
 
               {/* Navbar Superior */}
-              <header className="relative z-10 bg-white/80 backdrop-blur-md border-b border-slate-200 px-6 py-4 flex justify-between items-center sticky top-0">
+              <header className="z-10 bg-white/80 backdrop-blur-md border-b border-slate-200 px-6 py-4 flex justify-between items-center sticky top-0">
                 <div className="flex items-center gap-3">
                   <div className="bg-purple-700 p-2 rounded-lg shadow-lg">
                     {/* Reemplazo visual del logo del club */}
@@ -188,46 +317,28 @@ const AdminPage = () => {
                 </div>
 
                 {/* Rejilla de Menú */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-                  {menuItems.map((item) => (
-                    <div
-                      key={item.id}
-                      onClick={() => {
-                        if (item.id === 'RegistroConquis') {
-                          router.push('/admin/RegistroConquis');
-                        } else if (item.id === 'unidades') {
-                          router.push('/admin/unidades');
-                        } else if (item.id === 'consejero') {
-                          router.push('/admin/consejero');
-                        } else if (item.id === 'especialidades') {
-                          router.push('/admin/especialidades');
-                        } else if (item.id === 'calificaciones') {
-                          setActiveTab('configuracion');
-                        } else if (item.id === 'calendario') {
-                          router.push('/admin/calendario');
-                        } else {
-                          setActiveTab(item.id);
-                        }
-                      }}
-                      className={`group relative bg-white p-8 rounded-3xl border-2 ${item.color.split(' ')[0]} transition-all duration-500 cursor-pointer overflow-hidden shadow-sm hover:shadow-xl hover:-translate-y-2 flex flex-col items-center text-center`}
-                    >
-                      {/* Círculo de fondo que crece en hover */}
-                      <div className={`absolute -bottom-10 -right-10 w-24 h-24 rounded-full ${item.bgColor} opacity-0 group-hover:opacity-100 transition-all duration-500 scale-150`}></div>
-                      <div className={`relative z-10 p-4 rounded-2xl ${item.bgColor} ${item.color.split(' ')[1]} mb-6 transition-transform duration-500 group-hover:scale-110 group-hover:rotate-3`}>
-                        {item.icon}
-                      </div>
-                      <h3 className="relative z-10 text-xl font-bold text-slate-800 mb-3">
-                        {item.title}
-                      </h3>
-                      <p className="relative z-10 text-sm text-slate-500 leading-relaxed mb-6">
-                        {item.description}
-                      </p>
-                      <div className={`relative z-10 flex items-center gap-1 font-bold text-xs uppercase tracking-widest ${item.color.split(' ')[1]}`}>
-                        Gestionar <ChevronRight className="w-3 h-3" />
-                      </div>
+                <DndContext
+                  collisionDetection={closestCenter}
+                  onDragEnd={event => {
+                    const { active, over } = event;
+                    if (active.id !== over?.id) {
+                      const oldIndex = menuItems.findIndex(i => i.id === active.id);
+                      const newIndex = menuItems.findIndex(i => i.id === over?.id);
+                      setMenuItems(arrayMove(menuItems, oldIndex, newIndex));
+                    }
+                  }}
+                >
+                  <SortableContext
+                    items={menuItems.map(i => i.id)}
+                    strategy={verticalListSortingStrategy}
+                  >
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+                      {menuItems.map((item, idx) => (
+                        <SortableMenuCard key={item.id} item={item} index={idx} />
+                      ))}
                     </div>
-                  ))}
-                </div>
+                  </SortableContext>
+                </DndContext>
 
                 {/* Contenido del tab activo */}
                 {activeTab && activeTab !== 'miembros' && (
