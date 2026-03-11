@@ -41,7 +41,7 @@ const AspirantePage = () => {
     const [actividades, setActividades] = useState<Array<{nombre:string,completado:boolean,evaluador:string,fecha:string,hora:string,firma:string}>>([]);
     const [firmaIndex, setFirmaIndex] = useState<number | null>(null);
     const [evaluador, setEvaluador] = useState<string>("");
-    let tarjetaDoc: TarjetaGuiaMayor;
+    let tarjetaDoc: TarjetaGuiaMayor | null;
       const seleccionarAspirante = async (aspirante:any) => {
         setAspiranteId(aspirante.id);
         setEvaluador(aspirante.evaluador || "");
@@ -66,7 +66,8 @@ const AspirantePage = () => {
           });
           setActividades(actividadesIniciales);
         } else {
-          setActividades(snap.data().actividades);
+          tarjetaDoc = { id: snap.id, ...(snap.data() as Omit<TarjetaGuiaMayor, "id">) };
+          setActividades((snap.data() as any).actividades);
         }
       };
      const actualizarActividad = async (index:number, estado:boolean) => {
