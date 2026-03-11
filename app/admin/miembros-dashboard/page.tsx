@@ -1,9 +1,10 @@
 "use client";
-export const dynamic = "force-dynamic";
+
+import { Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import MiembroDashboard from "../../miembros/dashboard";
 
-export default function MiembrosDashboardPage() {
+function DashboardContent() {
   const searchParams = useSearchParams();
   const pin = searchParams.get("pin") || "";
 
@@ -16,4 +17,12 @@ export default function MiembrosDashboardPage() {
   }
 
   return <MiembroDashboard />;
+}
+
+export default function MiembrosDashboardPage() {
+  return (
+    <Suspense fallback={<div className="p-10 text-center">Cargando...</div>}>
+      <DashboardContent />
+    </Suspense>
+  );
 }
