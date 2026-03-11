@@ -64,7 +64,7 @@ const EvaluarGuiaMayorPage = () => {
           progreso: 0,
           fechaInicio: new Date().toISOString().split("T")[0]
         });
-        tarjetaDoc = { id: nuevaTarjeta.id, nombre: aspirante?.nombre || "", estado: "en_proceso", progreso: 0, fechaInicio: new Date().toISOString().split("T")[0] };
+        tarjetaDoc = { id: nuevaTarjeta.id, estado: "en_proceso", progreso: 0, fechaInicio: new Date().toISOString().split("T")[0] };
         // Crear actividades base
         for (const req of actividadesBase) {
           await addDoc(collection(db, "actividadesTarjetaGuiaMayor"), {
