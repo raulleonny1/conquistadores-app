@@ -34,7 +34,11 @@ export default function FirmaDigital({ onSave }: FirmaDigitalProps) {
         <button onClick={guardarFirma}>
           Guardar firma
         </button>
-        <button onClick={() => sigRef.current.clear()}>
+        <button onClick={() => {
+          if (sigRef.current) {
+            (sigRef.current as SignatureCanvas).clear();
+          }
+        }}>
           Limpiar
         </button>
       </div>
