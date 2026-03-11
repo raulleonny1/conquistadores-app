@@ -1,5 +1,5 @@
 import { ref, uploadString, getDownloadURL } from "firebase/storage"
-import { storage } from "@/firebase"
+import { storage } from "../firebase"
 
 export async function guardarFirma(
   base64: string,
