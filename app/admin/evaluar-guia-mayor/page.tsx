@@ -61,7 +61,7 @@ const EvaluarGuiaMayorPage = () => {
       // Buscar tarjeta
       const q = query(collection(db, "tarjetaGuiaMayor"), where("aspiranteId", "==", aspiranteId));
       const snap = await getDocs(q);
-      let tarjetaDoc: TarjetaDoc | null = snap.docs.length > 0 ? { id: snap.docs[0].id, ...snap.docs[0].data() } : null;
+      let tarjetaDoc: TarjetaDoc | null = snap.docs.length > 0 ? { id: snap.docs[0].id, ...(snap.docs[0].data() as Omit<TarjetaDoc, "id">) } : null;
       // Si no existe, crearla
       if (!tarjetaDoc) {
         const aspirante = aspirantes.find(a => a.id === aspiranteId);
