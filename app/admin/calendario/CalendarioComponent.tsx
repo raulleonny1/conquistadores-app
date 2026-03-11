@@ -35,7 +35,9 @@ export default function CalendarioComponent() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await addDoc(collection(db, "eventos"), form);
+      const { formatFechaDDMMYYYY } = await import("@/src/firebase");
+      const eventoForm = { ...form, fecha: formatFechaDDMMYYYY(new Date(form.fecha)) };
+      await addDoc(collection(db, "eventos"), eventoForm);
       setShowForm(false);
       setForm({ nombre: "", fecha: "", lugar: "", observacion: "" });
     } catch (err) {

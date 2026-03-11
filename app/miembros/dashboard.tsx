@@ -50,8 +50,8 @@ const App = () => {
 
 	// Simulación de eventos y calificaciones
 	const proximosEventos = [
-		{ id: 1, titulo: "Campamento de Verano", fecha: "15 de Oct", tipo: "Campamento", color: "bg-orange-100 text-orange-600" },
-		{ id: 2, titulo: "Desfile Cívico", fecha: "20 de Oct", tipo: "Evento", color: "bg-blue-100 text-blue-600" }
+		{ id: 1, titulo: "Campamento de Verano", fecha: (() => { const { formatFechaDDMMYYYY } = require("../../src/firebase"); return formatFechaDDMMYYYY(new Date()); })(), tipo: "Campamento", color: "bg-orange-100 text-orange-600" },
+		{ id: 2, titulo: "Desfile Cívico", fecha: (() => { const { formatFechaDDMMYYYY } = require("../../src/firebase"); return formatFechaDDMMYYYY(new Date()); })(), tipo: "Evento", color: "bg-blue-100 text-blue-600" }
 	];
 	const calificacionesRecientes = [
 		{ id: 1, materia: "Nudos y Amarres", nota: "Excelente", icono: <div className="p-2 bg-indigo-100 text-indigo-600 rounded-lg"><BookOpen size={20}/></div> },
@@ -69,7 +69,13 @@ const App = () => {
 				const hoy = new Date();
 				const diaSemana = hoy.getDay();
 				const idx = diaSemana === 0 ? 6 : diaSemana - 1;
-				setFraseHoy(data.frases[idx] || null);
+				setFraseHoy({
+					frase: data.frases[idx],
+					hora: (() => {
+						const { formatFechaDDMMYYYY } = require("../../src/firebase");
+						return formatFechaDDMMYYYY(new Date());
+					})()
+				});
 			}
 		});
 

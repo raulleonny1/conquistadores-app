@@ -64,10 +64,11 @@ export default function DirectivaPage() {
         setEditId(null);
       } else {
         const pin = generarPin();
+        const { formatFechaDDMMYYYY } = await import("../../../src/firebase");
         await addDoc(collection(db, "directivaClub"), {
           ...form,
           pin,
-          fechaRegistro: new Date().toISOString()
+          fechaRegistro: formatFechaDDMMYYYY(new Date())
         });
         alert("Directiva registrada correctamente. PIN: " + pin);
       }

@@ -21,10 +21,11 @@ export default function CalificacionesPage() {
     setLoading(true);
     try {
       for (const item of items) {
+        const { formatFechaDDMMYYYY } = await import("../../../src/firebase");
         await addDoc(collection(db, "calificaciones"), {
           nombre: item.nombre,
           puntos: item.puntos,
-          fecha: new Date().toISOString()
+          fecha: formatFechaDDMMYYYY(new Date())
         });
       }
       alert("Calificaciones guardadas correctamente.");

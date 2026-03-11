@@ -238,7 +238,10 @@ export default function ConsejeroDashboard({ consejeroId }: { consejeroId: strin
                 actividades.map((evento: any) => (
                   <div key={evento.id} className="p-3 bg-slate-50 rounded-xl border border-slate-100">
                     <div className="font-bold text-rose-700 mb-1">{evento.nombre}</div>
-                    <div className="text-xs text-slate-600 mb-1">Fecha: {evento.fecha}</div>
+                    <div className="text-xs text-slate-600 mb-1">Fecha: {(() => {
+                      const { formatFechaDDMMYYYY } = require("../../src/firebase");
+                      return formatFechaDDMMYYYY(evento.fecha);
+                    })()}</div>
                     <div className="text-xs text-slate-600 mb-1">Lugar: {evento.lugar}</div>
                     <div className="text-xs text-slate-400">{evento.observacion}</div>
                   </div>

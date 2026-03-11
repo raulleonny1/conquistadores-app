@@ -34,10 +34,13 @@ export default function EventosSidebar() {
                 <ChevronRight size={18} className="text-slate-300 group-hover:text-indigo-600 group-hover:translate-x-1 transition-all" />
               </div>
               <h4 className="font-black text-slate-800 leading-tight mb-3 text-base">{evento.nombre}</h4>
-              <div className="flex items-center gap-3 text-slate-500 text-xs font-bold uppercase tracking-widest">
-                <div className="p-1.5 bg-indigo-50 rounded-lg"><Clock size={14} className="text-indigo-500" /></div>
-                {evento.fecha}
-              </div>
+               <div className="flex items-center gap-3 text-slate-500 text-xs font-bold uppercase tracking-widest">
+                 <div className="p-1.5 bg-indigo-50 rounded-lg"><Clock size={14} className="text-indigo-500" /></div>
+                 {(() => {
+                   const { formatFechaDDMMYYYY } = require("@/src/firebase");
+                   return formatFechaDDMMYYYY(evento.fecha);
+                 })()}
+               </div>
               <div className="mt-2 text-xs text-slate-500 font-semibold">Lugar: {evento.lugar}</div>
               <div className="mt-1 text-xs text-slate-400">{evento.observacion}</div>
             </div>

@@ -13,3 +13,16 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 
 export const db = getFirestore(app);
+// Formatea una fecha JS a dd/mm/yyyy con ceros
+export function formatFechaDDMMYYYY(date: Date | string): string {
+  let d: Date;
+  if (typeof date === "string") {
+    d = new Date(date);
+  } else {
+    d = date;
+  }
+  const day = d.getDate().toString().padStart(2, "0");
+  const month = (d.getMonth() + 1).toString().padStart(2, "0");
+  const year = d.getFullYear();
+  return `${day}/${month}/${year}`;
+}
