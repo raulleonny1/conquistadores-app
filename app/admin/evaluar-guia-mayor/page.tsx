@@ -1,3 +1,8 @@
+type EvaluacionActividad = {
+  id: string;
+  actividad: string;
+  completado: boolean;
+};
 "use client";
 import React, { useState, useEffect } from "react";
 import { db } from "../../../src/firebase";
@@ -90,7 +95,10 @@ const EvaluarGuiaMayorPage = () => {
       // Cargar evaluaciones previas y marcar progreso
       const qEval = query(collection(db, "evaluacionesGuiaMayor"), where("aspiranteId", "==", aspiranteId));
       const snapEval = await getDocs(qEval);
-      const evals = snapEval.docs.map(d => ({ id: d.id, ...d.data() }));
+      const evals: EvaluacionActividad[] = snapEval.docs.map(d => ({
+        id: d.id,
+        ...(d.data() as Omit<EvaluacionActividad, "id">)
+      }));
       setEvaluaciones(evals);
       // Marcar actividades completadas
       setActividades(acts => acts.map(act => {
