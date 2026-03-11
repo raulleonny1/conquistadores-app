@@ -1,9 +1,9 @@
+"use client";
 type EvaluacionActividad = {
   id: string;
   actividad: string;
   completado: boolean;
 };
-"use client";
 import React, { useState, useEffect } from "react";
 import { db } from "../../../src/firebase";
 import { collection, onSnapshot, query, where, addDoc, getDocs, updateDoc, doc } from "firebase/firestore";
