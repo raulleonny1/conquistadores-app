@@ -3,7 +3,11 @@
 import SignatureCanvas from "react-signature-canvas"
 import { useRef } from "react"
 
-export default function FirmaDigital({ onSave }) {
+interface FirmaDigitalProps {
+  onSave: (firmaBase64: string) => void;
+}
+
+export default function FirmaDigital({ onSave }: FirmaDigitalProps) {
 
   const sigRef = useRef(null)
 
