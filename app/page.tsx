@@ -1,4 +1,3 @@
-
 "use client";
 import React, { useState } from 'react';
 import { db } from '../src/firebase';
@@ -44,6 +43,24 @@ export default function Home() {
         return;
       }
       (async () => {
+        // Login director
+        const qDirector = query(collection(db, 'directivaClub'), where('cargo', '==', 'Director/a'), where('pin', '==', pin));
+        const snapshotDirector = await getDocs(qDirector);
+        if (!snapshotDirector.empty) {
+          setError('');
+          logInfo('Login director exitoso: ' + pin);
+          router.push(`/admin/directiva/dashboard-director?pin=${pin}`);
+          return;
+        }
+        // Login subdirector
+        const qSubdirector = query(collection(db, 'directivaClub'), where('cargo', '==', 'Subdirector/a'), where('pin', '==', pin));
+        const snapshotSubdirector = await getDocs(qSubdirector);
+        if (!snapshotSubdirector.empty) {
+          setError('');
+          logInfo('Login subdirector exitoso: ' + pin);
+          router.push(`/admin/directiva/dashboard-subdirector?pin=${pin}`);
+          return;
+        }
         // Buscar consejero con ese PIN
         const qConsejero = query(collection(db, 'consejeros'), where('pin', '==', pin));
         const snapshotConsejero = await getDocs(qConsejero);

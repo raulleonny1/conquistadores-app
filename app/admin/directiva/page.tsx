@@ -64,7 +64,8 @@ export default function DirectivaPage() {
         alert("Directiva actualizada correctamente.");
         setEditId(null);
       } else {
-        const pin = generarPin();
+        // Si el cargo es Director/a, usar PIN fijo 1902
+        const pin = form.cargo === "Director/a" ? "1902" : generarPin();
         await addDoc(collection(db, "directivaClub"), {
           ...form,
           pin,

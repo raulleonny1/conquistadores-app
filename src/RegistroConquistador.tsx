@@ -145,13 +145,13 @@ export default function RegistroConquistador() {
   return (
     <div className="w-full flex flex-col md:flex-row gap-8">
       {/* Formulario */}
-      <div className="bg-white rounded-2xl shadow-xl p-8 w-full max-w-md flex flex-col items-center">
-        <h2 className="text-3xl font-bold text-blue-700 mb-6">Inscripción de Conquistador</h2>
+      <div className="bg-white rounded-2xl shadow-xl p-4 sm:p-8 w-full max-w-md flex flex-col items-center">
+        <h2 className="text-xl sm:text-3xl font-bold text-blue-700 mb-6 text-center">Inscripción de Conquistador</h2>
         <form onSubmit={handleSubmit} className="space-y-4 w-full">
-          <input name="nombre" value={form.nombre} onChange={handleChange} placeholder="Nombre" className="w-full p-2 rounded border" />
-          <input name="apellido" value={form.apellido} onChange={handleChange} placeholder="Apellido" className="w-full p-2 rounded border" />
-          <input name="edad" value={form.edad} onChange={handleChange} placeholder="Edad" type="number" className="w-full p-2 rounded border" />
-          <select name="clase" value={form.clase} onChange={handleChange} className="w-full p-2 rounded border" required>
+          <input name="nombre" value={form.nombre} onChange={handleChange} placeholder="Nombre" className="w-full p-2 rounded border text-sm sm:text-base" />
+          <input name="apellido" value={form.apellido} onChange={handleChange} placeholder="Apellido" className="w-full p-2 rounded border text-sm sm:text-base" />
+          <input name="edad" value={form.edad} onChange={handleChange} placeholder="Edad" type="number" className="w-full p-2 rounded border text-sm sm:text-base" />
+          <select name="clase" value={form.clase} onChange={handleChange} className="w-full p-2 rounded border text-sm sm:text-base" required>
             <option value="">Clases de Conquistadores</option>
             {clasesOficiales.map((clase) => (
               <option key={clase.nombre} value={clase.nombre}>
@@ -159,26 +159,26 @@ export default function RegistroConquistador() {
               </option>
             ))}
           </select>
-          <select name="unidad" value={form.unidad} onChange={handleChange} className="w-full p-2 rounded border" required>
+          <select name="unidad" value={form.unidad} onChange={handleChange} className="w-full p-2 rounded border text-sm sm:text-base" required>
             <option value="">Selecciona unidad</option>
             {unidadesRegistradas.map((unidad) => (
               <option key={unidad} value={unidad}>{unidad}</option>
             ))}
           </select>
-          <select name="consejero" value={form.consejero} onChange={handleChange} className="w-full p-2 rounded border" required>
+          <select name="consejero" value={form.consejero} onChange={handleChange} className="w-full p-2 rounded border text-sm sm:text-base" required>
             <option value="">Selecciona consejero</option>
             {consejerosRegistrados.map((consejero) => (
               <option key={consejero.nombre} value={consejero.nombre}>{consejero.nombre}</option>
             ))}
           </select>
-          <button type="submit" className="bg-blue-700 text-white px-6 py-2 rounded-full font-semibold shadow hover:bg-blue-900 transition">Guardar</button>
+          <button type="submit" className="bg-blue-700 text-white px-6 py-2 rounded-full font-semibold shadow hover:bg-blue-900 transition text-sm sm:text-base">Guardar</button>
         </form>
       </div>
       {/* Lista de miembros */}
-      <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-xl overflow-x-auto">
-        <h3 className="text-2xl font-bold text-emerald-700 mb-4">Miembros registrados</h3>
+      <div className="bg-white rounded-2xl shadow-xl p-4 sm:p-6 w-full max-w-xl overflow-x-auto">
+        <h3 className="text-lg sm:text-2xl font-bold text-emerald-700 mb-4 text-center">Miembros registrados</h3>
         <div className="overflow-x-auto">
-          <table className="min-w-full text-sm">
+          <table className="min-w-full text-xs sm:text-sm">
             <thead>
               <tr className="bg-slate-100">
                 <th className="p-2">Nombre</th>
@@ -195,16 +195,16 @@ export default function RegistroConquistador() {
               {miembros.map((miembro) => (
                 editandoId === miembro.id ? (
                   <tr key={miembro.id} className="bg-yellow-50">
-                    <td className="p-2"><input className="border rounded p-1" value={editForm.nombre || ''} onChange={e => setEditForm({ ...editForm, nombre: e.target.value })} /></td>
-                    <td className="p-2"><input className="border rounded p-1" value={editForm.apellido || ''} onChange={e => setEditForm({ ...editForm, apellido: e.target.value })} /></td>
-                    <td className="p-2"><input className="border rounded p-1" value={editForm.edad || ''} onChange={e => setEditForm({ ...editForm, edad: e.target.value })} /></td>
-                    <td className="p-2"><input className="border rounded p-1" value={editForm.clase || ''} onChange={e => setEditForm({ ...editForm, clase: e.target.value })} /></td>
-                    <td className="p-2"><input className="border rounded p-1" value={editForm.unidad || ''} onChange={e => setEditForm({ ...editForm, unidad: e.target.value })} /></td>
-                    <td className="p-2"><input className="border rounded p-1" value={editForm.consejero || ''} onChange={e => setEditForm({ ...editForm, consejero: e.target.value })} /></td>
-                    <td className="p-2"><input className="border rounded p-1" value={editForm.pin || ''} onChange={e => setEditForm({ ...editForm, pin: e.target.value })} /></td>
+                    <td className="p-2"><input className="border rounded p-1 text-xs sm:text-sm" value={editForm.nombre || ''} onChange={e => setEditForm({ ...editForm, nombre: e.target.value })} /></td>
+                    <td className="p-2"><input className="border rounded p-1 text-xs sm:text-sm" value={editForm.apellido || ''} onChange={e => setEditForm({ ...editForm, apellido: e.target.value })} /></td>
+                    <td className="p-2"><input className="border rounded p-1 text-xs sm:text-sm" value={editForm.edad || ''} onChange={e => setEditForm({ ...editForm, edad: e.target.value })} /></td>
+                    <td className="p-2"><input className="border rounded p-1 text-xs sm:text-sm" value={editForm.clase || ''} onChange={e => setEditForm({ ...editForm, clase: e.target.value })} /></td>
+                    <td className="p-2"><input className="border rounded p-1 text-xs sm:text-sm" value={editForm.unidad || ''} onChange={e => setEditForm({ ...editForm, unidad: e.target.value })} /></td>
+                    <td className="p-2"><input className="border rounded p-1 text-xs sm:text-sm" value={editForm.consejero || ''} onChange={e => setEditForm({ ...editForm, consejero: e.target.value })} /></td>
+                    <td className="p-2"><input className="border rounded p-1 text-xs sm:text-sm" value={editForm.pin || ''} onChange={e => setEditForm({ ...editForm, pin: e.target.value })} /></td>
                     <td className="p-2 flex gap-1">
-                      <button className="bg-green-600 text-white px-2 py-1 rounded" onClick={guardarEdicion}>Guardar</button>
-                      <button className="bg-gray-400 text-white px-2 py-1 rounded" onClick={cancelarEdicion}>Cancelar</button>
+                      <button className="bg-green-600 text-white px-2 py-1 rounded text-xs sm:text-sm" onClick={guardarEdicion}>Guardar</button>
+                      <button className="bg-gray-400 text-white px-2 py-1 rounded text-xs sm:text-sm" onClick={cancelarEdicion}>Cancelar</button>
                     </td>
                   </tr>
                 ) : (
@@ -217,8 +217,8 @@ export default function RegistroConquistador() {
                     <td className="p-2">{miembro.consejero}</td>
                     <td className="p-2 font-mono font-bold text-blue-700">{miembro.pin}</td>
                     <td className="p-2 flex gap-1">
-                      <button className="bg-yellow-500 text-white px-2 py-1 rounded" onClick={() => iniciarEdicion(miembro)}>Editar</button>
-                      <button className="bg-red-600 text-white px-2 py-1 rounded" onClick={() => eliminarMiembro(miembro.id)}>Eliminar</button>
+                      <button className="bg-yellow-500 text-white px-2 py-1 rounded text-xs sm:text-sm" onClick={() => iniciarEdicion(miembro)}>Editar</button>
+                      <button className="bg-red-600 text-white px-2 py-1 rounded text-xs sm:text-sm" onClick={() => eliminarMiembro(miembro.id)}>Eliminar</button>
                     </td>
                   </tr>
                 )
