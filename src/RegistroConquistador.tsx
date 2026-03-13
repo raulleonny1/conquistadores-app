@@ -2,11 +2,11 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../src/firebase';
 import { collection, addDoc, onSnapshot, doc, deleteDoc, updateDoc } from 'firebase/firestore';
+import { logInfo } from "@/src/lib/logger";
+import { handleError } from "@/src/lib/errorHandler";
 
 export default function RegistroConquistador() {
   // ...existing code...
-  import { logInfo } from "@/src/lib/logger";
-  import { handleError } from "@/src/lib/errorHandler";
   const [form, setForm] = useState({
     nombre: '',
     apellido: '',
