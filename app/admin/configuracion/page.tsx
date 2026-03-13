@@ -1,24 +1,18 @@
-
 "use client";
 import React, { useState } from 'react';
 import { db } from "../../../src/firebase";
 import { collection, getDocs, updateDoc, doc } from "firebase/firestore";
-
 import {
-  Settings, Users, ShieldCheck, RefreshCcw, ArrowLeft, Search, UserCog, ChevronRight, History
+  Settings,
+  Users,
+  ShieldCheck,
+  RefreshCcw,
+  ArrowLeft,
+  Search,
+  UserCog,
+  ChevronRight,
+  History
 } from 'lucide-react';
-
-type Usuario = {
-  id: string;
-  nombre: string;
-  pin: string;
-};
-
-type UserTableProps = {
-  users: Usuario[];
-  typeLabel: string;
-  onReset: (id: string, nombre: string) => void;
-};
 
 type ConfigSectionProps = {
   title: string;
@@ -28,6 +22,18 @@ type ConfigSectionProps = {
   children?: React.ReactNode;
   actionLabel?: string;
   onAction?: () => void;
+};
+
+type UserTableProps = {
+  users: Usuario[];
+  typeLabel: string;
+  onReset: (id: string, nombre: string) => void;
+};
+
+type Usuario = {
+  id: string;
+  nombre: string;
+  pin: string;
 };
 
 const ConfigSection: React.FC<ConfigSectionProps> = ({
@@ -66,7 +72,7 @@ const ConfigSection: React.FC<ConfigSectionProps> = ({
   </div>
 );
 
-const UserTable = ({ users, typeLabel, onReset }) => (
+const UserTable: React.FC<UserTableProps> = ({ users, typeLabel, onReset }) => (
   <div className="overflow-x-auto">
     <table className="w-full text-left border-collapse">
       <thead>
@@ -77,25 +83,13 @@ const UserTable = ({ users, typeLabel, onReset }) => (
         </tr>
       </thead>
       <tbody className="divide-y divide-slate-100">
-        {users.map((user) => (
+        {users.map((user: Usuario) => (
           <tr key={user.id} className="hover:bg-slate-50/80 transition-colors">
             <td className="px-6 py-4">
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-xs font-bold text-slate-600">
                   {user.nombre.charAt(0)}
-      type Usuario = {
-        id: string;
-        nombre: string;
-        pin: string;
-      };
-
-      type UserTableProps = {
-        users: Usuario[];
-        typeLabel: string;
-        onReset: (id: string, nombre: string) => void;
-      };
-
-      const UserTable = ({ users, typeLabel, onReset }: UserTableProps) => (
+                </div>
                 <span className="font-medium text-slate-700">{user.nombre}</span>
               </div>
             </td>
@@ -122,8 +116,8 @@ const UserTable = ({ users, typeLabel, onReset }) => (
 
 export default function ConfiguracionAdmin() {
   const [searchTerm, setSearchTerm] = useState('');
-  const [consejeros, setConsejeros] = useState([]);
-  const [conquistadores, setConquistadores] = useState([]);
+  const [consejeros, setConsejeros] = useState<Usuario[]>([]);
+  const [conquistadores, setConquistadores] = useState<Usuario[]>([]);
   const [loadingConsejeros, setLoadingConsejeros] = useState(false);
   const [loadingConquistadores, setLoadingConquistadores] = useState(false);
   const [error, setError] = useState('');
@@ -184,7 +178,7 @@ export default function ConfiguracionAdmin() {
   };
 
   // Resetear pin individual de consejero
-  const handleResetPinIndividualConsejero = async (id, nombre) => {
+  const handleResetPinIndividualConsejero = async (id: string, nombre: string) => {
     setError('');
     setSuccess('');
     setLoadingConsejeros(true);
@@ -229,7 +223,7 @@ export default function ConfiguracionAdmin() {
   };
 
   // Resetear pin individual de conquistador
-  const handleResetPinIndividualConquistador = async (id, nombre) => {
+  const handleResetPinIndividualConquistador = async (id: string, nombre: string) => {
     setError('');
     setSuccess('');
     setLoadingConquistadores(true);
