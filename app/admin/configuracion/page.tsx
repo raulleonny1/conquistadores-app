@@ -70,7 +70,19 @@ const UserTable = ({ users, typeLabel, onReset }) => (
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-xs font-bold text-slate-600">
                   {user.nombre.charAt(0)}
-                </div>
+      type Usuario = {
+        id: string;
+        nombre: string;
+        pin: string;
+      };
+
+      type UserTableProps = {
+        users: Usuario[];
+        typeLabel: string;
+        onReset: (id: string, nombre: string) => void;
+      };
+
+      const UserTable = ({ users, typeLabel, onReset }: UserTableProps) => (
                 <span className="font-medium text-slate-700">{user.nombre}</span>
               </div>
             </td>
