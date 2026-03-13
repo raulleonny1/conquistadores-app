@@ -4,8 +4,10 @@ import React, { useEffect, useState } from "react";
 import { getDocs, doc, updateDoc, deleteDoc, addDoc, collection, onSnapshot } from "firebase/firestore";
 import { db } from "@/src/firebase";
 import { especialidadesBase } from "@/src/data/especialidades";
+import { logInfo } from "@/src/lib/logger";
 
 export default function RegistroConquisPageInner() {
+  // ...existing code...
   const [conquis, setConquis] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   type EspecialidadObj = {
@@ -29,6 +31,11 @@ export default function RegistroConquisPageInner() {
   });
   const [saving, setSaving] = useState(false);
   const [unidades, setUnidades] = useState<any[]>([]);
+    // Ejemplo de uso al registrar un conquistador
+    const registrarConquistador = async () => {
+      // ...lógica de registro...
+      logInfo("Se registró un conquistador");
+    };
   const [consejeros, setConsejeros] = useState<any[]>([]);
   const clasesOficiales = [
     "Amigo",

@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from "react";
 import EventosSidebar from './EventosSidebar';
 import { db } from "../../src/firebase";
-import { collection, getDocs, query, where, onSnapshot } from "firebase/firestore";
+import { collection, getDocs, query, where, onSnapshot, addDoc } from "firebase/firestore";
 import {
   Users,
   Award,
@@ -26,10 +26,9 @@ export default function ConsejeroDashboard({ consejeroId }: { consejeroId: strin
   const [showMenu, setShowMenu] = useState(false);
   const [showUnidadModal, setShowUnidadModal] = useState<string|null>(null);
   const [detallesMiembros, setDetallesMiembros] = useState<Record<string, any[]>>({});
+  const [retosEspeciales, setRetosEspeciales] = useState<any[]>([]);
 
   useEffect(() => {
-    let unsubscribeUnidades: (() => void) | null = null;
-    let nombreConsejero = "";
     let isMounted = true;
     async function fetchData() {
       setLoading(true);
@@ -57,29 +56,33 @@ export default function ConsejeroDashboard({ consejeroId }: { consejeroId: strin
         });
         await Promise.all(promises);
         setMiembrosPorUnidad(miembrosUnidad);
-        // Guardar detalles para el modal
         setDetallesMiembros(detallesPorUnidad);
       } else {
         setMiembrosPorUnidad({});
         setDetallesMiembros({});
       }
-      // Calificaciones (puedes migrar esto a tiempo real si lo deseas)
+      // Calificaciones
       const califQuery = await getDocs(query(collection(db, "calificaciones"), where("consejeroId", "==", consejeroId)));
       if (!isMounted) return;
       setCalificaciones(califQuery.docs.map(doc => {
         const data = doc.data();
         return `${data.unidad || ""}: ${data.nota || ""}`;
       }));
-      // Actividades: usar eventos reales de Firebase
+      // Actividades
       const eventosQuery = await getDocs(collection(db, "eventos"));
       if (!isMounted) return;
       setActividades(eventosQuery.docs.map(doc => ({ id: doc.id, ...doc.data() })));
       setLoading(false);
     }
     if (consejeroId) fetchData();
+    // Suscripción en tiempo real a retosEspeciales
+    const retosQuery = query(collection(db, "retosEspeciales"), where("consejeroId", "==", consejeroId));
+    const unsubscribeRetos = onSnapshot(retosQuery, snap => {
+      setRetosEspeciales(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
     return () => {
       isMounted = false;
-      // Elimina la llamada a unsubscribeUnidades porque nunca se asigna
+      unsubscribeRetos();
     };
   }, [consejeroId]);
 
@@ -151,6 +154,77 @@ export default function ConsejeroDashboard({ consejeroId }: { consejeroId: strin
 
         {/* Rejilla de Secciones */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {/* Tarjeta: Reto Especial */}
+          <div className="group bg-gradient-to-br from-purple-100 via-pink-100 to-indigo-100 rounded-3xl p-6 shadow-xl border border-white hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1">
+            <div className="flex justify-between items-start mb-4">
+              <div className="p-3 rounded-2xl bg-purple-500 hover:bg-purple-600 text-white shadow-lg transition-all">
+                <Award className="w-6 h-6" />
+              </div>
+              <button className="p-2 text-slate-300 group-hover:text-slate-500 transition-colors">
+                <ChevronRight size={20} />
+              </button>
+            </div>
+            <h3 className="text-xl font-bold mb-1 text-purple-700">Reto Especial</h3>
+            <p className="text-slate-500 text-sm mb-6 leading-relaxed">Envía retos a tus conquistadores por unidad.</p>
+            {/* Formulario editable para cada unidad */}
+            {unidades.map(unidad => (
+              <div key={unidad} className="mb-4">
+                <div className="font-bold text-purple-700">Unidad: {unidad}</div>
+                <form
+                  className="bg-white rounded-xl p-3 border border-purple-200 mt-2 flex flex-col gap-2"
+                  onSubmit={async e => {
+                    e.preventDefault();
+                    const form = e.target as HTMLFormElement;
+                    const titulo = (form.elements.namedItem("titulo") as HTMLInputElement).value;
+                    const descripcion = (form.elements.namedItem("descripcion") as HTMLInputElement).value;
+                    const puntos = parseInt((form.elements.namedItem("puntos") as HTMLInputElement).value, 10);
+                    const fecha = new Date().toISOString().split("T")[0];
+                    try {
+                      await addDoc(collection(db, "retosEspeciales"), {
+                        titulo,
+                        descripcion,
+                        puntos,
+                        unidad,
+                        consejeroId,
+                        fecha
+                      });
+                      alert("Reto creado y enviado a los conquistadores de la unidad " + unidad);
+                    } catch (err) {
+                      let errorMsg = "";
+                      if (err instanceof Error) {
+                        errorMsg = err.message;
+                      } else {
+                        errorMsg = typeof err === "string" ? err : JSON.stringify(err);
+                      }
+                      alert("Error al crear reto: " + errorMsg);
+                    }
+                  }}
+                >
+                  <input name="titulo" placeholder="Título del reto" className="border p-2 rounded-xl" required />
+                  <input name="descripcion" placeholder="Descripción" className="border p-2 rounded-xl" required />
+                  <input name="puntos" placeholder="Puntos" type="number" className="border p-2 rounded-xl" required />
+                  <button type="submit" className="bg-purple-600 text-white px-4 py-2 rounded-xl font-bold hover:bg-purple-800 transition-all text-sm">
+                    Enviar reto a conquistadores
+                  </button>
+                </form>
+                {/* Mostrar retos especiales de la unidad en tiempo real */}
+                {retosEspeciales.filter(r => r.unidad === unidad).length > 0 && (
+                  <div className="mt-2">
+                    <div className="font-semibold text-purple-600 mb-1">Retos enviados:</div>
+                    <ul className="space-y-2">
+                      {retosEspeciales.filter(r => r.unidad === unidad).map(r => (
+                        <li key={r.id} className="bg-purple-50 border border-purple-200 rounded-xl p-2">
+                          <div className="font-bold text-purple-700">{r.titulo}</div>
+                          <div className="text-xs text-purple-500">{r.descripcion}</div>
+                          <div className="text-xs text-purple-400">Puntos: {r.puntos} | Fecha: {r.fecha}</div>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
           {/* Tarjeta: Unidades */}
           <SectionCard
             title="Tus Unidades"

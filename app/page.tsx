@@ -5,6 +5,8 @@ import { db } from '../src/firebase';
 import { collection, getDocs, query, where } from 'firebase/firestore';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
+import { logInfo, logError } from "@/src/lib/logger";
+import { handleError } from "@/src/lib/errorHandler";
 
 export default function Home() {
     // Función para agregar dígitos al PIN
@@ -31,11 +33,13 @@ export default function Home() {
     if (pin.length === 4) {
       if (pin === '1844') {
         setError('');
+        logInfo('Login admin exitoso');
         router.push('/admin');
         return;
       }
       if (pin === '*611') {
         setError('');
+        logInfo('Login evaluador guía mayor exitoso');
         router.push('/admin/evaluar-guia-mayor');
         return;
       }
@@ -46,6 +50,7 @@ export default function Home() {
         if (!snapshotConsejero.empty) {
           const consejeroDoc = snapshotConsejero.docs[0];
           setError('');
+          logInfo('Login consejero exitoso: ' + consejeroDoc.id);
           router.push(`/consejero/${consejeroDoc.id}`);
           return;
         }
@@ -54,10 +59,12 @@ export default function Home() {
         const snapshotMiembro = await getDocs(qMiembro);
         if (!snapshotMiembro.empty) {
           setError('');
+          logInfo('Login miembro exitoso: ' + pin);
           router.push(`/miembros/dashboard?pin=${pin}`);
           return;
         }
         setError('PIN incorrecto.');
+        logError('PIN incorrecto: ' + pin);
         setTimeout(() => setPin(''), 600);
       })();
     }

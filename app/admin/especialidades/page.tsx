@@ -71,7 +71,8 @@ export default function Page() {
       );
 
       if (!yaExiste) {
-        await addDoc(collection(db, "especialidades"), esp);
+        const docRef = await addDoc(collection(db, "especialidades"), esp);
+        logInfo('Especialidad agregada: ' + docRef.id);
         agregados++;
       }
 

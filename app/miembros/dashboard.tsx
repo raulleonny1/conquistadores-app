@@ -5,6 +5,7 @@ import EventosSidebar from './EventosSidebar';
 import { db } from '../../src/firebase';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { getAuth, signOut } from 'firebase/auth';
+import { logInfo, logError } from "@/src/lib/logger";
 import { useSearchParams } from 'next/navigation';
 import {
 	Medal,
@@ -37,8 +38,10 @@ const iconosEspecialidades: Record<string, string> = {
 };
 
 const App = () => {
-		const [frasesSemana, setFrasesSemana] = useState<any[]>([]);
-		const [fraseHoy, setFraseHoy] = useState<{ frase: string, hora: string } | null>(null);
+	const [frasesSemana, setFrasesSemana] = useState<any[]>([]);
+	const [fraseHoy, setFraseHoy] = useState<{ frase: string, hora: string } | null>(null);
+	const [retosEspeciales, setRetosEspeciales] = useState<any[]>([]);
+	const [defaultReto, setDefaultReto] = useState<any | null>(null);
 	const searchParams = useSearchParams();
 	const pin = searchParams.get('pin') || '';
 
@@ -79,13 +82,51 @@ const App = () => {
 			}
 		});
 
+		// Suscripción en tiempo real a retos de la unidad y retos globales
+		let unsubReto: (() => void) | undefined;
+		if (user && user.unidad) {
+			const retosQuery = collection(db, "retosEspeciales");
+			unsubReto = onSnapshot(retosQuery, snap => {
+				const retos = snap.docs.map(doc => {
+					const data = doc.data();
+					return {
+						id: doc.id,
+						titulo: data.titulo || '',
+						descripcion: data.descripcion || '',
+						puntos: data.puntos || 0,
+						fecha: data.fecha || '',
+						unidad: data.unidad || '',
+						consejeroId: data.consejeroId || ''
+					};
+				});
+				// Filtrar retos: globales (admin) o de la unidad
+				const retosFiltrados = retos.filter(r => r.unidad === user.unidad || r.unidad === "ALL" || !r.unidad);
+				retosFiltrados.sort((a, b) => (a.fecha > b.fecha ? -1 : 1));
+				setRetosEspeciales(retosFiltrados);
+				// Si no hay retos, buscar el reto especial por ID
+				if (retosFiltrados.length === 0) {
+					import('firebase/firestore').then(({ getDoc, doc }) => {
+						getDoc(doc(db, "retosEspeciales", "0eVaYg1dXcAchOdqtNd8")).then(snap => {
+							if (snap.exists()) {
+								setDefaultReto({ id: snap.id, ...snap.data() });
+							} else {
+								setDefaultReto(null);
+							}
+						});
+					});
+				} else {
+					setDefaultReto(null);
+				}
+			});
+		}
+
 		if (!pin) {
 			setError('No se proporcionó PIN');
-			setLoading(false);
 			return;
 		}
 
-		const fetchUser = async () => {
+		// Fetch user logic directly here
+		(async () => {
 			try {
 				const qConquis = query(collection(db, 'RegistroConquis'), where('pin', '==', pin));
 				const snapConquis = await getDocs(qConquis);
@@ -101,7 +142,6 @@ const App = () => {
 					setLoading(false);
 					return;
 				}
-
 				const qConsejero = query(collection(db, 'consejeros'), where('pin', '==', pin));
 				const snapConsejero = await getDocs(qConsejero);
 				if (!snapConsejero.empty) {
@@ -116,24 +156,26 @@ const App = () => {
 					setLoading(false);
 					return;
 				}
-
 				setError('No existe usuario con ese PIN.');
 			} catch (e) {
 				setError('Error al consultar datos');
 				console.error('Error Firestore:', e);
 			}
 			setLoading(false);
-		};
-
-		fetchUser();
+		})();
 
 		// cleanup SIEMPRE al final
-		return () => unsubFrases();
+		return () => {
+			unsubFrases();
+			if (unsubReto) unsubReto();
+		};
 	}, [pin]);
 
 	const handleLogout = () => {
+		import { logInfo } from "@/src/lib/logger";
 		const auth = getAuth();
 		signOut(auth).then(() => {
+			logInfo('Logout miembro exitoso');
 			window.location.href = '/';
 		});
 	};
@@ -142,6 +184,8 @@ const App = () => {
 		return <div className="text-center mt-10 text-lg text-indigo-700">Cargando datos...</div>;
 	}
 	if (error) {
+		import { logError } from "@/src/lib/logger";
+		logError('Error en dashboard miembro: ' + error + ' PIN: ' + pin);
 		return <div className="text-center mt-10 text-lg text-red-700 font-bold">{error}<br/><span className="text-xs text-slate-500">PIN ingresado: {pin}</span></div>;
 	}
 
@@ -355,10 +399,47 @@ const App = () => {
 								<div className="bg-indigo-400/20 backdrop-blur-md px-3 py-1 rounded-full inline-block mb-4 border border-indigo-400/30">
 									<p className="text-[10px] font-black uppercase tracking-[0.2em] text-indigo-200">Reto Especial</p>
 								</div>
-								<h4 className="text-2xl md:text-3xl font-black mb-6 leading-tight tracking-tighter">Aprende 5 nudos nuevos y gana 200 XP extra</h4>
-								<button className="w-full bg-white text-indigo-900 px-8 py-4 rounded-2xl font-black text-xs uppercase tracking-[0.2em] hover:scale-105 active:scale-95 transition-all shadow-xl shadow-indigo-950/50">
-									¡Aceptar Reto!
-								</button>
+								{/* Depuración: mostrar unidad del usuario y de los retos */}
+								<div className="mb-4 p-2 bg-yellow-50 border border-yellow-200 rounded-xl text-xs text-yellow-700">
+									<div><b>Unidad del usuario:</b> {user?.unidad || 'Sin unidad'}</div>
+									<div><b>Retos encontrados:</b> {retosEspeciales.length}</div>
+									{retosEspeciales.length > 0 && (
+										<ul className="mt-2">
+											{retosEspeciales.map((reto, idx) => (
+												<li key={reto.id}>
+													<b>Reto {idx + 1}:</b> unidad: "{reto.unidad}" | título: "{reto.titulo}"
+												</li>
+											))}
+										</ul>
+									)}
+								</div>
+								{retosEspeciales.length > 0 ? (
+									<>
+										{retosEspeciales.map((reto, idx) => (
+											<div key={reto.id} className="mb-8">
+												<h4 className="text-2xl md:text-3xl font-black mb-2 leading-tight tracking-tighter">{reto.titulo}</h4>
+												<p className="mb-2 text-indigo-200 text-sm">{reto.descripcion}</p>
+												<div className="mb-2 text-xs text-indigo-300">Puntos: {reto.puntos} | Fecha: {reto.fecha}</div>
+												<button className="w-full bg-white text-indigo-900 px-8 py-4 rounded-2xl font-black text-xs uppercase tracking-[0.2em] hover:scale-105 active:scale-95 transition-all shadow-xl shadow-indigo-950/50">
+													¡Aceptar Reto!
+												</button>
+											</div>
+										))}
+									</>
+								) : defaultReto ? (
+									<>
+										<h4 className="text-2xl md:text-3xl font-black mb-6 leading-tight tracking-tighter">{defaultReto.titulo}</h4>
+										<p className="mb-4 text-indigo-200 text-sm">{defaultReto.descripcion}</p>
+										<div className="mb-4 text-xs text-indigo-300">Puntos: {defaultReto.puntos} | Fecha: {defaultReto.fecha}</div>
+										<button className="w-full bg-white text-indigo-900 px-8 py-4 rounded-2xl font-black text-xs uppercase tracking-[0.2em] hover:scale-105 active:scale-95 transition-all shadow-xl shadow-indigo-950/50">
+											¡Aceptar Reto!
+										</button>
+									</>
+								) : (
+									<>
+										<h4 className="text-2xl md:text-3xl font-black mb-6 leading-tight tracking-tighter">No hay reto especial asignado</h4>
+									</>
+								)}
 							</div>
 						</div>
 

@@ -4,6 +4,9 @@ import { db } from '../src/firebase';
 import { collection, addDoc, onSnapshot, doc, deleteDoc, updateDoc } from 'firebase/firestore';
 
 export default function RegistroConquistador() {
+  // ...existing code...
+  import { logInfo } from "@/src/lib/logger";
+  import { handleError } from "@/src/lib/errorHandler";
   const [form, setForm] = useState({
     nombre: '',
     apellido: '',
@@ -38,6 +41,7 @@ export default function RegistroConquistador() {
           nombre: doc.data().nombre,
           unidades: doc.data().unidades || []
         })));
+        logInfo("Se cargaron los consejeros desde Firebase");
       });
     });
   }, []);
@@ -65,6 +69,11 @@ export default function RegistroConquistador() {
   }, []);
 
   // ...existing code...
+  // Ejemplo de uso al registrar un conquistador
+  const registrarConquistador = async () => {
+    // ...lógica de registro...
+    logInfo("Se registró un conquistador");
+  };
 
 
   // Leer miembros en tiempo real
@@ -82,10 +91,12 @@ export default function RegistroConquistador() {
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    import { handleError } from "@/src/lib/errorHandler";
     try {
       const pin = generarPin();
       await addDoc(collection(db, 'RegistroConquis'), { ...form, pin });
       alert('Registro guardado en Firebase. PIN: ' + pin);
+      logInfo('Registro guardado en Firebase. PIN: ' + pin);
       setForm({
         nombre: '',
         apellido: '',
@@ -98,6 +109,8 @@ export default function RegistroConquistador() {
       });
     } catch (error) {
       alert('Error al guardar en Firebase');
+      logError('Error al guardar en Firebase: ' + error);
+      handleError(error);
     }
   };
 
@@ -105,6 +118,7 @@ export default function RegistroConquistador() {
   const eliminarMiembro = async (id: string) => {
     if (window.confirm('¿Eliminar este miembro?')) {
       await deleteDoc(doc(db, 'RegistroConquis', id));
+      logInfo('Miembro eliminado: ' + id);
     }
   };
 
@@ -120,6 +134,8 @@ export default function RegistroConquistador() {
   const guardarEdicion = async () => {
     const { id, ...rest } = editForm;
     await updateDoc(doc(db, 'RegistroConquis', id), rest);
+      await updateDoc(doc(db, 'RegistroConquis', id), rest);
+      logInfo('Miembro actualizado: ' + id);
     setEditandoId(null);
     setEditForm({});
   };

@@ -51,9 +51,11 @@ export default function UnidadesPage() {
 
     if (editId) {
       await updateDoc(doc(db, "unidades", editId), form);
+      logInfo('Unidad actualizada: ' + editId);
       setEditId(null);
     } else {
-      await addDoc(unidadesRef, form);
+      const docRef = await addDoc(unidadesRef, form);
+      logInfo('Unidad registrada: ' + docRef.id);
     }
 
     setForm({ nombre: "", banderin: "" });
@@ -77,6 +79,8 @@ export default function UnidadesPage() {
     if (!confirmar) return;
 
     await deleteDoc(doc(db, "unidades", id));
+  await deleteDoc(doc(db, "unidades", id));
+  logInfo('Unidad eliminada: ' + id);
 
     setUnidades(unidades.filter((u) => u.id !== id));
   };
