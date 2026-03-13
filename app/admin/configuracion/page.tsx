@@ -17,15 +17,15 @@ type ConfigSectionProps = {
   onAction?: () => void;
 };
 
-const ConfigSection = ({
+const ConfigSection: React.FC<ConfigSectionProps> = ({
   title,
   subtitle,
   icon: Icon,
-  colorClass,
+  colorClass = "bg-blue-500",
   children,
   actionLabel,
   onAction
-}: ConfigSectionProps) => (
+}) => (
   <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden mb-6 transition-all hover:shadow-md">
     <div className="p-6 border-b border-slate-50 flex flex-col md:flex-row md:items-center justify-between gap-4">
       <div className="flex items-start gap-4">
