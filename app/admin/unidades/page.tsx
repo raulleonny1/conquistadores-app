@@ -11,6 +11,7 @@ import {
   deleteDoc,
   doc,
 } from "firebase/firestore";
+import { logInfo } from "@/src/lib/logger";
 
 const unidadesRef = collection(db, "unidades");
 
