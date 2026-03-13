@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import { db } from "@/src/firebase";
 import { collection, addDoc, getDocs, deleteDoc, doc } from "firebase/firestore";
 import { especialidadesBase } from "@/src/data/especialidades";
+import { logInfo } from "@/src/lib/logger";
 
 type Especialidad = {
   id?: string;
