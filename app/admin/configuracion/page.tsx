@@ -3,9 +3,22 @@
 import React, { useState } from 'react';
 import { db } from "../../../src/firebase";
 import { collection, getDocs, updateDoc, doc } from "firebase/firestore";
+
 import {
   Settings, Users, ShieldCheck, RefreshCcw, ArrowLeft, Search, UserCog, ChevronRight, History
 } from 'lucide-react';
+
+type Usuario = {
+  id: string;
+  nombre: string;
+  pin: string;
+};
+
+type UserTableProps = {
+  users: Usuario[];
+  typeLabel: string;
+  onReset: (id: string, nombre: string) => void;
+};
 
 type ConfigSectionProps = {
   title: string;
