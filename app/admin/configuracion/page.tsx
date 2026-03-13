@@ -7,7 +7,25 @@ import {
   Settings, Users, ShieldCheck, RefreshCcw, ArrowLeft, Search, UserCog, ChevronRight, History
 } from 'lucide-react';
 
-const ConfigSection = ({ title, subtitle, icon: Icon, colorClass, children, actionLabel, onAction }) => (
+type ConfigSectionProps = {
+  title: string;
+  subtitle?: string;
+  icon: any;
+  colorClass?: string;
+  children?: React.ReactNode;
+  actionLabel?: string;
+  onAction?: () => void;
+};
+
+const ConfigSection = ({
+  title,
+  subtitle,
+  icon: Icon,
+  colorClass,
+  children,
+  actionLabel,
+  onAction
+}: ConfigSectionProps) => (
   <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden mb-6 transition-all hover:shadow-md">
     <div className="p-6 border-b border-slate-50 flex flex-col md:flex-row md:items-center justify-between gap-4">
       <div className="flex items-start gap-4">
