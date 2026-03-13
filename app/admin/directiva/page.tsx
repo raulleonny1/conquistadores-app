@@ -1,6 +1,7 @@
 "use client";
 import React, { useState, useEffect } from "react";
 import { db } from "../../../src/firebase";
+import { formatFechaDDMMYYYY } from "@/src/utils/formatoFecha";
 import { collection, addDoc, onSnapshot, deleteDoc, doc, updateDoc } from "firebase/firestore";
 import { ArrowLeft } from "lucide-react";
 
