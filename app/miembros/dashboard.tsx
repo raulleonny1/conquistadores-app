@@ -171,8 +171,8 @@ const App = () => {
 		};
 	}, [pin]);
 
+	import { logInfo, logError } from "@/src/lib/logger";
 	const handleLogout = () => {
-		import { logInfo } from "@/src/lib/logger";
 		const auth = getAuth();
 		signOut(auth).then(() => {
 			logInfo('Logout miembro exitoso');
@@ -184,7 +184,6 @@ const App = () => {
 		return <div className="text-center mt-10 text-lg text-indigo-700">Cargando datos...</div>;
 	}
 	if (error) {
-		import { logError } from "@/src/lib/logger";
 		logError('Error en dashboard miembro: ' + error + ' PIN: ' + pin);
 		return <div className="text-center mt-10 text-lg text-red-700 font-bold">{error}<br/><span className="text-xs text-slate-500">PIN ingresado: {pin}</span></div>;
 	}
