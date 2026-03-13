@@ -1,6 +1,6 @@
 "use client";
 import React, { useState } from "react";
-import { db } from "../../../src/firebase";
+import { db, formatFechaDDMMYYYY } from "../../../src/firebase";
 import { collection, addDoc } from "firebase/firestore";
 import { ArrowLeft, PlusCircle } from "lucide-react";
 
@@ -21,7 +21,6 @@ export default function CalificacionesPage() {
     setLoading(true);
     try {
       for (const item of items) {
-        const { formatFechaDDMMYYYY } = await import("../../../src/firebase");
         await addDoc(collection(db, "calificaciones"), {
           nombre: item.nombre,
           puntos: item.puntos,

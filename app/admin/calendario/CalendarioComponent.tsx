@@ -1,7 +1,7 @@
 "use client";
 import React, { useState, useEffect } from "react";
 import { db } from "@/src/firebase";
-import { collection, addDoc, onSnapshot } from "firebase/firestore";
+import { collection, addDoc, onSnapshot, doc, deleteDoc, updateDoc } from "firebase/firestore";
 
 export default function CalendarioComponent() {
     const [editId, setEditId] = useState<string | null>(null);
@@ -20,7 +20,6 @@ export default function CalendarioComponent() {
     // Manejar eliminación
     const handleDelete = async (id: string) => {
       if (window.confirm("¿Eliminar este evento?")) {
-        const { doc, deleteDoc } = await import("firebase/firestore");
         await deleteDoc(doc(db, "eventos", id));
       }
     };
@@ -67,7 +66,6 @@ export default function CalendarioComponent() {
       const fechaFormateada = `${dia}/${mes}/${año}`;
       const eventoForm = { ...form, fecha: fechaFormateada };
       if (editId) {
-        const { doc, updateDoc } = await import("firebase/firestore");
         await updateDoc(doc(db, "eventos", editId), eventoForm);
         setEditId(null);
       } else {

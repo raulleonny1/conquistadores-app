@@ -34,7 +34,9 @@ export default function RegistroConquistador() {
 
   // Consejeros desde Firebase (con unidades)
   const [consejerosRegistrados, setConsejerosRegistrados] = useState<{nombre: string, unidades: string[]}[]>([]);
+  // ...existing code...
   React.useEffect(() => {
+    // Los imports dinámicos se mantienen si son necesarios para SSR, pero los estáticos van arriba
     import('firebase/firestore').then(({ getDocs, collection }) => {
       getDocs(collection(db, 'consejeros')).then(snapshot => {
         setConsejerosRegistrados(snapshot.docs.map(doc => ({
@@ -91,7 +93,7 @@ export default function RegistroConquistador() {
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    import { handleError } from "@/src/lib/errorHandler";
+    // ...existing code...
     try {
       const pin = generarPin();
       await addDoc(collection(db, 'RegistroConquis'), { ...form, pin });

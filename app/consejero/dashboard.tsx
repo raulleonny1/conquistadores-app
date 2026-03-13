@@ -1,7 +1,7 @@
 "use client";
 import React, { useEffect, useState } from "react";
 import EventosSidebar from './EventosSidebar';
-import { db } from "../../src/firebase";
+import { db, formatFechaDDMMYYYY } from "../../src/firebase";
 import { collection, getDocs, query, where, onSnapshot, addDoc } from "firebase/firestore";
 import {
   Users,
@@ -89,7 +89,7 @@ export default function ConsejeroDashboard({ consejeroId }: { consejeroId: strin
   if (loading) return <div className="text-center mt-10 text-lg text-blue-700">Cargando datos reales...</div>;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-teal-100 to-sky-200 font-sans text-slate-800">
+    <div className="min-h-screen bg-linear-to-br from-emerald-50 via-teal-100 to-sky-200 font-sans text-slate-800">
       {/* Navbar Superior */}
       <nav className="bg-white/70 backdrop-blur-md sticky top-0 z-50 border-b border-white/20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -155,7 +155,7 @@ export default function ConsejeroDashboard({ consejeroId }: { consejeroId: strin
         {/* Rejilla de Secciones */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {/* Tarjeta: Reto Especial */}
-          <div className="group bg-gradient-to-br from-purple-100 via-pink-100 to-indigo-100 rounded-3xl p-6 shadow-xl border border-white hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1">
+          <div className="group bg-linear-to-br from-purple-100 via-pink-100 to-indigo-100 rounded-3xl p-6 shadow-xl border border-white hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1">
             <div className="flex justify-between items-start mb-4">
               <div className="p-3 rounded-2xl bg-purple-500 hover:bg-purple-600 text-white shadow-lg transition-all">
                 <Award className="w-6 h-6" />
@@ -312,10 +312,7 @@ export default function ConsejeroDashboard({ consejeroId }: { consejeroId: strin
                 actividades.map((evento: any) => (
                   <div key={evento.id} className="p-3 bg-slate-50 rounded-xl border border-slate-100">
                     <div className="font-bold text-rose-700 mb-1">{evento.nombre}</div>
-                    <div className="text-xs text-slate-600 mb-1">Fecha: {(() => {
-                      const { formatFechaDDMMYYYY } = require("../../src/firebase");
-                      return formatFechaDDMMYYYY(evento.fecha);
-                    })()}</div>
+                    <div className="text-xs text-slate-600 mb-1">Fecha: {formatFechaDDMMYYYY(evento.fecha)}</div>
                     <div className="text-xs text-slate-600 mb-1">Lugar: {evento.lugar}</div>
                     <div className="text-xs text-slate-400">{evento.observacion}</div>
                   </div>

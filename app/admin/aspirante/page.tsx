@@ -1,6 +1,6 @@
 "use client";
 import React, { useState, useEffect } from "react";
-import { db } from "../../../src/firebase";
+import { db, formatFechaDDMMYYYY } from "../../../src/firebase";
 import {
   collection,
   addDoc,
@@ -130,7 +130,6 @@ const AspirantePage = () => {
         setEditId(null);
       } else {
         const pin = generarPin();
-        const { formatFechaDDMMYYYY } = await import("../../../src/firebase");
         // Registrar aspirante
         const aspiranteDoc = await addDoc(collection(db, "aspirantesGuiaMayor"), {
           ...form,

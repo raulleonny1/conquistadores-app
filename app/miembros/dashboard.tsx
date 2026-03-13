@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { onSnapshot, doc } from 'firebase/firestore';
 import EventosSidebar from './EventosSidebar';
-import { db } from '../../src/firebase';
+import { db, formatFechaDDMMYYYY } from '../../src/firebase';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { getAuth, signOut } from 'firebase/auth';
 import { logInfo, logError } from "@/src/lib/logger";
@@ -53,8 +53,8 @@ const App = () => {
 
 	// Simulación de eventos y calificaciones
 	const proximosEventos = [
-		{ id: 1, titulo: "Campamento de Verano", fecha: (() => { const { formatFechaDDMMYYYY } = require("../../src/firebase"); return formatFechaDDMMYYYY(new Date()); })(), tipo: "Campamento", color: "bg-orange-100 text-orange-600" },
-		{ id: 2, titulo: "Desfile Cívico", fecha: (() => { const { formatFechaDDMMYYYY } = require("../../src/firebase"); return formatFechaDDMMYYYY(new Date()); })(), tipo: "Evento", color: "bg-blue-100 text-blue-600" }
+		{ id: 1, titulo: "Campamento de Verano", fecha: formatFechaDDMMYYYY(new Date()), tipo: "Campamento", color: "bg-orange-100 text-orange-600" },
+		{ id: 2, titulo: "Desfile Cívico", fecha: formatFechaDDMMYYYY(new Date()), tipo: "Evento", color: "bg-blue-100 text-blue-600" }
 	];
 	const calificacionesRecientes = [
 		{ id: 1, materia: "Nudos y Amarres", nota: "Excelente", icono: <div className="p-2 bg-indigo-100 text-indigo-600 rounded-lg"><BookOpen size={20}/></div> },
@@ -74,10 +74,7 @@ const App = () => {
 				const idx = diaSemana === 0 ? 6 : diaSemana - 1;
 				setFraseHoy({
 					frase: data.frases[idx],
-					hora: (() => {
-						const { formatFechaDDMMYYYY } = require("../../src/firebase");
-						return formatFechaDDMMYYYY(new Date());
-					})()
+					hora: formatFechaDDMMYYYY(new Date())
 				});
 			}
 		});

@@ -64,7 +64,6 @@ export default function DirectivaPage() {
         setEditId(null);
       } else {
         const pin = generarPin();
-        const { formatFechaDDMMYYYY } = await import("../../../src/firebase");
         await addDoc(collection(db, "directivaClub"), {
           ...form,
           pin,
