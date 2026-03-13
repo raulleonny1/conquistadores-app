@@ -171,7 +171,6 @@ const App = () => {
 		};
 	}, [pin]);
 
-	import { logInfo, logError } from "@/src/lib/logger";
 	const handleLogout = () => {
 		const auth = getAuth();
 		signOut(auth).then(() => {
