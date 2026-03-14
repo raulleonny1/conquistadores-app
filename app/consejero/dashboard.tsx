@@ -291,14 +291,41 @@ export default function ConsejeroDashboard({ consejeroId }: { consejeroId: strin
             title="Calificaciones"
             description="Califica el desempeño o actividades de tu unidad."
             icon={<Award className="w-6 h-6" />}
-            items={calificaciones}
+            items={Object.values(detallesMiembros).flat().map((miembro: any) => (
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="font-bold text-blue-700">{miembro.nombre}</div>
+                  <div className="text-xs text-slate-600">PIN: {miembro.pin}</div>
+                </div>
+                <button
+                  className="bg-blue-600 text-white px-4 py-2 rounded-xl font-bold hover:bg-blue-800 transition-all text-xs"
+                  onClick={() => window.location.href = `/consejero/calificaciones?conquistador=${miembro.pin}`}
+                >
+                  Evaluar
+                </button>
+              </div>
+            ))}
             emptyMessage="No hay calificaciones registradas."
             color="blue"
+            extra={
+              <div className="flex justify-center mt-4">
+                <button
+                  className="bg-green-600 text-white px-6 py-2 rounded-xl font-bold hover:bg-green-800 transition-all text-sm"
+                  onClick={() => {
+                    const unidad = unidades[0] || "";
+                    if (unidad) window.location.href = `/consejero/calificaciones-grupo?unidad=${unidad}`;
+                    else alert("No hay unidad disponible para calificar en grupo.");
+                  }}
+                >
+                  Calificar en grupo
+                </button>
+              </div>
+            }
           />
           {/* Tarjeta: Actividades conectada a eventos reales */}
           <div className="group bg-white/80 backdrop-blur-sm rounded-3xl p-6 shadow-xl border border-white hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1">
             <div className="flex justify-between items-start mb-4">
-              <div className="p-3 rounded-2xl bg-rose-500 hover:bg-rose-600  ESTtext-white shadow-lg transition-all">
+              <div className="p-3 rounded-2xl bg-rose-500 hover:bg-rose-600 text-white shadow-lg transition-all">
                 <Calendar className="w-6 h-6" />
               </div>
               <button className="p-2 text-slate-300 group-hover:text-slate-500 transition-colors">
@@ -384,7 +411,7 @@ export default function ConsejeroDashboard({ consejeroId }: { consejeroId: strin
 }
 
 // Sub-componente para las tarjetas de sección
-function SectionCard({ title, description, icon, items, emptyMessage, color, onDetalles }: {
+function SectionCard({ title, description, icon, items, emptyMessage, color, onDetalles, extra }: {
   title: string;
   description: string;
   icon: React.ReactNode;
@@ -392,6 +419,7 @@ function SectionCard({ title, description, icon, items, emptyMessage, color, onD
   emptyMessage: string;
   color: "emerald" | "blue" | "rose";
   onDetalles?: (unidad: string) => void;
+  extra?: React.ReactNode;
 }) {
   const colors: any = {
     emerald: "bg-emerald-500 hover:bg-emerald-600 ring-emerald-100",
@@ -431,7 +459,11 @@ function SectionCard({ title, description, icon, items, emptyMessage, color, onD
           </div>
         )}
       </div>
-      {/* El botón de detalles ahora está dentro de cada unidad, así que este bloque global se eliminó */}
+      {extra && (
+        <div className="mt-4">
+          {extra}
+        </div>
+      )}
     </div>
   );
 }

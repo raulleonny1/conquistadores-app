@@ -28,14 +28,13 @@ import {
 const iconosEspecialidades: Record<string, string> = {
 	"Vida al Aire Libre": "🏕️",
 	"Fogatas y Cocina": "🔥",
-	"Nudos y Amarres": "🪢",
-	"Primeros Auxilios": "⛑️",
-	"Exploración": "🧭",
 	"Naturaleza": "🌳",
 	"Cocina": "🍳",
 	"Deportes": "⚽",
 	// ...agrega más según tus especialidades
 };
+// ...existing code...
+// Agregar botón Ficha Médica en la columna derecha, debajo de EventosSidebar
 
 const App = () => {
 	const [frasesSemana, setFrasesSemana] = useState<any[]>([]);
@@ -56,11 +55,83 @@ const App = () => {
 		{ id: 1, titulo: "Campamento de Verano", fecha: formatFechaDDMMYYYY(new Date()), tipo: "Campamento", color: "bg-orange-100 text-orange-600" },
 		{ id: 2, titulo: "Desfile Cívico", fecha: formatFechaDDMMYYYY(new Date()), tipo: "Evento", color: "bg-blue-100 text-blue-600" }
 	];
-	const calificacionesRecientes = [
-		{ id: 1, materia: "Nudos y Amarres", nota: "Excelente", icono: <div className="p-2 bg-indigo-100 text-indigo-600 rounded-lg"><BookOpen size={20}/></div> },
-		{ id: 2, materia: "Primeros Auxilios", nota: "Aprobado", icono: <div className="p-2 bg-emerald-100 text-emerald-600 rounded-lg"><Medal size={20}/></div> }
-	];
+	// Calificaciones recientes: mostrar disciplina real
+	const [calificacionesRecientes, setCalificacionesRecientes] = useState<any[]>([]);
+	const [totalPuntos, setTotalPuntos] = useState(0);
+	const [puntosAutomaticos, setPuntosAutomaticos] = useState(false);
 
+	useEffect(() => {
+		if (!pin) return;
+		const ref = doc(db, "calificacionesConquis", pin);
+		const unsub = onSnapshot(ref, (snap) => {
+			if (snap.exists()) {
+				const data = snap.data();
+				const puntos = data.puntos || {};
+				setCalificacionesRecientes([
+					{
+						id: "disciplina",
+						materia: "Disciplina",
+						nota: `${puntos.disciplina || 0} puntos`,
+						icono: <div className="p-2 bg-indigo-100 text-indigo-600 rounded-lg"><BookOpen size={20}/></div>
+					},
+					{
+						id: "misionero",
+						materia: "Misionero",
+						nota: `${puntos.misionero || 0} puntos`,
+						icono: <div className="p-2 bg-green-100 text-green-600 rounded-lg"><Trophy size={20}/></div>
+					}
+				]);
+				// Sumar todos los puntos
+				const total = Object.values(puntos).reduce((acc: number, val) => {
+					if (typeof val === "number") return acc + val;
+					if (typeof val === "string") return acc + (parseInt(val) || 0);
+					return acc;
+				}, 0);
+				setTotalPuntos(total);
+			} else {
+				setCalificacionesRecientes([
+					{
+						id: "disciplina",
+						materia: "Disciplina",
+						nota: "0 puntos",
+						icono: <div className="p-2 bg-indigo-100 text-indigo-600 rounded-lg"><BookOpen size={20}/></div>
+					}
+				]);
+				setTotalPuntos(0);
+			}
+		});
+
+		// Lógica para sumar 10 puntos automáticos después de 30 segundos
+		let timeoutId: NodeJS.Timeout;
+		if (pin) {
+			timeoutId = setTimeout(async () => {
+				// Sumar 10 puntos en la categoría "actividad" solo una vez por día
+				const { getDoc, setDoc, doc } = await import('firebase/firestore');
+				const snap = await getDoc(doc(db, "calificacionesConquis", pin));
+				let puntosActuales: Record<string, number> = {};
+				let ultimaActividad = '';
+				if (snap.exists()) {
+					puntosActuales = snap.data().puntos || {};
+					ultimaActividad = snap.data().ultimaActividad || '';
+				}
+				// Fecha actual en formato YYYY-MM-DD
+				const hoy = new Date();
+				const fechaHoy = hoy.getFullYear() + '-' + String(hoy.getMonth() + 1).padStart(2, '0') + '-' + String(hoy.getDate()).padStart(2, '0');
+				if (ultimaActividad === fechaHoy) {
+					// Ya recibió puntos hoy, no hacer nada
+					return;
+				}
+				const nuevosPuntos = { ...puntosActuales, actividad: (typeof puntosActuales.actividad === 'number' ? puntosActuales.actividad : 0) + 10 };
+				await setDoc(doc(db, "calificacionesConquis", pin), { puntos: nuevosPuntos, ultimaActividad: fechaHoy }, { merge: true });
+				setPuntosAutomaticos(true);
+				setTimeout(() => setPuntosAutomaticos(false), 5000);
+			}, 30000);
+		}
+		return () => {
+			unsub();
+			if (timeoutId) clearTimeout(timeoutId);
+		};
+	}, [pin]);
 
 	useEffect(() => {
 		// Notificación de frases de la semana
@@ -238,15 +309,17 @@ const App = () => {
           
 					{/* Tarjeta de Rango y XP Flotante */}
 					<div className="bg-white/95 backdrop-blur-xl p-5 rounded-[2.5rem] shadow-2xl flex items-center justify-center md:justify-start gap-4 border border-white mx-auto md:mx-0 w-full max-w-sm md:w-auto transform hover:scale-105 transition-transform cursor-default">
-						<div className="bg-amber-100 p-4 rounded-3xl shadow-inner">
-							<Star className="text-amber-500 fill-amber-500" size={32} />
-						</div>
+						{puntosAutomaticos && (
+							<div className="absolute top-0 right-0 bg-green-500 text-white px-3 py-1 rounded-xl font-bold text-xs shadow-lg animate-in fade-in slide-in-from-top-4">
+								¡Has recibido 10 puntos por actividad en la plataforma!
+							</div>
+						)}
 						<div className="text-left">
 							<p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] leading-none mb-1">Tu Rol</p>
 							<p className="text-xl font-black text-slate-800 leading-none mb-1">{tipo === 'conquistador' ? 'Conquistador' : 'Consejero'}</p>
 							<div className="flex items-center gap-2 text-green-600 font-black">
 								<TrendingUp size={16} />
-								<span className="text-sm tracking-tight">{user.puntos ? user.puntos.toLocaleString() : 0} PUNTOS</span>
+								<span className="text-sm tracking-tight">{totalPuntos} PUNTOS</span>
 							</div>
 						</div>
 					</div>
@@ -319,7 +392,12 @@ const App = () => {
 										<BookOpen className="text-indigo-600" size={24} />
 										Calificaciones
 									</h3>
-									<button className="text-indigo-600 text-xs font-black uppercase tracking-widest hover:underline">Ver Todo</button>
+																		<button
+																			className="text-indigo-600 text-xs font-black uppercase tracking-widest hover:underline"
+																			onClick={() => window.location.href = `/conquistadores/calificaciones?pin=${pin}`}
+																		>
+																			Ver Todo
+																		</button>
 								</div>
 								<div className="space-y-4">
 									{calificacionesRecientes.map(cal => (
@@ -328,7 +406,6 @@ const App = () => {
 												<div className="group-hover:scale-110 transition-transform">{cal.icono}</div>
 												<div>
 													<p className="font-black text-slate-800 text-sm">{cal.materia}</p>
-													<p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Examen Final</p>
 												</div>
 											</div>
 											<span className="px-4 py-1.5 bg-emerald-100 text-emerald-700 rounded-xl text-[11px] font-black uppercase shadow-sm">
@@ -384,6 +461,11 @@ const App = () => {
             
 						{/* Próximos Eventos reales desde Firebase */}
 						<EventosSidebar />
+						<button className="w-full bg-green-600 text-white px-8 py-4 rounded-2xl font-black text-xs uppercase tracking-[0.2em] hover:scale-105 active:scale-95 transition-all shadow-xl shadow-green-950/50 mt-6"
+							onClick={() => window.location.href = `/miembros/ficha-medica?pin=${pin}`}
+						>
+							FICHA MÉDICA
+						</button>
 
 						{/* Tarjeta de Reto Semanal - El toque final */}
 						<div className="bg-linear-to-br from-indigo-950 via-indigo-900 to-indigo-800 rounded-b-4xl p-10 text-white relative overflow-hidden group shadow-2xl">

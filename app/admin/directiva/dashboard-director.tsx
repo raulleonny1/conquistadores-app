@@ -7,6 +7,7 @@ import { Users, Target, Trophy, Calendar, LogOut, X, Zap } from "lucide-react";
 import { useMiembros } from "@/src/hooks/useMiembros";
 import { useUnidades } from "@/src/hooks/useUnidades";
 import { useEventos } from "@/src/hooks/useEventos";
+import { getDoc, doc } from "firebase/firestore";
 
 export default function DashboardDirector() {
   const { miembros } = useMiembros();
@@ -148,29 +149,27 @@ export default function DashboardDirector() {
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 font-mono">
-                {activeTab === 'miembros' && data.miembros.list.map((m, i) => (
-                  <div key={i} className="group bg-slate-900/50 p-6 rounded-4xl border border-white/5 hover:border-cyan-500/50 transition-all flex items-center gap-6">
-                    <div className="w-20 h-20 bg-cyan-500 rounded-3xl flex items-center justify-center text-3xl font-black shadow-lg shadow-cyan-500/20">
-                      {m.name.charAt(0)}
-                    </div>
-                    <div>
-                      <h4 className="text-xl font-bold text-cyan-400">{m.name}</h4>
-                      <p className="text-slate-500">EDAD: {m.age} AÑOS</p>
-                      <span className="text-[10px] px-2 py-0.5 bg-cyan-500/10 text-cyan-500 rounded-md font-black tracking-widest uppercase">{m.rank}</span>
-                    </div>
+                {activeTab === 'miembros' && (
+                  <>
+                    {data.miembros.list.map((m, i) => (
+                      <MiembroDetalleConFicha key={i} miembro={m} />
+                    ))}
+                  </>
+                )}
+                {activeTab === 'unidades' && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {data.unidades.list.map((u, i) => (
+                      <div key={i} className="bg-slate-900/50 p-6 rounded-3xl border border-white/5 hover:border-fuchsia-500/50 transition-all flex items-center justify-between group">
+                        <p className="text-xl font-black tracking-tight group-hover:translate-x-2 transition-transform italic underline decoration-fuchsia-500/30 decoration-4">
+                          {u}
+                        </p>
+                        <div className="w-10 h-10 rounded-full bg-fuchsia-500/10 flex items-center justify-center text-fuchsia-500">
+                          <Target size={20} />
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                ))}
-
-                {activeTab === 'unidades' && data.unidades.list.map((u, i) => (
-                  <div key={i} className="bg-slate-900/50 p-6 rounded-3xl border border-white/5 hover:border-fuchsia-500/50 transition-all flex items-center justify-between group">
-                    <p className="text-xl font-black tracking-tight group-hover:translate-x-2 transition-transform italic underline decoration-fuchsia-500/30 decoration-4">
-                      {u}
-                    </p>
-                    <div className="w-10 h-10 rounded-full bg-fuchsia-500/10 flex items-center justify-center text-fuchsia-500">
-                      <Target size={20} />
-                    </div>
-                  </div>
-                ))}
+                )}
 
                 {activeTab === 'eventos' && data.eventos.list.map((e, i) => (
                   <div key={i} className="col-span-full bg-linear-to-r from-amber-500/10 to-transparent p-10 rounded-[3rem] border border-amber-500/20">
@@ -206,6 +205,25 @@ export default function DashboardDirector() {
           text-shadow: 4px 4px 0px rgba(217, 70, 239, 0.3);
         }
       `}</style>
+    </div>
+  );
+}
+
+// Componente para mostrar detalles de miembro en modo lectura
+function MiembroDetalleConFicha({ miembro }: { miembro: any }) {
+  return (
+    <div className="bg-slate-900/60 p-6 rounded-3xl border border-cyan-500/20 shadow-lg flex flex-col gap-2">
+      <div className="flex items-center gap-4 mb-2">
+        <div className="w-16 h-16 rounded-full bg-cyan-200/30 flex items-center justify-center">
+          {/* Foto o icono */}
+          <span className="text-2xl font-black text-cyan-700">{miembro.name?.charAt(0) || '?'}</span>
+        </div>
+        <div>
+          <div className="text-xl font-black text-cyan-300">{miembro.name}</div>
+          <div className="text-xs text-cyan-100">Rango: {miembro.rank}</div>
+        </div>
+      </div>
+      <div className="text-xs text-cyan-100">Edad: {miembro.age}</div>
     </div>
   );
 }
