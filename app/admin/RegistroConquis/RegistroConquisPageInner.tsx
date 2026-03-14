@@ -142,15 +142,15 @@ export default function RegistroConquisPageInner() {
       <form onSubmit={handleSubmit} className="bg-white rounded-3xl p-8 shadow-md border border-slate-200 mb-8 max-w-xl mx-auto">
         <h3 className="text-xl font-bold mb-4 text-indigo-700">Registrar nuevo conquistador</h3>
         <div className="grid grid-cols-1 gap-4">
-          <input name="nombre" value={form.nombre} onChange={handleInput} required placeholder="Nombre y Apellido" className="border rounded-lg px-4 py-2" />
-          <input name="edad" value={form.edad} onChange={handleInput} required placeholder="Edad" type="number" className="border rounded-lg px-4 py-2" />
-          <input name="whatsapp" value={form.whatsapp} onChange={handleInput} required placeholder="WhatsApp" type="tel" className="border rounded-lg px-4 py-2" />
+          <input name="nombre" value={form.nombre} onChange={handleInput} placeholder="Nombre y Apellido" className="border rounded-lg px-4 py-2" />
+          <input name="edad" value={form.edad} onChange={handleInput} placeholder="Edad" type="number" className="border rounded-lg px-4 py-2" />
+          <input name="whatsapp" value={form.whatsapp} onChange={handleInput} placeholder="WhatsApp" type="tel" className="border rounded-lg px-4 py-2" />
           <select name="unidad" value={form.unidad} onChange={handleInput} required className="border rounded-lg px-4 py-2">
             <option value="">Selecciona unidad</option>
             {unidades.map((u, idx) => (
               <option key={idx} value={u.nombre}>{u.nombre}</option>
             ))}
-          </select>
+            </select>
           {form.unidad && (
             <div className="text-xs text-blue-700 font-semibold">Consejero: {form.consejero || "Sin asignar"}</div>
           )}
@@ -159,7 +159,7 @@ export default function RegistroConquisPageInner() {
             {clasesOficiales.map((c, idx) => (
               <option key={idx} value={c}>{c}</option>
             ))}
-          </select>
+            </select>
           {/* Especialidades anidadas y múltiples */}
           <div className="border rounded-lg px-4 py-2 bg-slate-50 mb-2">
             <div className="font-bold mb-2 text-indigo-700">Especialidades</div>
@@ -169,7 +169,7 @@ export default function RegistroConquisPageInner() {
                 {areas.map((a, idx) => (
                   <option key={idx} value={a}>{a}</option>
                 ))}
-              </select>
+                </select>
               {form.especialidadArea && (
                 <select name="especialidadCategoria" value={form.especialidadCategoria} onChange={handleInput} className="border rounded-lg px-2 py-1">
                   <option value="">Categoría</option>

@@ -43,6 +43,7 @@ export default function Home() {
         return;
       }
       (async () => {
+        // ...existing code...
         // Login director
         const qDirector = query(collection(db, 'directivaClub'), where('cargo', '==', 'Director/a'), where('pin', '==', pin));
         const snapshotDirector = await getDocs(qDirector);
@@ -78,6 +79,23 @@ export default function Home() {
           setError('');
           logInfo('Login miembro exitoso: ' + pin);
           router.push(`/miembros/dashboard?pin=${pin}`);
+          return;
+        }
+        // Login aspirante a guía mayor
+        const qAspirante = query(collection(db, 'aspirantesGuiaMayor'), where('pin', '==', pin));
+        const snapshotAspirante = await getDocs(qAspirante);
+        if (!snapshotAspirante.empty) {
+          const aspiranteDoc = snapshotAspirante.docs[0];
+          const data = aspiranteDoc.data();
+          const camposObligatorios = ["nombre", "edad", "nacimiento", "sexo", "direccion", "telefono", "email", "iglesia", "club"];
+          const registroCompleto = camposObligatorios.every(c => data[c]);
+          setError('');
+          logInfo('Login aspirante exitoso: ' + pin);
+          if (!registroCompleto) {
+            router.push(`/aspirante/completar-registro?pin=${pin}`);
+          } else {
+            router.push(`/aspirante/dashboard?pin=${pin}`);
+          }
           return;
         }
         setError('PIN incorrecto.');

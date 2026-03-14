@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, Suspense } from "react";
 import { db } from "../../../src/firebase";
 import { collection, doc, getDocs, setDoc, query, where } from "firebase/firestore";
 import { useSearchParams, usePathname } from "next/navigation";
@@ -18,7 +18,7 @@ const CATEGORIAS_PUNTOS = [
   { id: "especialidades", nombre: "Especialidades" }
 ];
 
-export default function CalificacionesGrupoPage() {
+function CalificacionesGrupoPage() {
   const searchParams = useSearchParams();
   const pathname = usePathname();
   const unidad = searchParams.get("unidad") || "";
@@ -30,7 +30,6 @@ export default function CalificacionesGrupoPage() {
       consejeroId = match[1];
     }
   }
-  // Guardar y recuperar consejeroId en localStorage
   useEffect(() => {
     if (consejeroId) {
       localStorage.setItem("consejeroId", consejeroId);
@@ -132,4 +131,11 @@ export default function CalificacionesGrupoPage() {
     </div>
   );
 }
-// ...existing code...
+
+const CalificacionesGrupoPageWrapper = () => (
+  <Suspense fallback={<div className="text-center mt-10 text-lg text-blue-700">Cargando datos...</div>}>
+    <CalificacionesGrupoPage />
+  </Suspense>
+);
+
+export default CalificacionesGrupoPageWrapper;

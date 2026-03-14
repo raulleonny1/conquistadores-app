@@ -151,7 +151,7 @@ export default function RegistroConquistador() {
           <input name="nombre" value={form.nombre} onChange={handleChange} placeholder="Nombre" className="w-full p-2 rounded border text-sm sm:text-base" />
           <input name="apellido" value={form.apellido} onChange={handleChange} placeholder="Apellido" className="w-full p-2 rounded border text-sm sm:text-base" />
           <input name="edad" value={form.edad} onChange={handleChange} placeholder="Edad" type="number" className="w-full p-2 rounded border text-sm sm:text-base" />
-          <select name="clase" value={form.clase} onChange={handleChange} className="w-full p-2 rounded border text-sm sm:text-base" required>
+          <select name="clase" value={form.clase} onChange={handleChange} className="w-full p-2 rounded border text-sm sm:text-base">
             <option value="">Clases de Conquistadores</option>
             {clasesOficiales.map((clase) => (
               <option key={clase.nombre} value={clase.nombre}>
@@ -159,13 +159,13 @@ export default function RegistroConquistador() {
               </option>
             ))}
           </select>
-          <select name="unidad" value={form.unidad} onChange={handleChange} className="w-full p-2 rounded border text-sm sm:text-base" required>
+          <select name="unidad" value={form.unidad} onChange={handleChange} className="w-full p-2 rounded border text-sm sm:text-base">
             <option value="">Selecciona unidad</option>
             {unidadesRegistradas.map((unidad) => (
               <option key={unidad} value={unidad}>{unidad}</option>
             ))}
           </select>
-          <select name="consejero" value={form.consejero} onChange={handleChange} className="w-full p-2 rounded border text-sm sm:text-base" required>
+          <select name="consejero" value={form.consejero} onChange={handleChange} className="w-full p-2 rounded border text-sm sm:text-base">
             <option value="">Selecciona consejero</option>
             {consejerosRegistrados.map((consejero) => (
               <option key={consejero.nombre} value={consejero.nombre}>{consejero.nombre}</option>
