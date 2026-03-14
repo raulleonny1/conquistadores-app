@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, Suspense } from "react";
 import { db } from "../../../src/firebase";
 import { collection, doc, onSnapshot, setDoc } from "firebase/firestore";
 import { useSearchParams } from "next/navigation";
@@ -25,7 +25,7 @@ const CATEGORIAS_PUNTOS = [
   { id: "especialidades", nombre: "Especialidades" }
 ];
 
-export default function CalificacionesConquistadorPage() {
+function CalificacionesConquistadorPageInner() {
   const searchParams = useSearchParams();
   const pin = searchParams.get("pin") || "";
   const [puntos, setPuntos] = useState<any>({});
@@ -110,5 +110,13 @@ export default function CalificacionesConquistadorPage() {
       <HistorialSemanal />
 
     </div>
+  );
+}
+
+export default function CalificacionesConquistadorPage() {
+  return (
+    <Suspense fallback={<div>Cargando calificaciones...</div>}>
+      <CalificacionesConquistadorPageInner />
+    </Suspense>
   );
 }
