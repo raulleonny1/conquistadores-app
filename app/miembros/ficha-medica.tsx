@@ -3,8 +3,9 @@ import React, { useState, useEffect, useRef } from "react";
 import { db } from "../../src/firebase";
 import { doc, setDoc, getDoc } from "firebase/firestore";
 import { useSearchParams } from "next/navigation";
+import { Suspense } from "react";
 
-export default function FichaMedicaPage() {
+function FichaMedicaPageInner() {
   const searchParams = useSearchParams();
   const pin = searchParams.get("pin") || "";
   const [form, setForm] = useState({
@@ -175,5 +176,13 @@ export default function FichaMedicaPage() {
         </button>
       </form>
     </div>
+  );
+}
+
+export default function FichaMedicaPage() {
+  return (
+    <Suspense fallback={<div className="text-center mt-10 text-lg text-green-700">Cargando ficha médica...</div>}>
+      <FichaMedicaPageInner />
+    </Suspense>
   );
 }
