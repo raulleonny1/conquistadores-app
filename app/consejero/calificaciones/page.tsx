@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, Suspense } from "react";
 import { db } from "../../../src/firebase";
 import { collection, doc, onSnapshot, setDoc } from "firebase/firestore";
 import { useSearchParams } from "next/navigation";
@@ -26,6 +26,14 @@ const CATEGORIAS_PUNTOS = [
 ];
 
 export default function CalificacionesConsejeroPage() {
+  return (
+    <Suspense fallback={<div className="text-center mt-10 text-lg text-indigo-700">Cargando datos...</div>}>
+      <CalificacionesConsejeroPageInner />
+    </Suspense>
+  );
+}
+
+function CalificacionesConsejeroPageInner() {
   const searchParams = useSearchParams();
   const pin = searchParams.get("conquistador") || "";
   const [puntos, setPuntos] = useState<any>({});
