@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import { onSnapshot, doc } from 'firebase/firestore';
 import EventosSidebar from './EventosSidebar';
 import { db, formatFechaDDMMYYYY } from '../../src/firebase';
@@ -529,4 +529,10 @@ const App = () => {
 	);
 };
 
-export default App;
+const AppWrapper = () => (
+	<Suspense fallback={<div className="text-center mt-10 text-lg text-indigo-700">Cargando datos...</div>}>
+		<App />
+	</Suspense>
+);
+
+export default AppWrapper;
