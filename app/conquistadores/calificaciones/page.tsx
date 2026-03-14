@@ -1,8 +1,6 @@
-"use client";
-import React, { useEffect, useState, Suspense } from "react";
+import React, { useEffect, useState } from "react";
 import { db } from "../../../src/firebase";
 import { collection, doc, onSnapshot, setDoc } from "firebase/firestore";
-import { useSearchParams } from "next/navigation";
 import {
   Trophy,
   Star,
@@ -25,9 +23,8 @@ const CATEGORIAS_PUNTOS = [
   { id: "especialidades", nombre: "Especialidades" }
 ];
 
-function CalificacionesConquistadorPageInner() {
-  const searchParams = useSearchParams();
-  const pin = searchParams.get("pin") || "";
+export default function CalificacionesConquistadorPage({ searchParams }: { searchParams: { pin?: string } }) {
+  const pin = searchParams.pin || "";
   const [puntos, setPuntos] = useState<any>({});
   const [nombre, setNombre] = useState("");
   const [loading, setLoading] = useState(true);
@@ -110,13 +107,5 @@ function CalificacionesConquistadorPageInner() {
       <HistorialSemanal />
 
     </div>
-  );
-}
-
-export default function CalificacionesConquistadorPage() {
-  return (
-    <Suspense fallback={<div>Cargando calificaciones...</div>}>
-      <CalificacionesConquistadorPageInner />
-    </Suspense>
   );
 }
