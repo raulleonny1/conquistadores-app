@@ -100,7 +100,8 @@ const AspirantePage = () => {
     anioIngreso: "",
     cargoActual: "",
     unidad: "",
-    aniosClub: ""
+    aniosClub: "",
+    clase: ""
   });
   const [editId, setEditId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -116,7 +117,23 @@ const AspirantePage = () => {
     return () => unsub();
   }, []);
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    setForm({ ...form, [e.target.name]: e.target.value });
+    if (e.target.name === "nacimiento") {
+      const nacimiento = e.target.value;
+      let edad = "";
+      if (nacimiento) {
+        const birthDate = new Date(nacimiento);
+        const today = new Date();
+        let years = today.getFullYear() - birthDate.getFullYear();
+        const m = today.getMonth() - birthDate.getMonth();
+        if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+          years--;
+        }
+        edad = years.toString();
+      }
+      setForm({ ...form, nacimiento, edad });
+    } else {
+      setForm({ ...form, [e.target.name]: e.target.value });
+    }
   };
 
   const handleSave = async () => {
@@ -130,28 +147,28 @@ const AspirantePage = () => {
         setEditId(null);
       } else {
         const pin = generarPin();
-        // Registrar aspirante
-        const aspiranteDoc = await addDoc(collection(db, "aspirantesGuiaMayor"), {
+        // Registrar aspirante usando el pin como ID
+        await setDoc(doc(db, "aspirantesGuiaMayor", pin), {
           ...form,
           pin,
           fechaRegistro: formatFechaDDMMYYYY(new Date())
         });
         // Crear tarjetaGuiaMayor
-          await setDoc(doc(db, "tarjetaGuiaMayor", aspiranteDoc.id), {
-            aspiranteId: aspiranteDoc.id,
-            aspiranteNombre: form.nombre,
-            fechaInicio: new Date().toLocaleDateString(),
-            actividades: tarjetaGuiaMayor.flatMap(grupo =>
-              grupo.actividades.map(act => ({
-                nombre: act,
-                completado: false,
-                evaluador: "",
-                fecha: "",
-                hora: "",
-                firma: ""
-              }))
-            )
-          });
+        await setDoc(doc(db, "tarjetaGuiaMayor", pin), {
+          aspiranteId: pin,
+          aspiranteNombre: form.nombre,
+          fechaInicio: new Date().toLocaleDateString(),
+          actividades: tarjetaGuiaMayor.flatMap(grupo =>
+            grupo.actividades.map(act => ({
+              nombre: act,
+              completado: false,
+              evaluador: "",
+              fecha: "",
+              hora: "",
+              firma: ""
+            }))
+          )
+        });
         alert("Aspirante registrado correctamente. PIN: " + pin);
       }
       setForm({
@@ -197,7 +214,8 @@ const AspirantePage = () => {
       anioIngreso: a.anioIngreso,
       cargoActual: a.cargoActual,
       unidad: a.unidad,
-      aniosClub: a.aniosClub
+      aniosClub: a.aniosClub,
+      clase: a.clase || ""
     });
     setEditId(a.id);
   };
@@ -232,15 +250,28 @@ const AspirantePage = () => {
             <input name="nombre" value={form.nombre} onChange={handleChange} placeholder="Nombre completo" className="border p-2 rounded-xl" />
             <input name="edad" value={form.edad} onChange={handleChange} placeholder="Edad" className="border p-2 rounded-xl" type="number" />
             <input name="nacimiento" value={form.nacimiento} onChange={handleChange} placeholder="Fecha de nacimiento" className="border p-2 rounded-xl" type="date" />
-            <input name="sexo" value={form.sexo} onChange={handleChange} placeholder="Sexo" className="border p-2 rounded-xl" />
+            <select name="sexo" value={form.sexo} onChange={handleChange} className="border p-2 rounded-xl">
+              <option value="">Sexo</option>
+              <option value="Hombre">Hombre</option>
+              <option value="Mujer">Mujer</option>
+            </select>
             <input name="direccion" value={form.direccion} onChange={handleChange} placeholder="Dirección" className="border p-2 rounded-xl" />
             <input name="telefono" value={form.telefono} onChange={handleChange} placeholder="Teléfono" className="border p-2 rounded-xl" />
             <input name="email" value={form.email} onChange={handleChange} placeholder="Email" className="border p-2 rounded-xl" type="email" />
-            <input name="iglesia" value={form.iglesia} onChange={handleChange} placeholder="Iglesia local" className="border p-2 rounded-xl" />
+            <select name="iglesia" value={form.iglesia} onChange={handleChange} className="border p-2 rounded-xl">
+              <option value="">Iglesia local</option>
+              <option value="Iglesia Florida Norte">Iglesia Florida Norte</option>
+            </select>
             <input name="distrito" value={form.distrito} onChange={handleChange} placeholder="Distrito" className="border p-2 rounded-xl" />
-            <input name="asociacion" value={form.asociacion} onChange={handleChange} placeholder="Asociación / Misión" className="border p-2 rounded-xl" />
+            <select name="asociacion" value={form.asociacion} onChange={handleChange} className="border p-2 rounded-xl">
+              <option value="">Asociación / Misión</option>
+              <option value="Misión Ecuatoriana del Sur">Misión Ecuatoriana del Sur</option>
+            </select>
             <input name="pastor" value={form.pastor} onChange={handleChange} placeholder="Pastor" className="border p-2 rounded-xl" />
-            <input name="director" value={form.director} onChange={handleChange} placeholder="Director de conquistadores" className="border p-2 rounded-xl" />
+            <select name="director" value={form.director} onChange={handleChange} className="border p-2 rounded-xl">
+              <option value="">Director de conquistadores</option>
+              <option value="Jenniffer Cargua">Jenniffer Cargua</option>
+            </select>
             <input name="club" value={form.club} onChange={handleChange} placeholder="Club" className="border p-2 rounded-xl" />
             <input name="anioIngreso" value={form.anioIngreso} onChange={handleChange} placeholder="Año de ingreso" className="border p-2 rounded-xl" type="number" />
             <select name="cargoActual" value={form.cargoActual} onChange={handleChange} className="border p-2 rounded-xl">
@@ -251,6 +282,15 @@ const AspirantePage = () => {
             </select>
             <input name="unidad" value={form.unidad} onChange={handleChange} placeholder="Unidad" className="border p-2 rounded-xl" />
             <input name="aniosClub" value={form.aniosClub} onChange={handleChange} placeholder="Años en el club" className="border p-2 rounded-xl" type="number" />
+            <select name="claseOficial" value={form.claseOficial} onChange={handleChange} className="border p-2 rounded-xl">
+              <option value="">Clase</option>
+              <option value="Amigo">Amigo</option>
+              <option value="Compañero">Compañero</option>
+              <option value="Explorador">Explorador</option>
+              <option value="Pionero">Pionero</option>
+              <option value="Excursionista">Excursionista</option>
+              <option value="Guía">Guía</option>
+            </select>
           </form>
           <button
             onClick={handleSave}

@@ -2,7 +2,7 @@
 import React, { useState } from "react";
 import { db } from "../../src/firebase";
 import { doc, getDoc } from "firebase/firestore";
-import CompletarRegistroAspirante from "./completar-registro";
+import CompletarRegistroAspirante from "../../src/components/CompletarRegistroAspirante";
 
 export default function LoginAspirante() {
   const [pin, setPin] = useState("");

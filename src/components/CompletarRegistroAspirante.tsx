@@ -1,5 +1,6 @@
 "use client";
 import React, { useState, useEffect } from "react";
+import { collection, getDocs } from "firebase/firestore";
 import { db } from "../../src/firebase";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
 
@@ -24,7 +25,11 @@ type FormAspirante = {
   [key: string]: string;
 };
 
-export default function CompletarRegistroAspirante({ pin }: { pin: string }) {
+interface CompletarRegistroAspiranteProps {
+  pin: string;
+}
+
+const CompletarRegistroAspirante: React.FC<CompletarRegistroAspiranteProps> = ({ pin }) => {
   const [form, setForm] = useState<FormAspirante>({
     nombre: "",
     edad: "",
@@ -44,6 +49,12 @@ export default function CompletarRegistroAspirante({ pin }: { pin: string }) {
     unidad: "",
     aniosClub: ""
   });
+  const [unidadesRegistradas, setUnidadesRegistradas] = useState<string[]>([]);
+  useEffect(() => {
+    getDocs(collection(db, "unidades")).then(snapshot => {
+      setUnidadesRegistradas(snapshot.docs.map(doc => doc.data().nombre));
+    });
+  }, []);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -60,10 +71,27 @@ export default function CompletarRegistroAspirante({ pin }: { pin: string }) {
       }
     }
     if (pin) fetchData();
+    // eslint-disable-next-line
   }, [pin]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    setForm({ ...form, [e.target.name]: e.target.value });
+    if (e.target.name === "nacimiento") {
+      const nacimiento = e.target.value;
+      let edad = "";
+      if (nacimiento) {
+        const birthDate = new Date(nacimiento);
+        const today = new Date();
+        let years = today.getFullYear() - birthDate.getFullYear();
+        const m = today.getMonth() - birthDate.getMonth();
+        if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+          years--;
+        }
+        edad = years.toString();
+      }
+      setForm({ ...form, nacimiento, edad });
+    } else {
+      setForm({ ...form, [e.target.name]: e.target.value });
+    }
   };
 
   const handleSave = async () => {
@@ -87,24 +115,46 @@ export default function CompletarRegistroAspirante({ pin }: { pin: string }) {
   return (
     <div className="min-h-screen bg-slate-50 font-sans text-slate-900 flex flex-col items-center justify-center">
       <div className="bg-white rounded-3xl shadow-xl p-8 max-w-lg w-full">
+        <button
+          onClick={() => window.location.href = '/'}
+          className="bg-indigo-600 text-white font-bold px-6 py-2 rounded-xl hover:bg-indigo-800 transition-all mb-6"
+        >
+          Regresar
+        </button>
         <h2 className="text-2xl font-bold mb-6 text-indigo-700">Completa tu Registro</h2>
         {!registroCompleto && <div className="mb-4 text-red-600 font-bold">Debes completar todos los campos obligatorios para acceder al sistema.</div>}
         {error && <div className="mb-4 text-red-600">{error}</div>}
         {success && <div className="mb-4 text-green-600">{success}</div>}
         <form className="grid grid-cols-1 gap-4 mb-8">
           <input name="nombre" value={form.nombre} onChange={handleChange} placeholder="Nombre completo*" className="border p-2 rounded-xl" />
-          <input name="edad" value={form.edad} onChange={handleChange} placeholder="Edad*" className="border p-2 rounded-xl" type="number" />
           <input name="nacimiento" value={form.nacimiento} onChange={handleChange} placeholder="Fecha de nacimiento*" className="border p-2 rounded-xl" type="date" />
-          <input name="sexo" value={form.sexo} onChange={handleChange} placeholder="Sexo*" className="border p-2 rounded-xl" />
+          <input name="edad" value={form.edad} readOnly placeholder="Edad*" className="border p-2 rounded-xl bg-gray-100" type="number" />
+          <select name="sexo" value={form.sexo} onChange={handleChange} className="border p-2 rounded-xl">
+            <option value="">Sexo*</option>
+            <option value="Hombre">Hombre</option>
+            <option value="Mujer">Mujer</option>
+          </select>
           <input name="direccion" value={form.direccion} onChange={handleChange} placeholder="Dirección*" className="border p-2 rounded-xl" />
           <input name="telefono" value={form.telefono} onChange={handleChange} placeholder="Teléfono*" className="border p-2 rounded-xl" />
           <input name="email" value={form.email} onChange={handleChange} placeholder="Email*" className="border p-2 rounded-xl" type="email" />
-          <input name="iglesia" value={form.iglesia} onChange={handleChange} placeholder="Iglesia local*" className="border p-2 rounded-xl" />
+          <select name="iglesia" value={form.iglesia} onChange={handleChange} className="border p-2 rounded-xl">
+            <option value="">Iglesia local*</option>
+            <option value="Iglesia Florida Norte">Iglesia Florida Norte</option>
+          </select>
           <input name="distrito" value={form.distrito} onChange={handleChange} placeholder="Distrito" className="border p-2 rounded-xl" />
-          <input name="asociacion" value={form.asociacion} onChange={handleChange} placeholder="Asociación / Misión" className="border p-2 rounded-xl" />
+          <select name="asociacion" value={form.asociacion} onChange={handleChange} className="border p-2 rounded-xl">
+            <option value="">Asociación / Misión*</option>
+            <option value="Misión Ecuatoriana del Sur">Misión Ecuatoriana del Sur</option>
+          </select>
           <input name="pastor" value={form.pastor} onChange={handleChange} placeholder="Pastor" className="border p-2 rounded-xl" />
-          <input name="director" value={form.director} onChange={handleChange} placeholder="Director de conquistadores" className="border p-2 rounded-xl" />
-          <input name="club" value={form.club} onChange={handleChange} placeholder="Club*" className="border p-2 rounded-xl" />
+          <select name="director" value={form.director} onChange={handleChange} className="border p-2 rounded-xl">
+            <option value="">Director de conquistadores</option>
+            <option value="Jenniffer Cargua">Jenniffer Cargua</option>
+          </select>
+          <select name="club" value={form.club} onChange={handleChange} className="border p-2 rounded-xl">
+            <option value="">Club*</option>
+            <option value="Club Caleb">Club Caleb</option>
+          </select>
           <input name="anioIngreso" value={form.anioIngreso} onChange={handleChange} placeholder="Año de ingreso" className="border p-2 rounded-xl" type="number" />
           <select name="cargoActual" value={form.cargoActual} onChange={handleChange} className="border p-2 rounded-xl">
             <option value="">Cargo actual</option>
@@ -112,8 +162,22 @@ export default function CompletarRegistroAspirante({ pin }: { pin: string }) {
             <option value="Consejero">Consejero</option>
             <option value="Instructor">Instructor</option>
           </select>
-          <input name="unidad" value={form.unidad} onChange={handleChange} placeholder="Unidad" className="border p-2 rounded-xl" />
+          <select name="unidad" value={form.unidad} onChange={handleChange} className="border p-2 rounded-xl">
+            <option value="">Unidad</option>
+            {unidadesRegistradas.map((unidad) => (
+              <option key={unidad} value={unidad}>{unidad}</option>
+            ))}
+          </select>
           <input name="aniosClub" value={form.aniosClub} onChange={handleChange} placeholder="Años en el club" className="border p-2 rounded-xl" type="number" />
+          <select name="clase" value={form.clase || ""} onChange={handleChange} className="border p-2 rounded-xl">
+            <option value="">Clase</option>
+            <option value="Amigo">Amigo</option>
+            <option value="Compañero">Compañero</option>
+            <option value="Explorador">Explorador</option>
+            <option value="Pionero">Pionero</option>
+            <option value="Excursionista">Excursionista</option>
+            <option value="Guía">Guía</option>
+          </select>
         </form>
         <button
           onClick={handleSave}
@@ -125,4 +189,6 @@ export default function CompletarRegistroAspirante({ pin }: { pin: string }) {
       </div>
     </div>
   );
-}
+};
+
+export default CompletarRegistroAspirante;
