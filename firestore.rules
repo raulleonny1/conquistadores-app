@@ -1,0 +1,115 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // -----------------------------
+    // Helpers / Roles
+    // -----------------------------
+    function isAuth() {
+      return request.auth != null;
+    }
+
+    function role() {
+      return request.auth.token.role;
+    }
+
+    function isAdmin() {
+      return isAuth() && role() == "admin";
+    }
+
+    function isDirectiva() {
+      return isAuth() && role() == "directiva";
+    }
+
+    function isConsejero() {
+      return isAuth() && role() == "consejero";
+    }
+
+    function isMiembro() {
+      return isAuth() && role() == "miembro";
+    }
+
+    function isAspirante() {
+      return isAuth() && role() == "aspirante";
+    }
+
+    // Optional: allow users to read their own records based on a pin claim.
+    // WARNING: "pin" is low-entropy and should not be used as a security boundary
+    // unless you accept the risk. Prefer to use `uid` or a stable identifier.
+    function matchesPin(field) {
+      return isAuth() && request.auth.token.pin != null && request.auth.token.pin == field;
+    }
+
+    // -----------------------------
+    // Collections
+    // -----------------------------
+
+    match /unidades/{unitId} {
+      // Unidades are read in the UI to choose unidad/consejero.
+      allow read: if isAuth();
+      allow write: if isAdmin();
+    }
+
+    match /consejeros/{consejeroId} {
+      allow read: if isAuth();
+      allow write: if isAdmin();
+    }
+
+    match /RegistroConquis/{docId} {
+      // Admin / Directiva can read all.
+      // Consejeros can read documentos de su unidad.
+      // Miembros (con pin) can read su propio documento.
+      allow read: if isAdmin() || isDirectiva()
+        || (isConsejero() && request.auth.token.unidad != null && request.auth.token.unidad == resource.data.unidad)
+        || matchesPin(resource.data.pin);
+
+      // Escritura solo para admin (evita que cualquier usuario escriba libremente).
+      // Si deseas permitir que consejeros editen, añade un permiso adicional.
+      allow write: if isAdmin();
+    }
+
+    match /calificaciones/{docId} {
+      // Lectura: admin/directiva + consejero de la calificación + el miembro vinculado al pin.
+      allow read: if isAdmin() || isDirectiva()
+        || (isConsejero() && request.auth.token.consejeroId != null && request.auth.token.consejeroId == resource.data.consejeroId)
+        || matchesPin(resource.data.pin);
+
+      // Escritura: admin y consejero (solo si coincide su id).
+      allow write: if isAdmin() || (isConsejero() && request.auth.token.consejeroId != null && request.auth.token.consejeroId == request.resource.data.consejeroId);
+    }
+
+    match /calificacionesSemanal/{docId} {
+      allow read: if isAdmin() || isDirectiva() || matchesPin(resource.data.pin);
+      allow write: if isAdmin() || isConsejero();
+    }
+
+    match /calificacionesConquis/{docId} {
+      allow read: if isAdmin() || isDirectiva() || matchesPin(resource.data.pin);
+      allow write: if isAdmin() || isConsejero();
+    }
+
+    match /eventos/{docId} {
+      allow read: if isAuth();
+      allow write: if isAdmin() || isConsejero();
+    }
+
+    match /retosEspeciales/{docId} {
+      allow read: if isAuth();
+      allow write: if isAdmin() || isConsejero();
+    }
+
+    match /frasesSemana/{docId} {
+      allow read: if isAuth();
+      allow write: if isAdmin();
+    }
+
+    match /evaluacionesGuiaMayor/{docId} {
+      allow read: if isAdmin() || isDirectiva();
+      allow write: if isAdmin() || isDirectiva();
+    }
+
+    // Fallback: deny everything else explicitly.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

@@ -1,6 +1,6 @@
 "use client";
 
-import CompletarRegistroAspirante from '../../../src/components/CompletarRegistroAspirante';
+import CompletarRegistroAspirante from '../../../src/components/forms/CompletarRegistroAspirante';
 
 export default function CompletarRegistroAspirantePage() {
   // Obtener el pin de la URL

@@ -9,11 +9,12 @@ import {
   doc,
   updateDoc,
   getDoc,
-  setDoc
+  setDoc,
+  getDocs
 } from "firebase/firestore";
 import { tarjetaGuiaMayor } from "@/src/data/tarjetaGuiaMayor";
 import { TarjetaGuiaMayor } from "@/src/types";
-import FirmaDigital from "@/src/components/FirmaDigital";
+import FirmaDigital from "@/src/components/ui/FirmaDigital";
 import { guardarFirma } from "@/src/lib/guardarFirma";
 import { ArrowLeft } from "lucide-react";
 
@@ -103,6 +104,12 @@ const AspirantePage = () => {
     aniosClub: "",
     clase: ""
   });
+  const [unidadesRegistradas, setUnidadesRegistradas] = useState<string[]>([]);
+  useEffect(() => {
+    getDocs(collection(db, "unidades")).then(snapshot => {
+      setUnidadesRegistradas(snapshot.docs.map(doc => doc.data().nombre));
+    });
+  }, []);
   const [editId, setEditId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [aspirantes, setAspirantes] = useState<any[]>([]);
@@ -187,6 +194,7 @@ const AspirantePage = () => {
         club: "",
         anioIngreso: "",
         cargoActual: "",
+        clase: "",
         unidad: "",
         aniosClub: ""
       });
@@ -272,17 +280,26 @@ const AspirantePage = () => {
               <option value="">Director de conquistadores</option>
               <option value="Jenniffer Cargua">Jenniffer Cargua</option>
             </select>
-            <input name="club" value={form.club} onChange={handleChange} placeholder="Club" className="border p-2 rounded-xl" />
+            <select name="club" value={form.club} onChange={handleChange} className="border p-2 rounded-xl">
+              <option value="">Club*</option>
+              <option value="Club Caleb">Club Caleb</option>
+            </select>
             <input name="anioIngreso" value={form.anioIngreso} onChange={handleChange} placeholder="Año de ingreso" className="border p-2 rounded-xl" type="number" />
             <select name="cargoActual" value={form.cargoActual} onChange={handleChange} className="border p-2 rounded-xl">
               <option value="">Cargo actual</option>
               <option value="Conquistador">Conquistador</option>
               <option value="Consejero">Consejero</option>
               <option value="Instructor">Instructor</option>
+              <option value="Tesorero">Tesorero</option>
             </select>
-            <input name="unidad" value={form.unidad} onChange={handleChange} placeholder="Unidad" className="border p-2 rounded-xl" />
+            <select name="unidad" value={form.unidad} onChange={handleChange} className="border p-2 rounded-xl">
+              <option value="">Unidad</option>
+              {unidadesRegistradas.map((u) => (
+                <option key={u} value={u}>{u}</option>
+              ))}
+            </select>
             <input name="aniosClub" value={form.aniosClub} onChange={handleChange} placeholder="Años en el club" className="border p-2 rounded-xl" type="number" />
-            <select name="claseOficial" value={form.claseOficial} onChange={handleChange} className="border p-2 rounded-xl">
+            <select name="clase" value={form.clase} onChange={handleChange} className="border p-2 rounded-xl">
               <option value="">Clase</option>
               <option value="Amigo">Amigo</option>
               <option value="Compañero">Compañero</option>
@@ -308,7 +325,8 @@ const AspirantePage = () => {
                   <div className="flex-1">
                     <span className="font-bold text-indigo-800">{a.nombre}</span><br />
                     <span className="text-xs text-slate-400">Edad: {a.edad}</span><br />
-                    <span className="text-xs text-slate-400">Club: {a.club}</span>
+                    <span className="text-xs text-slate-400">Club: {a.club || 'Sin club'}</span><br />
+                    <span className="text-xs text-slate-400">Cargo: {a.cargoActual || 'Sin cargo'}</span>
                   </div>
                   <div className="flex flex-col md:flex-row md:items-center gap-2">
                     <span className="bg-indigo-100 text-indigo-800 px-3 py-1 rounded-lg font-mono">PIN: {a.pin}</span>

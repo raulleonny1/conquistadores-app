@@ -1,8 +1,8 @@
 "use client";
 import React, { useState, useEffect } from "react";
-import { useEspecialidades } from "@/src/hooks/useEspecialidades";
+import { useEspecialidades } from "@/src/hooks/firebase/useEspecialidades";
 import { Trophy, Calendar, Zap, LogOut, X, BookOpen, TrendingUp } from "lucide-react";
-import { useEventos } from "@/src/hooks/useEventos";
+import { useEventos } from "@/src/hooks/firebase/useEventos";
 import { useRouter, useSearchParams } from "next/navigation";
 import { db } from "../../../src/firebase";
 import { collection, onSnapshot } from "firebase/firestore";

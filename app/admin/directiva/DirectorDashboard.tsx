@@ -1,9 +1,10 @@
-import { useMiembros } from "@/src/hooks/useMiembros";
-import { useEventos } from "@/src/hooks/useEventos";
-import { useUnidades } from "@/src/hooks/useUnidades";
+import { useMiembros } from "@/src/hooks/firebase/useMiembros";
+import { useEventos } from "@/src/hooks/firebase/useEventos";
+import { useUnidades } from "@/src/hooks/firebase/useUnidades";
 import { LogOut, Users, Calendar, Layers } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import DashboardLayout from "@/src/components/dashboard/DashboardLayout";
 
 export default function DirectorDashboard() {
   const { miembros } = useMiembros();
@@ -29,16 +30,21 @@ export default function DirectorDashboard() {
   };
 
   return (
-    <div className="p-2 sm:p-4 md:p-6 min-h-screen bg-linear-to-br from-fuchsia-100 via-white to-indigo-100">
-      <div className="flex flex-col sm:flex-row justify-between items-center mb-8 gap-4">
-        <h1 className="text-2xl sm:text-3xl md:text-4xl font-black text-fuchsia-700 text-center sm:text-left">Panel del Director</h1>
-        <button
-          onClick={handleLogout}
-          className="flex items-center gap-2 bg-fuchsia-700 text-white px-4 py-2 rounded-xl font-bold hover:bg-fuchsia-900 transition-all"
-        >
-          <LogOut className="w-5 h-5" /> Cerrar sesión
-        </button>
-      </div>
+    <DashboardLayout
+      className="bg-linear-to-br from-fuchsia-100 via-white to-indigo-100"
+      header={{
+        title: "Panel del Director",
+        icon: <Users className="text-fuchsia-700 w-6 h-6" />,        
+        actions: (
+          <button
+            onClick={handleLogout}
+            className="flex items-center gap-2 bg-fuchsia-700 text-white px-4 py-2 rounded-xl font-bold hover:bg-fuchsia-900 transition-all"
+          >
+            <LogOut className="w-5 h-5" /> Cerrar sesión
+          </button>
+        ),
+      }}
+    >
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 mb-10">
         <div
           className="bg-white p-4 sm:p-6 rounded-2xl shadow-lg flex flex-col items-center border border-fuchsia-200 cursor-pointer hover:bg-fuchsia-50 transition-all min-w-0 w-full"
@@ -77,6 +83,6 @@ export default function DirectorDashboard() {
           <pre className="text-slate-700 whitespace-pre-wrap text-xs sm:text-sm md:text-base">{info}</pre>
         </div>
       )}
-    </div>
+    </DashboardLayout>
   );
 }

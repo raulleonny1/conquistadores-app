@@ -4,9 +4,9 @@ import { db } from "../../../src/firebase";
 import { collection, onSnapshot } from "firebase/firestore";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Users, Target, Trophy, Calendar, LogOut, X, Zap } from "lucide-react";
-import { useMiembros } from "@/src/hooks/useMiembros";
-import { useUnidades } from "@/src/hooks/useUnidades";
-import { useEventos } from "@/src/hooks/useEventos";
+import { useMiembros } from "@/src/hooks/firebase/useMiembros";
+import { useUnidades } from "@/src/hooks/firebase/useUnidades";
+import { useEventos } from "@/src/hooks/firebase/useEventos";
 import { getDoc, doc } from "firebase/firestore";
 
 export default function DashboardDirector() {

@@ -1,7 +1,7 @@
 "use client";
 import React, { useState, useEffect } from "react";
 import { collection, getDocs } from "firebase/firestore";
-import { db } from "../../src/firebase";
+import { db } from "@/src/firebase";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
 
 type FormAspirante = {
