@@ -1,5 +1,7 @@
 "use client";
 import React, { useEffect, useState } from "react";
+import { toast } from "react-hot-toast";
+import { handleError } from "@/src/lib/errorHandler";
 import { db } from "../../../src/firebase";
 import { collection, addDoc, query, where, getDocs, doc, getDoc, setDoc } from "firebase/firestore";
 import { useSearchParams } from "next/navigation";
@@ -41,35 +43,44 @@ export default function RegistroSemanal() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!fecha) return alert("Selecciona una fecha");
-    await addDoc(collection(db, "calificacionesSemanal"), {
-      pin,
-      fecha,
-      puntos
-    });
-    // Sumar puntos al documento principal
-    const ref = doc(db, "calificacionesConquis", pin);
-    const snap = await getDoc(ref);
-    let puntosActuales: { [key: string]: number } = {};
-    if (snap.exists()) {
-      puntosActuales = snap.data().puntos || {};
-    } else {
-      puntosActuales = CATEGORIAS_PUNTOS.reduce((acc, cat) => ({ ...acc, [cat.id]: 0 }), {});
+    if (!fecha) {
+      toast.error("Selecciona una fecha");
+      return;
     }
-    // Sumar cada categoría
-    const nuevosPuntos: { [key: string]: number } = { ...puntosActuales };
-    for (const cat of CATEGORIAS_PUNTOS) {
-      nuevosPuntos[cat.id] = (puntosActuales[cat.id] || 0) + (puntos[cat.id] || 0);
+
+    try {
+      await addDoc(collection(db, "calificacionesSemanal"), {
+        pin,
+        fecha,
+        puntos
+      });
+      // Sumar puntos al documento principal
+      const ref = doc(db, "calificacionesConquis", pin);
+      const snap = await getDoc(ref);
+      let puntosActuales: { [key: string]: number } = {};
+      if (snap.exists()) {
+        puntosActuales = snap.data().puntos || {};
+      } else {
+        puntosActuales = CATEGORIAS_PUNTOS.reduce((acc, cat) => ({ ...acc, [cat.id]: 0 }), {});
+      }
+      // Sumar cada categoría
+      const nuevosPuntos: { [key: string]: number } = { ...puntosActuales };
+      for (const cat of CATEGORIAS_PUNTOS) {
+        nuevosPuntos[cat.id] = (puntosActuales[cat.id] || 0) + (puntos[cat.id] || 0);
+      }
+      await setDoc(ref, {
+        puntos: nuevosPuntos
+      }, { merge: true });
+      setPuntos({});
+      setFecha("");
+      // Actualizar historial
+      const q = query(collection(db, "calificacionesSemanal"), where("pin", "==", pin));
+      const snapHist = await getDocs(q);
+      setHistorial(snapHist.docs.map(doc => doc.data()));
+      toast.success("Registro semanal guardado");
+    } catch (error) {
+      handleError(error, "Error al guardar el registro semanal");
     }
-    await setDoc(ref, {
-      puntos: nuevosPuntos
-    }, { merge: true });
-    setPuntos({});
-    setFecha("");
-    // Actualizar historial
-    const q = query(collection(db, "calificacionesSemanal"), where("pin", "==", pin));
-    const snapHist = await getDocs(q);
-    setHistorial(snapHist.docs.map(doc => doc.data()));
   };
 
   return (
@@ -95,7 +106,7 @@ export default function RegistroSemanal() {
       </form>
       <h3 className="text-lg font-bold mb-2">Historial semanal</h3>
       <div className="overflow-x-auto">
-        <table className="min-w-[600px] w-full border text-xs md:text-sm">
+          <table className="min-w-150 w-full border text-xs md:text-sm">
           <thead>
             <tr>
               <th className="border p-2">Fecha</th>

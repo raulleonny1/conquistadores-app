@@ -4,6 +4,8 @@ import { db } from "../../src/firebase";
 import { doc, setDoc, getDoc } from "firebase/firestore";
 import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
+import { toast } from "react-hot-toast";
+import { handleError } from "@/src/lib/errorHandler";
 
 function FichaMedicaPageInner() {
   const searchParams = useSearchParams();
@@ -40,7 +42,8 @@ function FichaMedicaPageInner() {
           videoRef.current.srcObject = stream;
           videoRef.current.play();
         } catch (err) {
-          alert("No se pudo acceder a la cámara");
+          toast.error("No se pudo acceder a la cámara");
+          handleError(err, "No se pudo acceder a la cámara");
           setShowCamera(false);
         }
       }
@@ -92,13 +95,19 @@ function FichaMedicaPageInner() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.foto) {
-      alert("La foto tipo carnet es obligatoria.");
+      toast.error("La foto tipo carnet es obligatoria.");
       return;
     }
+
     setGuardando(true);
-    await setDoc(doc(db, "fichasMedicas", pin), form, { merge: true });
-    setGuardando(false);
-    alert("Ficha médica guardada correctamente.");
+    try {
+      await setDoc(doc(db, "fichasMedicas", pin), form, { merge: true });
+      toast.success("Ficha médica guardada correctamente.");
+    } catch (error) {
+      handleError(error, "Error al guardar ficha médica");
+    } finally {
+      setGuardando(false);
+    }
   };
 
   if (loading) {

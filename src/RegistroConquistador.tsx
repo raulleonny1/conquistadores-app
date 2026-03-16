@@ -4,6 +4,7 @@ import { db } from '../src/firebase';
 import { collection, addDoc, onSnapshot, doc, deleteDoc, updateDoc } from 'firebase/firestore';
 import { logInfo, logError } from "@/src/lib/logger";
 import { handleError } from "@/src/lib/errorHandler";
+import { toast } from "react-hot-toast";
 
 export default function RegistroConquistador() {
   // ...existing code...
@@ -97,7 +98,7 @@ export default function RegistroConquistador() {
     try {
       const pin = generarPin();
       await addDoc(collection(db, 'RegistroConquis'), { ...form, pin });
-      alert('Registro guardado en Firebase. PIN: ' + pin);
+      toast.success('Registro guardado en Firebase. PIN: ' + pin);
       logInfo('Registro guardado en Firebase. PIN: ' + pin);
       setForm({
         nombre: '',
@@ -110,17 +111,24 @@ export default function RegistroConquistador() {
         pin: '',
       });
     } catch (error) {
-      alert('Error al guardar en Firebase');
+      toast.error('Error al guardar en Firebase');
       logError('Error al guardar en Firebase: ' + error);
-      handleError(error);
+      handleError(error, 'Error al guardar en Firebase');
     }
   };
 
   // Eliminar miembro
   const eliminarMiembro = async (id: string) => {
-    if (window.confirm('¿Eliminar este miembro?')) {
+    if (!window.confirm('¿Eliminar este miembro?')) return;
+
+    try {
       await deleteDoc(doc(db, 'RegistroConquis', id));
+      toast.success('Miembro eliminado');
       logInfo('Miembro eliminado: ' + id);
+    } catch (error) {
+      toast.error('Error al eliminar miembro');
+      logError('Error al eliminar miembro: ' + error);
+      handleError(error, 'Error al eliminar miembro');
     }
   };
 
@@ -135,11 +143,18 @@ export default function RegistroConquistador() {
   };
   const guardarEdicion = async () => {
     const { id, ...rest } = editForm;
-    await updateDoc(doc(db, 'RegistroConquis', id), rest);
+
+    try {
       await updateDoc(doc(db, 'RegistroConquis', id), rest);
+      toast.success('Miembro actualizado');
       logInfo('Miembro actualizado: ' + id);
-    setEditandoId(null);
-    setEditForm({});
+      setEditandoId(null);
+      setEditForm({});
+    } catch (error) {
+      toast.error('Error al actualizar el miembro');
+      logError('Error al actualizar el miembro: ' + error);
+      handleError(error, 'Error al actualizar el miembro');
+    }
   };
 
   return (

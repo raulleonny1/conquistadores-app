@@ -1,8 +1,10 @@
 "use client";
 import React, { useEffect, useState } from "react";
+import { toast } from "react-hot-toast";
 import EventosSidebar from './EventosSidebar';
 import { db, formatFechaDDMMYYYY } from "../../src/firebase";
 import { collection, getDocs, query, where, onSnapshot, addDoc } from "firebase/firestore";
+import { handleError } from "@/src/lib/errorHandler";
 import {
   Users,
   Award,
@@ -188,7 +190,7 @@ export default function ConsejeroDashboard({ consejeroId }: { consejeroId: strin
                         consejeroId,
                         fecha
                       });
-                      alert("Reto creado y enviado a los conquistadores de la unidad " + unidad);
+                      toast.success("Reto creado y enviado a los conquistadores de la unidad " + unidad);
                     } catch (err) {
                       let errorMsg = "";
                       if (err instanceof Error) {
@@ -196,7 +198,7 @@ export default function ConsejeroDashboard({ consejeroId }: { consejeroId: strin
                       } else {
                         errorMsg = typeof err === "string" ? err : JSON.stringify(err);
                       }
-                      alert("Error al crear reto: " + errorMsg);
+                      handleError(err, "Error al crear reto: " + errorMsg);
                     }
                   }}
                 >
@@ -314,7 +316,7 @@ export default function ConsejeroDashboard({ consejeroId }: { consejeroId: strin
                   onClick={() => {
                     const unidad = unidades[0] || "";
                     if (unidad) window.location.href = `/consejero/calificaciones-grupo?unidad=${unidad}`;
-                    else alert("No hay unidad disponible para calificar en grupo.");
+                    else toast.error("No hay unidad disponible para calificar en grupo.");
                   }}
                 >
                   Calificar en grupo

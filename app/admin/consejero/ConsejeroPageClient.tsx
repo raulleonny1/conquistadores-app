@@ -1,8 +1,10 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
+import { toast } from 'react-hot-toast';
 import { db } from '../../../src/firebase';
 import { collection, addDoc, getDocs } from 'firebase/firestore';
+import { handleError } from '@/src/lib/errorHandler';
 
 type ConsejeroPageClientProps = {
   initialUnidadesRegistradas?: string[];
@@ -58,11 +60,11 @@ export default function ConsejeroPage({ initialUnidadesRegistradas }: ConsejeroP
         unidades: form.unidades,
         consejeroAsociado: form.consejeroAsociado
       });
-      alert('Consejero registrado en Firebase');
+      toast.success('Consejero registrado en Firebase');
       setForm({ nombre: '', unidades: [], consejeroAsociado: '' });
       setRefresh(r => r + 1);
     } catch (error) {
-      alert('Error al registrar en Firebase');
+      handleError(error, 'Error al registrar en Firebase');
     }
   };
 
@@ -142,8 +144,9 @@ function ConsejerosList({ refresh, unidadesRegistradas }: { refresh: number; uni
         deleteDoc(doc(db, 'consejeros', id))
       );
       setConsejeros(consejeros.filter(c => c.id !== id));
-    } catch {
-      alert('Error al eliminar');
+      toast.success('Consejero eliminado');
+    } catch (error) {
+      handleError(error, 'Error al eliminar');
     }
   };
 
@@ -183,8 +186,8 @@ function ConsejerosList({ refresh, unidadesRegistradas }: { refresh: number; uni
       setEditForm({ nombre: '', unidades: [], consejeroAsociado: '' });
       // Refrescar lista
       setConsejeros(consejeros.map(c => c.id === editId ? { ...c, ...editForm } : c));
-    } catch {
-      alert('Error al editar');
+    } catch (error) {
+      handleError(error, 'Error al editar');
     }
   };
 

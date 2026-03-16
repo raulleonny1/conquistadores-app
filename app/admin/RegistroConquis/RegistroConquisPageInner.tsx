@@ -5,6 +5,18 @@ import { getDocs, doc, updateDoc, deleteDoc, addDoc, collection, onSnapshot } fr
 import { db } from "@/src/firebase";
 import { especialidadesBase } from "@/src/data/especialidades";
 import { logInfo } from "@/src/lib/logger";
+import { handleError } from "@/src/lib/errorHandler";
+import { toast } from "react-hot-toast";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 type EspecialidadObj = {
   area: string;
@@ -86,12 +98,19 @@ export default function RegistroConquisPageInner({ unidades: initialUnidades, co
   useEffect(() => {
     if (initialUnidades && initialConsejeros) return;
 
-    getDocs(collection(db, "unidades")).then(snapshot => {
-      setUnidades(snapshot.docs.map(doc => ({ nombre: doc.data().nombre, consejero: doc.data().consejero || "" })));
-    });
-    getDocs(collection(db, "consejeros")).then(snapshot => {
-      setConsejeros(snapshot.docs.map(doc => ({ nombre: doc.data().nombre, unidades: doc.data().unidades || [] })));
-    });
+    const loadInitialData = async () => {
+      try {
+        const unidadesSnapshot = await getDocs(collection(db, "unidades"));
+        setUnidades(unidadesSnapshot.docs.map(doc => ({ nombre: doc.data().nombre, consejero: doc.data().consejero || "" })));
+
+        const consejerosSnapshot = await getDocs(collection(db, "consejeros"));
+        setConsejeros(consejerosSnapshot.docs.map(doc => ({ nombre: doc.data().nombre, unidades: doc.data().unidades || [] })));
+      } catch (err) {
+        handleError(err, "Error cargando datos iniciales");
+      }
+    };
+
+    loadInitialData();
   }, [initialUnidades, initialConsejeros]);
 
   const handleInput = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -129,6 +148,7 @@ export default function RegistroConquisPageInner({ unidades: initialUnidades, co
         await updateDoc(doc(db, 'RegistroConquis', editId), rest);
         setEditId(null);
         setEditMode(false);
+        toast.success("Conquistador actualizado");
       } else {
         // Registrar
         const pin = generarPin();
@@ -137,7 +157,9 @@ export default function RegistroConquisPageInner({ unidades: initialUnidades, co
           pin,
           especialidades: form.especialidades,
         });
+        toast.success("Conquistador registrado");
       }
+
       setForm({
         nombre: "",
         apellido: "",
@@ -155,9 +177,10 @@ export default function RegistroConquisPageInner({ unidades: initialUnidades, co
         pin: ""
       });
     } catch (err) {
-      alert(editMode ? "Error al editar conquistador" : "Error al registrar conquistador");
+      handleError(err, editMode ? "Error al editar conquistador" : "Error al registrar conquistador");
+    } finally {
+      setSaving(false);
     }
-    setSaving(false);
   };
   // Edición
   const iniciarEdicion = (miembro: any) => {
@@ -209,8 +232,13 @@ export default function RegistroConquisPageInner({ unidades: initialUnidades, co
   };
   // Removed unused guardarEdicion and editForm/setEditForm
   const eliminarMiembro = async (id: string) => {
-    if (window.confirm('¿Eliminar este registro?')) {
+    if (!window.confirm('¿Eliminar este registro?')) return;
+
+    try {
       await deleteDoc(doc(db, 'RegistroConquis', id));
+      toast.success("Registro eliminado");
+    } catch (err) {
+      handleError(err, "Error al eliminar el registro");
     }
   };
 
@@ -319,28 +347,34 @@ export default function RegistroConquisPageInner({ unidades: initialUnidades, co
       <div className="bg-white rounded-3xl p-6 shadow-md border border-slate-200 max-w-3xl mx-auto">
         <h3 className="text-lg font-bold mb-4 text-blue-700">Conquistadores registrados</h3>
         {loading ? (
-          <div className="text-center text-blue-700">Cargando conquistadores...</div>
+          <Alert>
+            <AlertTitle>Cargando conquistadores...</AlertTitle>
+            <AlertDescription>Un momento mientras se cargan los datos desde Firestore.</AlertDescription>
+          </Alert>
         ) : conquis.length === 0 ? (
-          <div className="text-center text-red-700">No hay conquistadores registrados.</div>
+          <Alert>
+            <AlertTitle>No hay conquistadores registrados</AlertTitle>
+            <AlertDescription>Registra al menos un conquistador para ver información en la tabla.</AlertDescription>
+          </Alert>
         ) : (
-          <table className="min-w-full text-xs md:text-sm border-collapse">
-            <thead>
-              <tr className="bg-indigo-100">
-                <th className="px-2 py-1">Nombre</th>
-                <th className="px-2 py-1">Apellido</th>
-                <th className="px-2 py-1">Fecha Nacimiento</th>
-                <th className="px-2 py-1">Edad</th>
-                <th className="px-2 py-1">Programa</th>
-                <th className="px-2 py-1">WhatsApp</th>
-                <th className="px-2 py-1">Unidad</th>
-                <th className="px-2 py-1">Consejero</th>
-                <th className="px-2 py-1">Clase</th>
-                <th className="px-2 py-1">Especialidades</th>
-                <th className="px-2 py-1">PIN</th>
-                <th className="px-2 py-1">Acciones</th>
-              </tr>
-            </thead>
-            <tbody>
+          <Table className="text-xs md:text-sm">
+            <TableHeader>
+              <TableRow className="bg-indigo-100">
+                <TableHead>Nombre</TableHead>
+                <TableHead>Apellido</TableHead>
+                <TableHead>Fecha Nacimiento</TableHead>
+                <TableHead>Edad</TableHead>
+                <TableHead>Programa</TableHead>
+                <TableHead>WhatsApp</TableHead>
+                <TableHead>Unidad</TableHead>
+                <TableHead>Consejero</TableHead>
+                <TableHead>Clase</TableHead>
+                <TableHead>Especialidades</TableHead>
+                <TableHead>PIN</TableHead>
+                <TableHead>Acciones</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {conquis.map((m) => {
                 let especialidadesArr = [];
                 if (Array.isArray(m.especialidades)) {
@@ -349,45 +383,60 @@ export default function RegistroConquisPageInner({ unidades: initialUnidades, co
                   especialidadesArr = [{ area: "", categoria: "", especialidad: m.especialidades }];
                 }
                 return (
-                  <tr key={m.id} className="border-b">
-                    <td className="px-2 py-1 font-semibold">{m.nombre}</td>
-                    <td className="px-2 py-1">{m.apellido}</td>
-                    <td className="px-2 py-1">{m.fechaNacimiento}</td>
-                    <td className="px-2 py-1">{m.edad}</td>
-                    <td className="px-2 py-1">{m.programa}</td>
-                    <td className="px-2 py-1">{m.whatsapp}</td>
-                    <td className="px-2 py-1">{m.unidad}</td>
-                    <td className="px-2 py-1">{m.consejero}</td>
-                    <td className="px-2 py-1">{m.clase}</td>
-                    <td className="px-2 py-1">
-                      {especialidadesArr.length > 0 ? especialidadesArr.map((esp: EspecialidadObj, idx: number) => (
-                        <div key={idx}>{esp.area} &gt; {esp.categoria} &gt; {esp.especialidad}</div>
-                      )) : ""}
-                    </td>
-                    <td className="px-2 py-1 font-mono font-bold text-blue-700">{m.pin}</td>
-                    <td className="p-2 flex gap-1">
-                      <button className="bg-yellow-500 text-white px-2 py-1 rounded" onClick={() => iniciarEdicion(m)}>Editar</button>
-                      <button className="bg-red-600 text-white px-2 py-1 rounded" onClick={() => eliminarMiembro(m.id)}>Eliminar</button>
+                  <TableRow key={m.id} className="border-b">
+                    <TableCell className="font-semibold">{m.nombre}</TableCell>
+                    <TableCell>{m.apellido}</TableCell>
+                    <TableCell>{m.fechaNacimiento}</TableCell>
+                    <TableCell>{m.edad}</TableCell>
+                    <TableCell>{m.programa}</TableCell>
+                    <TableCell>{m.whatsapp}</TableCell>
+                    <TableCell>{m.unidad}</TableCell>
+                    <TableCell>{m.consejero}</TableCell>
+                    <TableCell>{m.clase}</TableCell>
+                    <TableCell>
+                      {especialidadesArr.length > 0
+                        ? especialidadesArr.map((esp: EspecialidadObj, idx: number) => (
+                            <div key={idx}>
+                              {esp.area} &gt; {esp.categoria} &gt; {esp.especialidad}
+                            </div>
+                          ))
+                        : ""}
+                    </TableCell>
+                    <TableCell className="font-mono font-bold text-blue-700">{m.pin}</TableCell>
+                    <TableCell className="p-2 flex flex-wrap gap-1">
+                      <Button variant="secondary" size="sm" onClick={() => iniciarEdicion(m)}>
+                        Editar
+                      </Button>
+                      <Button variant="destructive" size="sm" onClick={() => eliminarMiembro(m.id)}>
+                        Eliminar
+                      </Button>
                       {m.whatsapp ? (
-                        <a
-                          href={`https://wa.me/${m.whatsapp.replace(/[^0-9]/g, "")}?text=${encodeURIComponent(`¡Hola! Ingresa al link y accede con tu PIN: ${m.pin}. Te damos la bienvenida al club. ¡Hazlo bien bonito!`)}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="bg-green-500 text-white px-2 py-1 rounded flex items-center gap-1 hover:bg-green-600 transition-all"
+                        <Button
+                          asChild
+                          variant="secondary"
+                          size="sm"
+                          className="bg-green-500 hover:bg-green-600"
                         >
-                          <span>WhatsApp</span>
-                        </a>
+                          <a
+                            href={`https://wa.me/${m.whatsapp.replace(/[^0-9]/g, "")}?text=${encodeURIComponent(`¡Hola! Ingresa al link y accede con tu PIN: ${m.pin}. Te damos la bienvenida al club. ¡Hazlo bien bonito!`)}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-1"
+                          >
+                            WhatsApp
+                          </a>
+                        </Button>
                       ) : (
-                        <button className="bg-gray-300 text-white px-2 py-1 rounded flex items-center gap-1 cursor-not-allowed" disabled>
+                        <Button variant="outline" size="sm" disabled>
                           WhatsApp
-                        </button>
+                        </Button>
                       )}
-                    </td>
-                  </tr>
+                    </TableCell>
+                  </TableRow>
                 );
               })}
-            </tbody>
-          </table>
+            </TableBody>
+          </Table>
         )}
       </div>
     </div>

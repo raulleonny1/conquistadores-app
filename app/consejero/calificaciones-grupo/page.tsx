@@ -1,5 +1,7 @@
 "use client";
 import React, { useEffect, useState, Suspense } from "react";
+import { toast } from "react-hot-toast";
+import { handleError } from "@/src/lib/errorHandler";
 import { db } from "../../../src/firebase";
 import { collection, doc, getDocs, setDoc, query, where } from "firebase/firestore";
 import { useSearchParams, usePathname } from "next/navigation";
@@ -62,31 +64,43 @@ function CalificacionesGrupoPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!categoria || !fecha || !puntos) return alert("Completa todos los campos");
-    const pins = Object.keys(seleccionados).filter(pin => seleccionados[pin]);
-    if (pins.length === 0) return alert("Selecciona al menos un conquistador");
-    for (const pin of pins) {
-      const ref = doc(db, "calificacionesConquis", pin);
-      // Obtener puntos actuales
-      const snap = await getDocs(query(collection(db, "calificacionesConquis"), where("pin", "==", pin)));
-      let puntosActuales: { [key: string]: number } = {};
-      if (snap.docs.length > 0) {
-        puntosActuales = snap.docs[0].data().puntos || {};
-      } else {
-        puntosActuales = CATEGORIAS_PUNTOS.reduce((acc, cat) => ({ ...acc, [cat.id]: 0 }), {});
-      }
-      // Sumar puntos
-      const nuevosPuntos: { [key: string]: number } = { ...puntosActuales, [categoria]: (puntosActuales[categoria] || 0) + parseInt(puntos) };
-      await setDoc(ref, {
-        puntos: nuevosPuntos,
-        fechaUltima: fecha
-      }, { merge: true });
+    if (!categoria || !fecha || !puntos) {
+      toast.error("Completa todos los campos");
+      return;
     }
-    alert("Puntos agregados a los seleccionados");
-    setCategoria("");
-    setFecha("");
-    setPuntos("");
-    setSeleccionados({});
+    const pins = Object.keys(seleccionados).filter(pin => seleccionados[pin]);
+    if (pins.length === 0) {
+      toast.error("Selecciona al menos un conquistador");
+      return;
+    }
+
+    try {
+      for (const pin of pins) {
+        const ref = doc(db, "calificacionesConquis", pin);
+        // Obtener puntos actuales
+        const snap = await getDocs(query(collection(db, "calificacionesConquis"), where("pin", "==", pin)));
+        let puntosActuales: { [key: string]: number } = {};
+        if (snap.docs.length > 0) {
+          puntosActuales = snap.docs[0].data().puntos || {};
+        } else {
+          puntosActuales = CATEGORIAS_PUNTOS.reduce((acc, cat) => ({ ...acc, [cat.id]: 0 }), {});
+        }
+        // Sumar puntos
+        const nuevosPuntos: { [key: string]: number } = { ...puntosActuales, [categoria]: (puntosActuales[categoria] || 0) + parseInt(puntos) };
+        await setDoc(ref, {
+          puntos: nuevosPuntos,
+          fechaUltima: fecha
+        }, { merge: true });
+      }
+
+      toast.success("Puntos agregados a los seleccionados");
+      setCategoria("");
+      setFecha("");
+      setPuntos("");
+      setSeleccionados({});
+    } catch (error) {
+      handleError(error, "Error al guardar calificaciones");
+    }
   };
 
   return (
