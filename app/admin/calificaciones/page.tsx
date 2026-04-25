@@ -1,7 +1,7 @@
 "use client";
 import React, { useState, useEffect } from "react";
 import { db, formatFechaDDMMYYYY } from "../../../src/firebase";
-import { collection, addDoc, onSnapshot, doc, updateDoc, deleteDoc } from "firebase/firestore";
+import { collection, addDoc, getDocs, doc, updateDoc, deleteDoc } from "firebase/firestore";
 import { ArrowLeft, PlusCircle } from "lucide-react";
 
 export default function CalificacionesPage() {
@@ -14,12 +14,14 @@ export default function CalificacionesPage() {
   const [editNombre, setEditNombre] = useState("");
   const [editPuntos, setEditPuntos] = useState("");
 
-  // Escuchar cambios en tiempo real
+  // Cargar calificaciones (no es necesario mantener un listener en tiempo real)
+  const fetchCalificaciones = async () => {
+    const snapshot = await getDocs(collection(db, "calificaciones"));
+    setCalificaciones(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+  };
+
   useEffect(() => {
-    const unsubscribe = onSnapshot(collection(db, "calificaciones"), (snapshot) => {
-      setCalificaciones(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    });
-    return () => unsubscribe();
+    fetchCalificaciones();
   }, []);
   const handleAdd = () => {
     if (!nombre || !puntos) return;
@@ -45,6 +47,7 @@ export default function CalificacionesPage() {
     setEditId(null);
     setEditNombre("");
     setEditPuntos("");
+    await fetchCalificaciones();
   };
 
   // Eliminar calificación

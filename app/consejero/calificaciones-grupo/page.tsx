@@ -3,7 +3,7 @@ import React, { useEffect, useState, Suspense } from "react";
 import { toast } from "react-hot-toast";
 import { handleError } from "@/src/lib/errorHandler";
 import { db } from "../../../src/firebase";
-import { collection, doc, getDocs, setDoc, query, where } from "firebase/firestore";
+import { addDoc, collection, doc, getDoc, getDocs, setDoc, query, where } from "firebase/firestore";
 import { useSearchParams, usePathname } from "next/navigation";
 
 const CATEGORIAS_PUNTOS = [
@@ -32,12 +32,14 @@ function CalificacionesGrupoPage() {
       consejeroId = match[1];
     }
   }
+  const [consejeroIdState, setConsejeroIdState] = useState(consejeroId);
   useEffect(() => {
     if (consejeroId) {
       localStorage.setItem("consejeroId", consejeroId);
+      setConsejeroIdState(consejeroId);
     } else {
       const storedId = localStorage.getItem("consejeroId");
-      if (storedId) consejeroId = storedId;
+      if (storedId) setConsejeroIdState(storedId);
     }
   }, [consejeroId]);
   const [miembros, setMiembros] = useState<any[]>([]);
@@ -75,22 +77,43 @@ function CalificacionesGrupoPage() {
     }
 
     try {
+      const puntosAgregar = parseInt(puntos, 10);
+      if (!Number.isFinite(puntosAgregar) || puntosAgregar <= 0) {
+        toast.error("Ingresa puntos validos mayores a 0");
+        return;
+      }
       for (const pin of pins) {
         const ref = doc(db, "calificacionesConquis", pin);
-        // Obtener puntos actuales
-        const snap = await getDocs(query(collection(db, "calificacionesConquis"), where("pin", "==", pin)));
-        let puntosActuales: { [key: string]: number } = {};
-        if (snap.docs.length > 0) {
-          puntosActuales = snap.docs[0].data().puntos || {};
+        const snap = await getDoc(ref);
+        let puntosActuales: { [key: string]: number | string } = {};
+        if (snap.exists()) {
+          puntosActuales = snap.data().puntos || {};
         } else {
           puntosActuales = CATEGORIAS_PUNTOS.reduce((acc, cat) => ({ ...acc, [cat.id]: 0 }), {});
         }
-        // Sumar puntos
-        const nuevosPuntos: { [key: string]: number } = { ...puntosActuales, [categoria]: (puntosActuales[categoria] || 0) + parseInt(puntos) };
+        const valorPrevio = typeof puntosActuales[categoria] === "number"
+          ? (puntosActuales[categoria] as number)
+          : parseInt(String(puntosActuales[categoria] || 0), 10) || 0;
+        const nuevosPuntos: { [key: string]: number | string } = {
+          ...puntosActuales,
+          [categoria]: valorPrevio + puntosAgregar,
+        };
+        const miembro = miembros.find((m) => m.pin === pin);
         await setDoc(ref, {
+          pin,
+          nombre: miembro?.nombre || "",
           puntos: nuevosPuntos,
-          fechaUltima: fecha
+          fechaUltima: fecha,
         }, { merge: true });
+
+        await addDoc(collection(db, "calificacionesSemanal"), {
+          pin,
+          fecha,
+          origen: "consejero_grupal",
+          consejeroId: consejeroIdState || "",
+          puntos: { [categoria]: puntosAgregar },
+          totalEvento: puntosAgregar,
+        });
       }
 
       toast.success("Puntos agregados a los seleccionados");

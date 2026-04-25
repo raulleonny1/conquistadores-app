@@ -6,7 +6,7 @@ type EvaluacionActividad = {
 };
 import React, { useState, useEffect } from "react";
 import { db } from "../../../src/firebase";
-import { collection, onSnapshot, query, where, addDoc, getDocs, updateDoc, doc } from "firebase/firestore";
+import { collection, onSnapshot, query, where, addDoc, getDocs, updateDoc, doc, getDoc, setDoc } from "firebase/firestore";
 import { actividadesBase } from "./actividadesBase";
 import { tarjetaGuiaMayor } from "../../../src/data/tarjetaGuiaMayor";
 
@@ -19,8 +19,66 @@ type TarjetaDoc = {
 };
 
 const EvaluarGuiaMayorPage = () => {
+    const CATEGORIAS_BASE = [
+      "puntualidad",
+      "asistencia",
+      "disciplina",
+      "reclutador",
+      "materiales",
+      "fidelidad",
+      "misionero",
+      "colaborador",
+      "orden_cerrado",
+      "tareas",
+      "especialidades",
+    ];
+
+    const sumarPuntosAspirante = async (pinAspirante: string, delta: number) => {
+      if (!pinAspirante || delta === 0) return;
+      const ref = doc(db, "calificacionesConquis", pinAspirante);
+      const snap = await getDoc(ref);
+      let puntosActuales: Record<string, number | string> = {};
+      let nombreActual = "";
+
+      if (snap.exists()) {
+        const data = snap.data();
+        puntosActuales = data.puntos || {};
+        nombreActual = data.nombre || "";
+      } else {
+        puntosActuales = CATEGORIAS_BASE.reduce((acc, key) => ({ ...acc, [key]: 0 }), {});
+        const aspiranteSnap = await getDoc(doc(db, "aspirantesGuiaMayor", pinAspirante));
+        if (aspiranteSnap.exists()) {
+          nombreActual = aspiranteSnap.data().nombre || "";
+        }
+      }
+
+      const tareasActual = typeof puntosActuales.tareas === "number"
+        ? puntosActuales.tareas
+        : parseInt(String(puntosActuales.tareas || 0), 10) || 0;
+      const tareasNuevo = Math.max(0, tareasActual + delta);
+
+      await setDoc(ref, {
+        pin: pinAspirante,
+        nombre: nombreActual,
+        puntos: {
+          ...puntosActuales,
+          tareas: tareasNuevo,
+        },
+      }, { merge: true });
+
+      await addDoc(collection(db, "calificacionesSemanal"), {
+        pin: pinAspirante,
+        fecha: new Date().toLocaleDateString(),
+        origen: "evaluacion_guia_mayor",
+        evaluador,
+        puntos: { tareas: delta },
+        totalEvento: delta,
+      });
+    };
+
     // Guardar actividad en evaluacionesGuiaMayor
     const guardarActividad = async (actividad: string, estado: boolean) => {
+      const yaCompletado = !!evaluaciones.find(ev => ev.actividad === actividad && ev.completado);
       await addDoc(collection(db, "evaluacionesGuiaMayor"), {
         aspiranteId,
         actividad,
@@ -40,6 +98,8 @@ const EvaluarGuiaMayorPage = () => {
           hora: new Date().toLocaleTimeString()
         }];
       });
+      const delta = estado && !yaCompletado ? 1 : (!estado && yaCompletado ? -1 : 0);
+      await sumarPuntosAspirante(aspiranteId, delta);
     };
   const [aspirantes, setAspirantes] = useState<any[]>([]);
   const [aspiranteId, setAspiranteId] = useState("");

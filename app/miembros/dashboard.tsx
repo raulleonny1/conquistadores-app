@@ -1,7 +1,13 @@
 "use client";
 import React, { useEffect, useState } from 'react';
 import { db } from "../../src/firebase";
-import { collection, getDocs, query, where, doc, getDoc } from "firebase/firestore";
+import { collection, getDocs, query, where, doc, getDoc, onSnapshot } from "firebase/firestore";
+import {
+	DEFAULT_RETO_MIEMBRO,
+	mergeRetoConfig,
+	RETO_MIEMBRO_DOC_REF,
+	type RetoMiembroDashboardConfig,
+} from "@/src/lib/retoMiembroDashboard";
 import { useSearchParams, useRouter } from "next/navigation";
 import {
 	Trophy,
@@ -11,13 +17,11 @@ import {
 	Bell,
 	ChevronRight,
 	Medal,
-	Map,
 	CheckCircle2,
 	Clock,
 	ShieldCheck,
 	TrendingUp
 } from 'lucide-react';
-import DashboardLayout from "@/src/components/dashboard/DashboardLayout";
 
 interface Usuario {
 	nombre?: string;
@@ -48,6 +52,20 @@ function App() {
 	const [puntosCategorias, setPuntosCategorias] = useState<Record<string, number>>({});
 	const [proximosEventos, setProximosEventos] = useState<any[]>([]);
 	const [progresoClase, setProgresoClase] = useState(0);
+	const [retoMiembro, setRetoMiembro] = useState<RetoMiembroDashboardConfig>(DEFAULT_RETO_MIEMBRO);
+
+	useEffect(() => {
+		const unsub = onSnapshot(
+			RETO_MIEMBRO_DOC_REF,
+			(snap) => {
+				setRetoMiembro(mergeRetoConfig(snap.exists() ? (snap.data() as Partial<RetoMiembroDashboardConfig>) : undefined));
+			},
+			() => {
+				setRetoMiembro(DEFAULT_RETO_MIEMBRO);
+			}
+		);
+		return () => unsub();
+	}, []);
 
 	useEffect(() => {
 		if (!pin) return;
@@ -98,23 +116,7 @@ function App() {
 	const siguienteNivel = user.siguienteNivel || "Guía Mayor";
 
 	return (
-		<DashboardLayout
-			header={{
-				title: "Dashboard de Miembro",
-				subtitle: "Tu progreso y actividades",
-				actions: (
-					<button
-						className="flex items-center gap-2 bg-white/10 backdrop-blur-md text-white p-2 md:px-4 md:py-2 rounded-xl border border-white/20 hover:bg-red-500/80 transition-all shadow-lg active:scale-95"
-						onClick={() => router.push("/")}
-					>
-						<LogOut size={18} />
-						<span className="hidden md:inline text-sm font-black uppercase tracking-wider">Cerrar Sesión</span>
-					</button>
-				),
-				icon: <ShieldCheck className="text-white w-6 h-6" />
-			}}
-			className="bg-[#F8FAFC]"
-		>
+		<>
 			<div className="min-h-screen bg-[#F8FAFC] font-sans text-slate-900 pb-10">
 			<div className="absolute top-0 left-0 w-full h-80 md:h-64 bg-linear-to-br from-indigo-600 via-purple-600 to-pink-500 z-0 opacity-95 rounded-b-[2.5rem] md:rounded-none" />
 			<nav className="relative z-10 max-w-7xl mx-auto px-4 md:px-6 py-4 md:py-6 flex items-center justify-between">
@@ -163,10 +165,7 @@ function App() {
 				</div>
 				<div className="grid grid-cols-1 lg:grid-cols-12 gap-6 md:gap-8">
 					<div className="lg:col-span-8 space-y-6 md:space-y-8">
-						<div className="bg-white rounded-[2.5rem] p-6 md:p-10 shadow-xl border border-slate-100 overflow-hidden relative group">
-							<div className="absolute -top-10 -right-10 p-8 opacity-5 group-hover:scale-110 transition-transform hidden lg:block">
-								<Map size={240} />
-							</div>
+						<div className="bg-white rounded-[2.5rem] p-6 md:p-10 shadow-xl border border-slate-100 overflow-hidden relative">
 							<div className="relative z-10">
 								<div className="flex flex-col md:flex-row md:items-center justify-between mb-6 md:mb-10 gap-4">
 									<div>
@@ -294,25 +293,45 @@ function App() {
 								Calendario Completo
 							</button>
 						</div>
-						<div className="bg-linear-to-br from-indigo-950 via-indigo-900 to-indigo-800 rounded-[2.5rem] p-10 text-white relative overflow-hidden group shadow-2xl">
-							<div className="absolute -bottom-10 -right-10 opacity-10 rotate-12 group-hover:scale-125 transition-transform duration-700">
-								<Trophy size={200} />
-							</div>
-							<div className="relative z-10">
-								<div className="bg-indigo-400/20 backdrop-blur-md px-3 py-1 rounded-full inline-block mb-4 border border-indigo-400/30">
-									<p className="text-[10px] font-black uppercase tracking-[0.2em] text-indigo-200">Reto Especial</p>
+						{retoMiembro.activo && (
+							<div className="relative overflow-hidden rounded-3xl bg-linear-to-br from-violet-600 via-indigo-700 to-slate-900 p-6 text-white shadow-2xl ring-1 ring-white/10 sm:rounded-[2.5rem] sm:p-8">
+								{retoMiembro.mostrarIconoFondo && (
+									<div className="pointer-events-none absolute -right-4 bottom-0 top-0 flex items-center opacity-[0.1] sm:-right-2">
+										<Trophy className="h-36 w-36 shrink-0 text-white sm:h-44 sm:w-44" strokeWidth={1.15} />
+									</div>
+								)}
+								<div className="relative z-10">
+									<span className="mb-3 inline-block rounded-full border border-white/25 bg-white/15 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.18em] text-white/95">
+										{retoMiembro.etiqueta}
+									</span>
+									<h4 className="mb-6 text-xl font-black leading-snug tracking-tight text-balance sm:text-2xl md:text-3xl">
+										{retoMiembro.titulo}
+									</h4>
+									{retoMiembro.urlBoton?.trim() ? (
+										<a
+											href={retoMiembro.urlBoton.trim()}
+											target="_blank"
+											rel="noopener noreferrer"
+											className="flex min-h-[48px] w-full items-center justify-center rounded-2xl bg-white px-4 py-3.5 text-center text-xs font-black uppercase tracking-[0.15em] text-indigo-900 shadow-lg transition active:scale-[0.98] sm:text-sm"
+										>
+											{retoMiembro.textoBoton}
+										</a>
+									) : (
+										<button
+											type="button"
+											className="flex min-h-[48px] w-full cursor-default items-center justify-center rounded-2xl bg-white px-4 py-3.5 text-center text-xs font-black uppercase tracking-[0.15em] text-indigo-900 shadow-lg sm:text-sm"
+										>
+											{retoMiembro.textoBoton}
+										</button>
+									)}
 								</div>
-								<h4 className="text-2xl md:text-3xl font-black mb-6 leading-tight tracking-tighter">Aprende 5 nudos nuevos y gana 200 XP extra</h4>
-								<button className="w-full bg-white text-indigo-900 px-8 py-4 rounded-2xl font-black text-xs uppercase tracking-[0.2em] hover:scale-105 active:scale-95 transition-all shadow-xl shadow-indigo-950/50">
-									¡Aceptar Reto!
-								</button>
 							</div>
-						</div>
+						)}
 					</div>
 				</div>
 			</main>
 		</div>
-		</DashboardLayout>
+		</>
 	);
 }
 

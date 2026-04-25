@@ -1,7 +1,7 @@
 "use client";
 import React, { useEffect, useState } from "react";
 import { db } from "../../../src/firebase";
-import { collection, doc, onSnapshot, setDoc } from "firebase/firestore";
+import { doc, getDoc, setDoc } from "firebase/firestore";
 import {
   Trophy,
   Star,
@@ -32,24 +32,31 @@ export default function CalificacionesConquistadorPage({ searchParams }: { searc
 
   useEffect(() => {
     if (!pin) return;
-    const ref = doc(db, "calificacionesConquis", pin);
-    const unsub = onSnapshot(ref, (snap) => {
+
+    const fetchCalificaciones = async () => {
+      setLoading(true);
+      const ref = doc(db, "calificacionesConquis", pin);
+      const snap = await getDoc(ref);
+
       if (snap.exists()) {
         const data = snap.data();
         setPuntos(data.puntos || {});
         setNombre(data.nombre || "");
       } else {
         // Inicializar si no existe
-        setDoc(ref, {
+        const initialPuntos = CATEGORIAS_PUNTOS.reduce((acc, cat) => ({ ...acc, [cat.id]: 0 }), {});
+        await setDoc(ref, {
           nombre: "",
-          puntos: CATEGORIAS_PUNTOS.reduce((acc, cat) => ({ ...acc, [cat.id]: 0 }), {})
+          puntos: initialPuntos
         });
-        setPuntos(CATEGORIAS_PUNTOS.reduce((acc, cat) => ({ ...acc, [cat.id]: 0 }), {}));
+        setPuntos(initialPuntos);
         setNombre("");
       }
+
       setLoading(false);
-    });
-    return () => unsub();
+    };
+
+    fetchCalificaciones();
   }, [pin]);
 
   const total = Object.values(puntos).reduce((acc: number, val) => {

@@ -1,7 +1,7 @@
 "use client";
 import React, { useEffect, useState, Suspense } from "react";
 import { db } from "../../../src/firebase";
-import { collection, doc, onSnapshot, setDoc } from "firebase/firestore";
+import { addDoc, collection, doc, getDoc, query, setDoc, where, getDocs } from "firebase/firestore";
 import { useSearchParams } from "next/navigation";
 import {
   Trophy,
@@ -43,35 +43,50 @@ function CalificacionesConsejeroPageInner() {
   const [inputValores, setInputValores] = React.useState<{ [key: string]: string }>({});
   const [inputFechas, setInputFechas] = React.useState<{ [key: string]: string }>({});
 
+  const toNumber = (value: unknown) => {
+    if (typeof value === "number") return value;
+    if (typeof value === "string") return parseInt(value, 10) || 0;
+    return 0;
+  };
+
   useEffect(() => {
     if (!pin) return;
-    const ref = doc(db, "calificacionesConquis", pin);
-    const unsub = onSnapshot(ref, (snap) => {
+
+    const fetchCalificaciones = async () => {
+      setLoading(true);
+      const ref = doc(db, "calificacionesConquis", pin);
+      const snap = await getDoc(ref);
+
       if (snap.exists()) {
         const data = snap.data();
         setPuntos(data.puntos || {});
         setNombre(data.nombre || "");
       } else {
-        setDoc(ref, {
-          nombre: "",
-          puntos: CATEGORIAS_PUNTOS.reduce((acc, cat) => ({ ...acc, [cat.id]: 0 }), {})
+        const initialPuntos = CATEGORIAS_PUNTOS.reduce((acc, cat) => ({ ...acc, [cat.id]: 0 }), {});
+        let nombreDetectado = "";
+        const [miembroSnap, aspiranteSnap] = await Promise.all([
+          getDocs(query(collection(db, "RegistroConquis"), where("pin", "==", pin))),
+          getDocs(query(collection(db, "aspirantesGuiaMayor"), where("pin", "==", pin))),
+        ]);
+        if (!miembroSnap.empty) {
+          nombreDetectado = miembroSnap.docs[0].data().nombre || "";
+        } else if (!aspiranteSnap.empty) {
+          nombreDetectado = aspiranteSnap.docs[0].data().nombre || "";
+        }
+        await setDoc(ref, {
+          pin,
+          nombre: nombreDetectado,
+          puntos: initialPuntos,
         });
-        setPuntos(CATEGORIAS_PUNTOS.reduce((acc, cat) => ({ ...acc, [cat.id]: 0 }), {}));
-        setNombre("");
+        setPuntos(initialPuntos);
+        setNombre(nombreDetectado);
       }
-      setLoading(false);
-    });
-    return () => unsub();
-  }, [pin]);
 
-  const handleChange = async (catId: string, valor: number) => {
-    setPuntos((prev: any) => ({ ...prev, [catId]: (prev[catId] || 0) + valor }));
-    const ref = doc(db, "calificacionesConquis", pin);
-    await setDoc(ref, {
-      nombre,
-      puntos: { ...puntos, [catId]: (puntos[catId] || 0) + valor }
-    }, { merge: true });
-  };
+      setLoading(false);
+    };
+
+    fetchCalificaciones();
+  }, [pin]);
 
   const total = Object.values(puntos).reduce((acc: number, val) => {
     if (typeof val === "number") return acc + val;
@@ -125,11 +140,26 @@ function CalificacionesConsejeroPageInner() {
             const inputFecha = inputFechas[catId] || "";
             const inputValor = inputValores[catId] || "";
             if (!inputFecha) return alert("Selecciona una fecha");
+            const valorNumerico = parseInt(inputValor, 10) || 0;
+            if (valorNumerico <= 0) return alert("Ingresa puntos mayores a 0");
             const ref = doc(db, "calificacionesConquis", pin);
+            const puntosActualizados = { ...puntos, [catId]: toNumber(valor) + valorNumerico };
             await setDoc(ref, {
-              puntos: { ...puntos, [catId]: valor + (parseInt(inputValor) || 0) },
-              fechaUltima: inputFecha
+              pin,
+              nombre,
+              puntos: puntosActualizados,
+              fechaUltima: inputFecha,
             }, { merge: true });
+
+            await addDoc(collection(db, "calificacionesSemanal"), {
+              pin,
+              fecha: inputFecha,
+              origen: "consejero_individual",
+              puntos: { [catId]: valorNumerico },
+              totalEvento: valorNumerico,
+            });
+
+            setPuntos(puntosActualizados);
             setInputValores(prev => ({ ...prev, [catId]: "" }));
           };
           return (

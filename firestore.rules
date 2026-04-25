@@ -92,6 +92,12 @@ service cloud.firestore {
       allow write: if isAdmin() || isConsejero();
     }
 
+    // Reto destacado en dashboard de miembros (solo este documento es legible sin Auth).
+    match /config/{docId} {
+      allow read: if docId == "retoMiembroDashboard";
+      allow write: if isAdmin() || isConsejero();
+    }
+
     match /retosEspeciales/{docId} {
       allow read: if isAuth();
       allow write: if isAdmin() || isConsejero();

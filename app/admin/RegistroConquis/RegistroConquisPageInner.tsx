@@ -1,12 +1,12 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { getDocs, doc, updateDoc, deleteDoc, addDoc, collection, onSnapshot } from "firebase/firestore";
 import { db } from "@/src/firebase";
 import { especialidadesBase } from "@/src/data/especialidades";
-import { logInfo } from "@/src/lib/logger";
 import { handleError } from "@/src/lib/errorHandler";
 import { toast } from "react-hot-toast";
+import Link from "next/link";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
@@ -17,6 +17,14 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 type EspecialidadObj = {
   area: string;
@@ -24,21 +32,44 @@ type EspecialidadObj = {
   especialidad: string;
 };
 
+type Unidad = { nombre: string; consejero: string };
+
+type Consejero = { nombre: string; unidades: string[] };
+
+type RegistroConquis = {
+  id: string;
+  nombre: string;
+  apellido: string;
+  edad: string;
+  fechaNacimiento: string;
+  whatsapp: string;
+  unidad: string;
+  consejero: string;
+  clase: string;
+  especialidadArea: string;
+  especialidadCategoria: string;
+  especialidad: string;
+  especialidades: EspecialidadObj[];
+  pin: string;
+};
+
 type RegistroConquisPageInnerProps = {
-  unidades?: { nombre: string; consejero: string }[];
-  consejeros?: { nombre: string; unidades: string[] }[];
+  unidades?: Unidad[];
+  consejeros?: Consejero[];
 };
 
 export default function RegistroConquisPageInner({ unidades: initialUnidades, consejeros: initialConsejeros }: RegistroConquisPageInnerProps) {
-  const [conquis, setConquis] = useState<any[]>([]);
+  const [conquis, setConquis] = useState<RegistroConquis[]>([]);
   const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [selectedForDelete, setSelectedForDelete] = useState<RegistroConquis | null>(null);
 
   const [form, setForm] = useState({
     nombre: "",
     apellido: "",
     edad: "",
     fechaNacimiento: "",
-    programa: "",
     whatsapp: "",
     unidad: "",
     consejero: "",
@@ -51,8 +82,8 @@ export default function RegistroConquisPageInner({ unidades: initialUnidades, co
   });
   const [editMode, setEditMode] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [unidades, setUnidades] = useState<any[]>(initialUnidades ?? []);
-  const [consejeros, setConsejeros] = useState<any[]>(initialConsejeros ?? []);
+  const [unidades, setUnidades] = useState<Unidad[]>(initialUnidades ?? []);
+  const [consejeros, setConsejeros] = useState<Consejero[]>(initialConsejeros ?? []);
   const [editId, setEditId] = useState<string | null>(null);
   const clasesOficiales = [
     "Amigo",
@@ -67,22 +98,25 @@ export default function RegistroConquisPageInner({ unidades: initialUnidades, co
     const q = collection(db, "RegistroConquis");
     const unsub = onSnapshot(q, (snapshot) => {
       const sortedConquis = snapshot.docs
-        .map(doc => ({
-          id: doc.id,
-          apellido: doc.data().apellido || "",
-          clase: doc.data().clase || "",
-          consejero: doc.data().consejero || "",
-          edad: doc.data().edad || "",
-          especialidad: doc.data().especialidad || "",
-          especialidadArea: doc.data().especialidadArea || "",
-          especialidadCategoria: doc.data().especialidadCategoria || "",
-          especialidades: doc.data().especialidades || "",
-          nombre: doc.data().nombre || "",
-          pin: doc.data().pin || "",
-          unidad: doc.data().unidad || "",
-          whatsapp: doc.data().whatsapp || "",
-          ...doc.data()
-        }))
+        .map((doc) => {
+          const data = doc.data() as Partial<RegistroConquis>;
+          return {
+            id: doc.id,
+            apellido: data.apellido || "",
+            clase: data.clase || "",
+            consejero: data.consejero || "",
+            edad: data.edad || "",
+            especialidad: data.especialidad || "",
+            especialidadArea: data.especialidadArea || "",
+            especialidadCategoria: data.especialidadCategoria || "",
+            especialidades: (data.especialidades as EspecialidadObj[]) || [],
+            nombre: data.nombre || "",
+            pin: data.pin || "",
+            unidad: data.unidad || "",
+            whatsapp: data.whatsapp || "",
+            ...data,
+          } as RegistroConquis;
+        })
         .sort((a, b) => {
           const nombreA = (a.nombre || "").toLowerCase();
           const nombreB = (b.nombre || "").toLowerCase();
@@ -101,10 +135,16 @@ export default function RegistroConquisPageInner({ unidades: initialUnidades, co
     const loadInitialData = async () => {
       try {
         const unidadesSnapshot = await getDocs(collection(db, "unidades"));
-        setUnidades(unidadesSnapshot.docs.map(doc => ({ nombre: doc.data().nombre, consejero: doc.data().consejero || "" })));
+        setUnidades(unidadesSnapshot.docs.map((doc) => {
+          const data = doc.data() as Partial<Unidad>;
+          return { nombre: data.nombre || "", consejero: data.consejero || "" };
+        }));
 
         const consejerosSnapshot = await getDocs(collection(db, "consejeros"));
-        setConsejeros(consejerosSnapshot.docs.map(doc => ({ nombre: doc.data().nombre, unidades: doc.data().unidades || [] })));
+        setConsejeros(consejerosSnapshot.docs.map((doc) => {
+          const data = doc.data() as Partial<Consejero>;
+          return { nombre: data.nombre || "", unidades: data.unidades || [] };
+        }));
       } catch (err) {
         handleError(err, "Error cargando datos iniciales");
       }
@@ -112,6 +152,22 @@ export default function RegistroConquisPageInner({ unidades: initialUnidades, co
 
     loadInitialData();
   }, [initialUnidades, initialConsejeros]);
+
+  const filteredConquis = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    if (!term) return conquis;
+
+    return conquis.filter((c) => {
+      const match = (value?: string) => (value || "").toLowerCase().includes(term);
+      return (
+        match(c.nombre) ||
+        match(c.apellido) ||
+        match(c.unidad) ||
+        match(c.consejero) ||
+        match(c.whatsapp)
+      );
+    });
+  }, [conquis, search]);
 
   const handleInput = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -165,7 +221,6 @@ export default function RegistroConquisPageInner({ unidades: initialUnidades, co
         apellido: "",
         edad: "",
         fechaNacimiento: "",
-        programa: "",
         whatsapp: "",
         unidad: "",
         consejero: "",
@@ -183,7 +238,7 @@ export default function RegistroConquisPageInner({ unidades: initialUnidades, co
     }
   };
   // Edición
-  const iniciarEdicion = (miembro: any) => {
+  const iniciarEdicion = (miembro: RegistroConquis) => {
     setEditId(miembro.id);
     let especialidadesArr = [];
     if (Array.isArray(miembro.especialidades)) {
@@ -197,7 +252,6 @@ export default function RegistroConquisPageInner({ unidades: initialUnidades, co
       apellido: miembro.apellido || "",
       edad: miembro.edad || "",
       fechaNacimiento: miembro.fechaNacimiento || "",
-      programa: miembro.programa || "",
       whatsapp: miembro.whatsapp || "",
       unidad: miembro.unidad || "",
       consejero: miembro.consejero || "",
@@ -225,76 +279,198 @@ export default function RegistroConquisPageInner({ unidades: initialUnidades, co
       pin: "",
       unidad: "",
       whatsapp: "",
-      fechaNacimiento: "",
-      programa: ""
+      fechaNacimiento: ""
     });
     setEditMode(false);
   };
   // Removed unused guardarEdicion and editForm/setEditForm
-  const eliminarMiembro = async (id: string) => {
-    if (!window.confirm('¿Eliminar este registro?')) return;
+  const solicitarEliminacion = (miembro: RegistroConquis) => {
+    setSelectedForDelete(miembro);
+    setDeleteDialogOpen(true);
+  };
+
+  const confirmarEliminacion = async () => {
+    if (!selectedForDelete?.id) return;
 
     try {
-      await deleteDoc(doc(db, 'RegistroConquis', id));
+      await deleteDoc(doc(db, 'RegistroConquis', selectedForDelete.id));
       toast.success("Registro eliminado");
     } catch (err) {
       handleError(err, "Error al eliminar el registro");
+    } finally {
+      setDeleteDialogOpen(false);
+      setSelectedForDelete(null);
     }
   };
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans text-slate-900 px-4 py-8">
-      <h2 className="text-2xl font-black mb-6 text-indigo-700 text-center">RegistroConquis</h2>
-      <form onSubmit={handleSubmit} className="mb-6 flex flex-col items-center">
-        {/* Reordered fields */}
-        <input type="text" name="nombre" value={form.nombre} onChange={handleInput} placeholder="Nombre" className="border rounded-lg px-4 py-2 mb-2" required />
-        <input type="text" name="apellido" value={form.apellido} onChange={handleInput} placeholder="Apellido" className="border rounded-lg px-4 py-2 mb-2" />
-        <input type="date" name="fechaNacimiento" value={form.fechaNacimiento} onChange={handleInput} placeholder="Fecha de nacimiento" className="border rounded-lg px-4 py-2 mb-2" />
-        <input type="text" name="edad" value={form.edad} onChange={handleInput} placeholder="Edad" className="border rounded-lg px-4 py-2 mb-2" />
-        <input type="text" name="programa" value={form.programa} onChange={handleInput} placeholder="Programa" className="border rounded-lg px-4 py-2 mb-2" />
-        <input type="text" name="whatsapp" value={form.whatsapp} onChange={handleInput} placeholder="WhatsApp" className="border rounded-lg px-4 py-2 mb-2" />
-        <select name="unidad" value={form.unidad} onChange={handleInput} className="border rounded-lg px-4 py-2 mb-2">
-          <option value="">Selecciona unidad</option>
-          {unidades.map((u, idx) => (
-            <option key={idx} value={u.nombre}>{u.nombre}</option>
-          ))}
-        </select>
-        <div className="text-xs text-blue-700 font-semibold mb-2">Consejero: {form.consejero || "Sin asignar"}</div>
-        <select name="clase" value={form.clase} onChange={handleInput} required className="border rounded-lg px-4 py-2 mb-2">
-          <option value="">Selecciona clase</option>
-          {clasesOficiales.map((c, idx) => (
-            <option key={idx} value={c}>{c}</option>
-          ))}
-        </select>
-        {/* Especialidades anidadas y múltiples */}
-        <div className="border rounded-lg px-4 py-2 bg-slate-50 mb-2">
-          <div className="font-bold mb-2 text-indigo-700">Especialidades</div>
-          <div className="flex flex-col md:flex-row gap-2 mb-2">
-            <select name="especialidadArea" value={form.especialidadArea} onChange={handleInput} className="border rounded-lg px-2 py-1">
+      <div className="mx-auto mb-6 flex w-full max-w-3xl items-center justify-between">
+        <h2 className="text-2xl font-black text-indigo-700">RegistroConquis</h2>
+        <Link
+          href="/admin"
+          className="rounded-lg bg-slate-200 px-4 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-300"
+        >
+          Volver al menu
+        </Link>
+      </div>
+      <form onSubmit={handleSubmit} className="mb-6 max-w-3xl mx-auto grid grid-cols-1 gap-4 md:grid-cols-2">
+        <div className="flex flex-col gap-1">
+          <label htmlFor="nombre" className="text-sm font-semibold text-slate-700">Nombre</label>
+          <input
+            id="nombre"
+            type="text"
+            name="nombre"
+            value={form.nombre}
+            onChange={handleInput}
+            placeholder="Nombre"
+            className="w-full rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-200"
+            required
+          />
+        </div>
+
+        <div className="flex flex-col gap-1">
+          <label htmlFor="apellido" className="text-sm font-semibold text-slate-700">Apellido</label>
+          <input
+            id="apellido"
+            type="text"
+            name="apellido"
+            value={form.apellido}
+            onChange={handleInput}
+            placeholder="Apellido"
+            className="w-full rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-200"
+          />
+        </div>
+
+        <div className="flex flex-col gap-1">
+          <label htmlFor="fechaNacimiento" className="text-sm font-semibold text-slate-700">Fecha de nacimiento</label>
+          <input
+            id="fechaNacimiento"
+            type="date"
+            name="fechaNacimiento"
+            value={form.fechaNacimiento}
+            onChange={handleInput}
+            className="w-full rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-200"
+          />
+        </div>
+
+        <div className="flex flex-col gap-1">
+          <label htmlFor="edad" className="text-sm font-semibold text-slate-700">Edad</label>
+          <input
+            id="edad"
+            type="number"
+            name="edad"
+            value={form.edad}
+            onChange={handleInput}
+            placeholder="Edad"
+            className="w-full rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-200"
+          />
+        </div>
+
+        <div className="flex flex-col gap-1">
+          <label htmlFor="whatsapp" className="text-sm font-semibold text-slate-700">WhatsApp</label>
+          <input
+            id="whatsapp"
+            type="tel"
+            name="whatsapp"
+            value={form.whatsapp}
+            onChange={handleInput}
+            placeholder="WhatsApp (ej. +56912345678)"
+            className="w-full rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-200"
+          />
+        </div>
+
+        <div className="flex flex-col gap-1">
+          <label htmlFor="unidad" className="text-sm font-semibold text-slate-700">Unidad</label>
+          <select
+            id="unidad"
+            name="unidad"
+            value={form.unidad}
+            onChange={handleInput}
+            className="w-full rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-200"
+          >
+            <option value="">Selecciona unidad</option>
+            {unidades.map((u, idx) => (
+              <option key={idx} value={u.nombre}>{u.nombre}</option>
+            ))}
+          </select>
+        </div>
+
+        <div className="flex flex-col gap-1">
+          <label className="text-sm font-semibold text-slate-700">Consejero</label>
+          <input
+            type="text"
+            value={form.consejero || "Sin asignar"}
+            readOnly
+            className="w-full rounded-lg border border-slate-200 bg-slate-100 px-4 py-2 text-sm text-slate-700 shadow-sm"
+          />
+        </div>
+
+        <div className="flex flex-col gap-1">
+          <label htmlFor="clase" className="text-sm font-semibold text-slate-700">Clase</label>
+          <select
+            id="clase"
+            name="clase"
+            value={form.clase}
+            onChange={handleInput}
+            required
+            className="w-full rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-200"
+          >
+            <option value="">Selecciona clase</option>
+            {clasesOficiales.map((c, idx) => (
+              <option key={idx} value={c}>{c}</option>
+            ))}
+          </select>
+        </div>
+
+        <div className="md:col-span-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-4">
+          <div className="flex flex-col gap-1">
+            <p className="text-sm font-semibold text-indigo-700">Especialidades</p>
+            <p className="text-xs text-slate-600">Añade una o más especialidades al registro del conquistador.</p>
+          </div>
+
+          <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-4">
+            <select
+              name="especialidadArea"
+              value={form.especialidadArea}
+              onChange={handleInput}
+              className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-200"
+            >
               <option value="">Área</option>
               {areas.map((a, idx) => (
                 <option key={idx} value={a}>{a}</option>
               ))}
             </select>
-            {form.especialidadArea && (
-              <select name="especialidadCategoria" value={form.especialidadCategoria} onChange={handleInput} className="border rounded-lg px-2 py-1">
-                <option value="">Categoría</option>
-                {categorias.map((cat, idx) => (
-                  <option key={idx} value={cat}>{cat}</option>
-                ))}
-              </select>
-            )}
-            {form.especialidadArea && form.especialidadCategoria && (
-              <select name="especialidad" value={form.especialidad} onChange={handleInput} className="border rounded-lg px-2 py-1">
-                <option value="">Especialidad</option>
-                {especialidades.map((esp, idx) => (
-                  <option key={idx} value={esp}>{esp}</option>
-                ))}
-              </select>
-            )}
+
+            <select
+              name="especialidadCategoria"
+              value={form.especialidadCategoria}
+              onChange={handleInput}
+              disabled={!form.especialidadArea}
+              className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-200 disabled:cursor-not-allowed disabled:bg-slate-100"
+            >
+              <option value="">Categoría</option>
+              {categorias.map((cat, idx) => (
+                <option key={idx} value={cat}>{cat}</option>
+              ))}
+            </select>
+
+            <select
+              name="especialidad"
+              value={form.especialidad}
+              onChange={handleInput}
+              disabled={!form.especialidadCategoria}
+              className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-200 disabled:cursor-not-allowed disabled:bg-slate-100"
+            >
+              <option value="">Especialidad</option>
+              {especialidades.map((esp, idx) => (
+                <option key={idx} value={esp}>{esp}</option>
+              ))}
+            </select>
+
             <button
               type="button"
-              className="bg-indigo-600 text-white px-4 py-1 rounded font-bold text-sm hover:bg-indigo-700 transition-all"
+              className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700 disabled:opacity-50"
               disabled={!(form.especialidadArea && form.especialidadCategoria && form.especialidad)}
               onClick={() => {
                 if (form.especialidadArea && form.especialidadCategoria && form.especialidad) {
@@ -314,38 +490,71 @@ export default function RegistroConquisPageInner({ unidades: initialUnidades, co
                   });
                 }
               }}
-            >Agregar</button>
+            >
+              Agregar
+            </button>
           </div>
-          {/* Lista de especialidades seleccionadas */}
+
           {form.especialidades.length > 0 && (
-            <ul className="mb-2">
+            <ul className="mt-3 grid gap-2 text-xs">
               {form.especialidades.map((esp, idx) => (
-                <li key={idx} className="flex items-center gap-2 text-xs bg-indigo-50 rounded px-2 py-1 mb-1">
-                  <span>{esp.area} &gt; {esp.categoria} &gt; {esp.especialidad}</span>
+                <li
+                  key={idx}
+                  className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-white px-3 py-2 shadow-sm"
+                >
+                  <span className="text-slate-700">
+                    {esp.area} &gt; {esp.categoria} &gt; {esp.especialidad}
+                  </span>
                   <button
                     type="button"
-                    className="bg-red-500 text-white rounded px-2 py-0.5 text-xs font-bold"
+                    className="rounded-lg bg-red-500 px-2 py-1 text-xs font-semibold text-white hover:bg-red-600"
                     onClick={() => setForm({
                       ...form,
                       especialidades: form.especialidades.filter((_, i) => i !== idx)
                     })}
-                  >Eliminar</button>
+                  >
+                    Eliminar
+                  </button>
                 </li>
               ))}
             </ul>
           )}
         </div>
-        <button type="submit" disabled={saving} className="mt-6 bg-indigo-600 text-white px-6 py-2 rounded-xl font-bold text-sm hover:bg-indigo-700 transition-all">
-          {saving ? "Guardando..." : editMode ? "Guardar cambios" : "Registrar"}
-        </button>
-        {editMode && (
-          <button type="button" onClick={cancelarEdicion} className="mt-2 bg-gray-400 text-white px-6 py-2 rounded-xl font-bold text-sm hover:bg-gray-500 transition-all">
-            Cancelar edición
+
+        <div className="md:col-span-2 flex flex-col gap-3 md:flex-row md:justify-end">
+          {editMode && (
+            <button
+              type="button"
+              onClick={cancelarEdicion}
+              className="w-full rounded-xl bg-gray-400 px-6 py-2 text-sm font-bold text-white hover:bg-gray-500 md:w-auto"
+            >
+              Cancelar edición
+            </button>
+          )}
+          <button
+            type="submit"
+            disabled={saving}
+            className="w-full rounded-xl bg-indigo-600 px-6 py-2 text-sm font-bold text-white hover:bg-indigo-700 md:w-auto disabled:opacity-60"
+          >
+            {saving ? "Guardando..." : editMode ? "Guardar cambios" : "Registrar"}
           </button>
-        )}
+        </div>
       </form>
       <div className="bg-white rounded-3xl p-6 shadow-md border border-slate-200 max-w-3xl mx-auto">
-        <h3 className="text-lg font-bold mb-4 text-blue-700">Conquistadores registrados</h3>
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div>
+            <h3 className="text-lg font-bold text-blue-700">Conquistadores registrados</h3>
+            <p className="text-sm text-slate-600">Busca por nombre, unidad, consejero o WhatsApp.</p>
+          </div>
+          <input
+            type="search"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Buscar..."
+            className="w-full max-w-xs rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-200"
+          />
+        </div>
+
         {loading ? (
           <Alert>
             <AlertTitle>Cargando conquistadores...</AlertTitle>
@@ -356,89 +565,71 @@ export default function RegistroConquisPageInner({ unidades: initialUnidades, co
             <AlertTitle>No hay conquistadores registrados</AlertTitle>
             <AlertDescription>Registra al menos un conquistador para ver información en la tabla.</AlertDescription>
           </Alert>
+        ) : filteredConquis.length === 0 ? (
+          <Alert>
+            <AlertTitle>No se encontraron resultados</AlertTitle>
+            <AlertDescription>Prueba con otro término de búsqueda.</AlertDescription>
+          </Alert>
         ) : (
           <Table className="text-xs md:text-sm">
             <TableHeader>
               <TableRow className="bg-indigo-100">
                 <TableHead>Nombre</TableHead>
-                <TableHead>Apellido</TableHead>
-                <TableHead>Fecha Nacimiento</TableHead>
-                <TableHead>Edad</TableHead>
-                <TableHead>Programa</TableHead>
-                <TableHead>WhatsApp</TableHead>
                 <TableHead>Unidad</TableHead>
                 <TableHead>Consejero</TableHead>
-                <TableHead>Clase</TableHead>
-                <TableHead>Especialidades</TableHead>
                 <TableHead>PIN</TableHead>
                 <TableHead>Acciones</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {conquis.map((m) => {
-                let especialidadesArr = [];
-                if (Array.isArray(m.especialidades)) {
-                  especialidadesArr = m.especialidades;
-                } else if (typeof m.especialidades === "string" && m.especialidades.length > 0) {
-                  especialidadesArr = [{ area: "", categoria: "", especialidad: m.especialidades }];
-                }
-                return (
-                  <TableRow key={m.id} className="border-b">
-                    <TableCell className="font-semibold">{m.nombre}</TableCell>
-                    <TableCell>{m.apellido}</TableCell>
-                    <TableCell>{m.fechaNacimiento}</TableCell>
-                    <TableCell>{m.edad}</TableCell>
-                    <TableCell>{m.programa}</TableCell>
-                    <TableCell>{m.whatsapp}</TableCell>
-                    <TableCell>{m.unidad}</TableCell>
-                    <TableCell>{m.consejero}</TableCell>
-                    <TableCell>{m.clase}</TableCell>
-                    <TableCell>
-                      {especialidadesArr.length > 0
-                        ? especialidadesArr.map((esp: EspecialidadObj, idx: number) => (
-                            <div key={idx}>
-                              {esp.area} &gt; {esp.categoria} &gt; {esp.especialidad}
-                            </div>
-                          ))
-                        : ""}
-                    </TableCell>
-                    <TableCell className="font-mono font-bold text-blue-700">{m.pin}</TableCell>
-                    <TableCell className="p-2 flex flex-wrap gap-1">
-                      <Button variant="secondary" size="sm" onClick={() => iniciarEdicion(m)}>
-                        Editar
-                      </Button>
-                      <Button variant="destructive" size="sm" onClick={() => eliminarMiembro(m.id)}>
-                        Eliminar
-                      </Button>
-                      {m.whatsapp ? (
-                        <Button
-                          asChild
-                          variant="secondary"
-                          size="sm"
-                          className="bg-green-500 hover:bg-green-600"
-                        >
-                          <a
-                            href={`https://wa.me/${m.whatsapp.replace(/[^0-9]/g, "")}?text=${encodeURIComponent(`¡Hola! Ingresa al link y accede con tu PIN: ${m.pin}. Te damos la bienvenida al club. ¡Hazlo bien bonito!`)}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="flex items-center gap-1"
-                          >
-                            WhatsApp
-                          </a>
-                        </Button>
-                      ) : (
-                        <Button variant="outline" size="sm" disabled>
-                          WhatsApp
-                        </Button>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
+              {filteredConquis.map((m) => (
+                <TableRow key={m.id} className="border-b">
+                  <TableCell className="font-semibold">{m.nombre}</TableCell>
+                  <TableCell>{m.unidad}</TableCell>
+                  <TableCell>{m.consejero}</TableCell>
+                  <TableCell className="font-mono font-bold text-blue-700">{m.pin}</TableCell>
+                  <TableCell className="p-2 flex flex-wrap gap-1">
+                    <Button variant="secondary" size="sm" onClick={() => iniciarEdicion(m)}>
+                      Editar
+                    </Button>
+                    <Button variant="destructive" size="sm" onClick={() => solicitarEliminacion(m)}>
+                      Eliminar
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
             </TableBody>
           </Table>
         )}
       </div>
+
+      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Eliminar registro</DialogTitle>
+            <DialogDescription>
+              Esta acción no se puede deshacer. Los datos se eliminarán permanentemente de Firestore.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-2 text-sm text-slate-700">
+            {selectedForDelete ? (
+              <p>
+                ¿Confirmas que deseas eliminar el registro de <strong>{selectedForDelete.nombre}</strong> ({selectedForDelete.unidad})?
+              </p>
+            ) : (
+              <p>Selecciona un registro para eliminar.</p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>
+              Cancelar
+            </Button>
+            <Button variant="destructive" onClick={confirmarEliminacion}>
+              Eliminar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

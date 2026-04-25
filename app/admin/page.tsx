@@ -182,6 +182,8 @@ const AdminPage = () => {
               router.push('/admin/aspirante');
             } else if (item.id === 'directiva') {
               router.push('/admin/directiva');
+            } else if (item.id === 'rankin') {
+              router.push('/admin/rankin');
             } else {
               setActiveTab(item.id);
             }

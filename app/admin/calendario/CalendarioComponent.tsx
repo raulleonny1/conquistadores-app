@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from "react";
 import { db } from "@/src/firebase";
 import { collection, addDoc, onSnapshot, doc, deleteDoc, updateDoc } from "firebase/firestore";
+import RetoMiembroEditor from "./RetoMiembroEditor";
 
 export default function CalendarioComponent() {
     const [editId, setEditId] = useState<string | null>(null);
@@ -97,7 +98,9 @@ export default function CalendarioComponent() {
   }
 
   return (
-    <div className="max-w-2xl mx-auto">
+    <div className="mx-auto max-w-3xl space-y-10">
+      <RetoMiembroEditor />
+
       <div className="mb-8">
         <h3 className="text-xl font-bold text-emerald-700 mb-2">Calendario</h3>
         <div className="flex items-center gap-4 mb-4">
