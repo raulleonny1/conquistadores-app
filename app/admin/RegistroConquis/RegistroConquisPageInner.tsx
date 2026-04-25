@@ -241,12 +241,11 @@ export default function RegistroConquisPageInner({ unidades: initialUnidades, co
   const iniciarEdicion = (miembro: RegistroConquis) => {
     setEditId(miembro.id);
     const rawEsp = miembro.especialidades as EspecialidadObj[] | string | undefined;
-    let especialidadesArr: EspecialidadObj[] = [];
-    if (Array.isArray(rawEsp)) {
-      especialidadesArr = rawEsp;
-    } else if (typeof rawEsp === "string" && rawEsp.length > 0) {
-      especialidadesArr = [{ area: "", categoria: "", especialidad: rawEsp }];
-    }
+    const especialidadesArr: EspecialidadObj[] = Array.isArray(rawEsp)
+      ? rawEsp
+      : typeof rawEsp === "string" && rawEsp.length > 0
+        ? [{ area: "", categoria: "", especialidad: rawEsp }]
+        : ([] as EspecialidadObj[]);
     setForm({
       nombre: [miembro.nombre, miembro.apellido].filter(Boolean).join(" "),
       apellido: miembro.apellido || "",
