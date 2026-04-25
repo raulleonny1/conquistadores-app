@@ -109,7 +109,10 @@ export default function RankinPage() {
         totalesSnapshot.docs.forEach((d) => {
           const data = d.data() as Partial<{ puntos: Record<string, unknown> }>;
           const puntos = data.puntos || {};
-          totalesMap[d.id] = Object.values(puntos).reduce((acc, value) => acc + toNumber(value), 0);
+          totalesMap[d.id] = Object.values(puntos).reduce<number>(
+            (acc, value) => acc + toNumber(value),
+            0
+          );
         });
 
         setParticipantes(merged);
@@ -143,7 +146,10 @@ export default function RankinPage() {
           puntos: toNumber(puntosMap[cat.id]),
         })).filter((c) => c.puntos > 0);
 
-        const computedTotal = Object.values(puntosMap).reduce((acc, value) => acc + toNumber(value), 0);
+        const computedTotal = Object.values(puntosMap).reduce<number>(
+          (acc, value) => acc + toNumber(value),
+          0
+        );
         setResumenCategorias(categorias);
         setTotalGeneral(computedTotal);
 
@@ -151,7 +157,10 @@ export default function RankinPage() {
           .map((d) => {
             const data = d.data() as Partial<{ fecha: string; puntos: Record<string, number | string> }>;
             const puntos = data.puntos || {};
-            const totalEvento = Object.values(puntos).reduce((acc, value) => acc + toNumber(value), 0);
+            const totalEvento = Object.values(puntos).reduce<number>(
+              (acc, value) => acc + toNumber(value),
+              0
+            );
             return {
               id: d.id,
               fecha: data.fecha || "",

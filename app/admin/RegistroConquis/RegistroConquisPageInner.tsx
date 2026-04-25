@@ -240,12 +240,12 @@ export default function RegistroConquisPageInner({ unidades: initialUnidades, co
   // Edición
   const iniciarEdicion = (miembro: RegistroConquis) => {
     setEditId(miembro.id);
-    let especialidadesArr = [];
-    if (Array.isArray(miembro.especialidades)) {
-      especialidadesArr = miembro.especialidades;
-    } else if (typeof miembro.especialidades === "string" && miembro.especialidades.length > 0) {
-      // Try to parse string, fallback to single object
-      especialidadesArr = [{ area: "", categoria: "", especialidad: miembro.especialidades }];
+    const rawEsp = miembro.especialidades as EspecialidadObj[] | string | undefined;
+    let especialidadesArr: EspecialidadObj[] = [];
+    if (Array.isArray(rawEsp)) {
+      especialidadesArr = rawEsp;
+    } else if (typeof rawEsp === "string" && rawEsp.length > 0) {
+      especialidadesArr = [{ area: "", categoria: "", especialidad: rawEsp }];
     }
     setForm({
       nombre: [miembro.nombre, miembro.apellido].filter(Boolean).join(" "),
