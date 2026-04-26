@@ -19,6 +19,8 @@ type TarjetaDoc = {
 };
 
 const EvaluarGuiaMayorPage = () => {
+    const actividadesPlan = tarjetaGuiaMayor.flatMap((grupo) => grupo.actividades);
+    const actividadesSet = new Set(actividadesPlan);
     const CATEGORIAS_BASE = [
       "puntualidad",
       "asistencia",
@@ -78,28 +80,51 @@ const EvaluarGuiaMayorPage = () => {
 
     // Guardar actividad en evaluacionesGuiaMayor
     const guardarActividad = async (actividad: string, estado: boolean) => {
-      const yaCompletado = !!evaluaciones.find(ev => ev.actividad === actividad && ev.completado);
-      await addDoc(collection(db, "evaluacionesGuiaMayor"), {
-        aspiranteId,
-        actividad,
-        completado: estado,
-        evaluador,
-        fecha: new Date().toLocaleDateString(),
-        hora: new Date().toLocaleTimeString()
-      });
-      setEvaluaciones(evals => {
-        const otros = evals.filter(ev => ev.actividad !== actividad);
-        return [...otros, {
+      if (!aspiranteId) {
+        alert("Selecciona un aspirante antes de evaluar.");
+        return;
+      }
+      if (!evaluador.trim()) {
+        alert("Ingresa el nombre del evaluador.");
+        return;
+      }
+
+      const yaCompletado = !!evaluaciones.find((ev) => ev.actividad === actividad && ev.completado);
+      const now = new Date();
+      const fecha = now.toLocaleDateString();
+      const hora = now.toLocaleTimeString();
+
+      try {
+        await addDoc(collection(db, "evaluacionesGuiaMayor"), {
           aspiranteId,
           actividad,
           completado: estado,
-          evaluador,
-          fecha: new Date().toLocaleDateString(),
-          hora: new Date().toLocaleTimeString()
-        }];
-      });
-      const delta = estado && !yaCompletado ? 1 : (!estado && yaCompletado ? -1 : 0);
-      await sumarPuntosAspirante(aspiranteId, delta);
+          evaluador: evaluador.trim(),
+          fecha,
+          hora,
+        });
+
+        setEvaluaciones((evals) => {
+          const otros = evals.filter((ev) => ev.actividad !== actividad);
+          return [
+            ...otros,
+            {
+              aspiranteId,
+              actividad,
+              completado: estado,
+              evaluador: evaluador.trim(),
+              fecha,
+              hora,
+            },
+          ];
+        });
+
+        const delta = estado && !yaCompletado ? 1 : (!estado && yaCompletado ? -1 : 0);
+        await sumarPuntosAspirante(aspiranteId, delta);
+      } catch (err) {
+        console.error(err);
+        alert("No se pudo guardar la evaluación. Revisa permisos y conexión.");
+      }
     };
   const [aspirantes, setAspirantes] = useState<any[]>([]);
   const [aspiranteId, setAspiranteId] = useState("");
@@ -123,27 +148,44 @@ const EvaluarGuiaMayorPage = () => {
       return;
     }
     const fetchTarjetaYActividades = async () => {
-      // Buscar tarjeta
-      const q = query(collection(db, "tarjetaGuiaMayor"), where("aspiranteId", "==", aspiranteId));
-      const snap = await getDocs(q);
-      let tarjetaDoc: TarjetaDoc | null = snap.docs.length > 0 ? { id: snap.docs[0].id, ...(snap.docs[0].data() as Omit<TarjetaDoc, "id">) } : null;
-      // Si no existe, crearla
+      // Buscar tarjeta usando ID estable (aspiranteId) para evitar duplicados.
+      let tarjetaDoc: TarjetaDoc | null = null;
+      const tarjetaRef = doc(db, "tarjetaGuiaMayor", aspiranteId);
+      const tarjetaByIdSnap = await getDoc(tarjetaRef);
+      if (tarjetaByIdSnap.exists()) {
+        tarjetaDoc = { id: tarjetaByIdSnap.id, ...(tarjetaByIdSnap.data() as Omit<TarjetaDoc, "id">) };
+      } else {
+        // Compatibilidad: si existen tarjetas antiguas por query, usa la primera.
+        const q = query(collection(db, "tarjetaGuiaMayor"), where("aspiranteId", "==", aspiranteId));
+        const snap = await getDocs(q);
+        if (snap.docs.length > 0) {
+          tarjetaDoc = { id: snap.docs[0].id, ...(snap.docs[0].data() as Omit<TarjetaDoc, "id">) };
+        }
+      }
+
+      // Si no existe, crearla con docId = aspiranteId
       if (!tarjetaDoc) {
-        const aspirante = aspirantes.find(a => a.id === aspiranteId);
-        const nuevaTarjeta = await addDoc(collection(db, "tarjetaGuiaMayor"), {
+        const aspirante = aspirantes.find((a) => a.id === aspiranteId);
+        await setDoc(tarjetaRef, {
           aspiranteId,
           nombre: aspirante?.nombre || "",
           estado: "en_proceso",
           progreso: 0,
-          fechaInicio: new Date().toISOString().split("T")[0]
+          fechaInicio: new Date().toISOString().split("T")[0],
         });
-        tarjetaDoc = { id: nuevaTarjeta.id, estado: "en_proceso", progreso: 0, fechaInicio: new Date().toISOString().split("T")[0] };
-        // Crear actividades base
+        tarjetaDoc = {
+          id: aspiranteId,
+          estado: "en_proceso",
+          progreso: 0,
+          fechaInicio: new Date().toISOString().split("T")[0],
+          nombre: aspirante?.nombre || "",
+        };
+        // Crear actividades base asociadas a la tarjeta
         for (const req of actividadesBase) {
           await addDoc(collection(db, "actividadesTarjetaGuiaMayor"), {
-            tarjetaId: nuevaTarjeta.id,
+            tarjetaId: aspiranteId,
             requisito: req,
-            completado: false
+            completado: false,
           });
         }
       }
@@ -161,10 +203,12 @@ const EvaluarGuiaMayorPage = () => {
       }));
       setEvaluaciones(evals);
       // Marcar actividades completadas
-      setActividades(acts => acts.map(act => {
-        const found = evals.find(ev => ev.actividad === act.requisito && ev.completado);
-        return found ? { ...act, completado: true } : { ...act, completado: false };
-      }));
+      setActividades((acts) =>
+        acts.map((act) => {
+          const found = evals.find((ev) => ev.actividad === act.requisito && ev.completado);
+          return found ? { ...act, completado: true } : { ...act, completado: false };
+        })
+      );
     };
     fetchTarjetaYActividades();
   }, [aspiranteId]);
@@ -209,17 +253,19 @@ const EvaluarGuiaMayorPage = () => {
             <div className="font-bold text-pink-700 mb-2">Evaluador: {evaluador}</div>
             {/* Progreso automático */}
             {(() => {
-              const completadas = tarjetaGuiaMayor.filter(act => !!evaluaciones.find(ev => ev.actividad === act && ev.completado));
-              const total = tarjetaGuiaMayor.length;
+              const completadas = actividadesPlan.filter(
+                (act) => !!evaluaciones.find((ev) => ev.actividad === act && ev.completado)
+              ).length;
+              const total = actividadesPlan.length;
               return (
-                <div className="mb-4 font-bold text-green-700">Progreso: {completadas.length} / {total} requisitos</div>
+                <div className="mb-4 font-bold text-green-700">Progreso: {completadas} / {total} requisitos</div>
               );
             })()}
             <ul className="space-y-2">
               {tarjetaGuiaMayor.map((grupo, idxGrupo) => (
                 <React.Fragment key={grupo.seccion}>
                   <li className="font-bold text-indigo-600 mt-4 mb-2">{grupo.seccion}</li>
-                  {grupo.actividades.map((act, idxAct) => (
+                  {grupo.actividades.map((act) => (
                     <li key={`${grupo.seccion}-${act}`} className="flex items-center gap-2">
                       <input
                         type="checkbox"

@@ -79,12 +79,12 @@ service cloud.firestore {
 
     match /calificacionesSemanal/{docId} {
       allow read: if isAdmin() || isDirectiva() || matchesPin(resource.data.pin);
-      allow write: if isAdmin() || isConsejero();
+      allow write: if isAdmin() || isDirectiva() || isConsejero();
     }
 
     match /calificacionesConquis/{docId} {
       allow read: if isAdmin() || isDirectiva() || matchesPin(resource.data.pin);
-      allow write: if isAdmin() || isConsejero();
+      allow write: if isAdmin() || isDirectiva() || isConsejero();
     }
 
     match /eventos/{docId} {
