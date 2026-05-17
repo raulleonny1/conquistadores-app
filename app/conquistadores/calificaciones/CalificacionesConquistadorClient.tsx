@@ -6,20 +6,7 @@ import { db } from "../../../src/firebase";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { Star, Award } from "lucide-react";
 import HistorialSemanal from "./HistorialSemanal";
-
-const CATEGORIAS_PUNTOS = [
-  { id: "puntualidad", nombre: "Puntualidad" },
-  { id: "asistencia", nombre: "Asistencia" },
-  { id: "disciplina", nombre: "Disciplina" },
-  { id: "reclutador", nombre: "Reclutador" },
-  { id: "materiales", nombre: "Materiales" },
-  { id: "fidelidad", nombre: "Fidelidad Eclesiástica" },
-  { id: "misionero", nombre: "Misionero" },
-  { id: "colaborador", nombre: "Colaborador" },
-  { id: "orden_cerrado", nombre: "Orden Cerrado" },
-  { id: "tareas", nombre: "Completar Tareas" },
-  { id: "especialidades", nombre: "Especialidades" },
-];
+import { CATEGORIAS_PUNTOS, getCategoriasConPuntos, sumarPuntos } from "@/src/lib/categoriasPuntos";
 
 export default function CalificacionesConquistadorClient() {
   const searchParams = useSearchParams();
@@ -59,11 +46,8 @@ export default function CalificacionesConquistadorClient() {
     fetchCalificaciones();
   }, [pin]);
 
-  const total = Object.values(puntos).reduce((acc: number, val) => {
-    if (typeof val === "number") return acc + val;
-    if (typeof val === "string") return acc + (parseInt(val, 10) || 0);
-    return acc;
-  }, 0);
+  const categoriasConPuntos = getCategoriasConPuntos(puntos);
+  const total = sumarPuntos(puntos);
 
   if (!pin) {
     return (
@@ -108,21 +92,24 @@ export default function CalificacionesConquistadorClient() {
         </div>
       </div>
 
-      <div className="grid md:grid-cols-2 gap-4">
-        {CATEGORIAS_PUNTOS.map((cat) => {
-          const valor = puntos[cat.id] || 0;
-          return (
+      {categoriasConPuntos.length > 0 ? (
+        <div className="grid md:grid-cols-2 gap-4">
+          {categoriasConPuntos.map((cat) => (
             <div key={cat.id} className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100">
               <div className="flex justify-between items-center mb-3">
                 <span className="font-bold text-slate-700">{cat.nombre}</span>
-                <span className="text-sm font-bold text-blue-600">{valor} pts</span>
+                <span className="text-sm font-bold text-blue-600">{cat.valor} pts</span>
               </div>
             </div>
-          );
-        })}
-      </div>
+          ))}
+        </div>
+      ) : (
+        <p className="text-slate-500 text-sm text-center py-6 mb-4">
+          Aún no tienes puntos registrados en ninguna categoría.
+        </p>
+      )}
 
-      <HistorialSemanal />
+      <HistorialSemanal pin={pin} />
     </div>
   );
 }

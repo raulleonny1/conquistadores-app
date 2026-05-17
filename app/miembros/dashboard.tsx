@@ -22,6 +22,13 @@ import {
 	ShieldCheck,
 	TrendingUp
 } from 'lucide-react';
+import { getCategoriasConPuntos, sumarPuntos } from "@/src/lib/categoriasPuntos";
+import {
+	getProgresoClasePorcentaje,
+	getSiguienteClase,
+	resumenTareasDesdeHistorial,
+	type ResumenTareasMiembro,
+} from "@/src/lib/progresoConquistador";
 
 interface Usuario {
 	nombre?: string;
@@ -52,6 +59,12 @@ function App() {
 	const [puntosCategorias, setPuntosCategorias] = useState<Record<string, number>>({});
 	const [proximosEventos, setProximosEventos] = useState<any[]>([]);
 	const [progresoClase, setProgresoClase] = useState(0);
+	const [siguienteClase, setSiguienteClase] = useState<string | null>(null);
+	const [resumenTareas, setResumenTareas] = useState<ResumenTareasMiembro>({
+		tareasRegistradas: 0,
+		puntosTareas: 0,
+	});
+	const [historialSemanal, setHistorialSemanal] = useState<{ puntos?: Record<string, unknown> }[]>([]);
 	const [retoMiembro, setRetoMiembro] = useState<RetoMiembroDashboardConfig>(DEFAULT_RETO_MIEMBRO);
 
 	useEffect(() => {
@@ -69,41 +82,56 @@ function App() {
 
 	useEffect(() => {
 		if (!pin) return;
-		const loadData = async () => {
+
+		const unsubConquis = onSnapshot(doc(db, "calificacionesConquis", pin), (conquisSnap) => {
+			setPuntosCategorias(conquisSnap.exists() ? conquisSnap.data().puntos || {} : {});
+		});
+
+		(async () => {
 			try {
-				// RegistroConquis
-				const ref = query(collection(db, "RegistroConquis"), where("pin", "==", pin));
-				const snap = await getDocs(ref);
+				const snap = await getDocs(
+					query(collection(db, "RegistroConquis"), where("pin", "==", pin))
+				);
 				if (!snap.empty) {
 					const data = snap.docs[0].data();
+					const clase = (data.clase as string) || "";
 					setUser({ ...data });
 					setEspecialidades(data.especialidades || []);
-					setProgresoClase(data.progresoClase || 0);
+					setSiguienteClase(getSiguienteClase(clase));
+					const pctGuardado =
+						typeof data.progresoClase === "number" && !Number.isNaN(data.progresoClase)
+							? data.progresoClase
+							: null;
+					setProgresoClase(pctGuardado ?? getProgresoClasePorcentaje(clase));
 				} else {
 					setError("PIN inválido o usuario no encontrado.");
 				}
-				// Calificaciones normales
-				const califQuery = query(collection(db, "calificaciones"), where("pin", "==", pin));
-				const califSnap = await getDocs(califQuery);
-				setCalificacionesRecientes(califSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-				// CalificacionesConquis
-				const refConquis = doc(db, "calificacionesConquis", pin);
-				const conquisSnap = await getDoc(refConquis);
-				if (conquisSnap.exists()) {
-					const puntosObj = conquisSnap.data().puntos || {};
-					setPuntosCategorias(puntosObj);
-				}
-				// Eventos
+
+				const califSnap = await getDocs(
+					query(collection(db, "calificaciones"), where("pin", "==", pin))
+				);
+				setCalificacionesRecientes(califSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
+
 				const eventosSnap = await getDocs(collection(db, "eventos"));
-				setProximosEventos(eventosSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+				setProximosEventos(eventosSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
+
+				const semSnap = await getDocs(
+					query(collection(db, "calificacionesSemanal"), where("pin", "==", pin))
+				);
+				setHistorialSemanal(semSnap.docs.map((d) => d.data() as { puntos?: Record<string, unknown> }));
 			} catch (err) {
 				console.error(err);
 			} finally {
 				setLoading(false);
 			}
-		};
-		loadData();
+		})();
+
+		return () => unsubConquis();
 	}, [pin]);
+
+	useEffect(() => {
+		setResumenTareas(resumenTareasDesdeHistorial(historialSemanal, puntosCategorias));
+	}, [historialSemanal, puntosCategorias]);
 
 	if (loading) return <div className="text-center mt-10 text-lg text-indigo-700">Cargando datos...</div>;
 	if (error) return <div className="text-center mt-10 text-lg text-red-700">{error}</div>;
@@ -111,9 +139,17 @@ function App() {
 
 	const nombre = user.nombre || "Conquistador";
 	const unidad = user.unidad || "Sin unidad";
-	const tareasCompletadas = user.tareasCompletadas || 12;
-	const tareasPendientes = user.tareasPendientes || 5;
-	const siguienteNivel = user.siguienteNivel || "Guía Mayor";
+	const tareasCompletadas =
+		typeof user.tareasCompletadas === "number"
+			? user.tareasCompletadas
+			: resumenTareas.tareasRegistradas;
+	const tareasPendientes =
+		typeof user.tareasPendientes === "number" ? user.tareasPendientes : 0;
+	const siguienteNivel =
+		user.siguienteNivel || siguienteClase || "Nivel máximo (Guía)";
+	const rangoActual = user.clase || user.rango || "Sin clase";
+	const categoriasConPuntos = getCategoriasConPuntos(puntosCategorias);
+	const totalPuntos = sumarPuntos(puntosCategorias);
 
 	return (
 		<>
@@ -155,10 +191,10 @@ function App() {
 						</div>
 						<div className="text-left">
 							<p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] leading-none mb-1">Tu Rango Actual</p>
-							<p className="text-xl font-black text-slate-800 leading-none mb-1">{user.rango || 'Explorador Élite'}</p>
+							<p className="text-xl font-black text-slate-800 leading-none mb-1">{rangoActual}</p>
 							<div className="flex items-center gap-2 text-indigo-600 font-black">
 								<TrendingUp size={16} />
-								<span className="text-sm tracking-tight">{Object.values(puntosCategorias).reduce((acc, val) => acc + (typeof val === 'number' ? val : 0), 0).toLocaleString()} PUNTOS XP</span>
+								<span className="text-sm tracking-tight">{totalPuntos.toLocaleString()} PUNTOS XP</span>
 							</div>
 						</div>
 					</div>
@@ -187,7 +223,14 @@ function App() {
 										<CheckCircle2 className="text-indigo-600 shrink-0" size={24} />
 										<div>
 											<p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest leading-none mb-1">Completado</p>
-											<p className="font-black text-slate-800 text-lg">{tareasCompletadas} Tareas</p>
+											<p className="font-black text-slate-800 text-lg">
+												{tareasCompletadas} Tareas
+												{resumenTareas.puntosTareas > 0 && (
+													<span className="block text-xs font-bold text-indigo-500/80 mt-0.5">
+														{resumenTareas.puntosTareas} pts (consejero/admin)
+													</span>
+												)}
+											</p>
 										</div>
 									</div>
 									<div className="flex items-center gap-4 p-5 rounded-3xl bg-orange-50/50 border border-orange-100 group-hover:bg-orange-50 transition-colors">
@@ -217,25 +260,41 @@ function App() {
 									<button className="text-indigo-600 text-xs font-black uppercase tracking-widest hover:underline" onClick={() => router.push(`/miembros/calificaciones?pin=${pin}`)}>Ver Todo</button>
 								</div>
 								<div className="space-y-4">
-									{calificacionesRecientes.length === 0 ? (
-										<div className="text-slate-400 text-xs">No hay calificaciones registradas.</div>
+									{categoriasConPuntos.length === 0 && calificacionesRecientes.length === 0 ? (
+										<div className="text-slate-400 text-xs">Aún no tienes puntos ni notas registradas.</div>
 									) : (
-										calificacionesRecientes.map((cal: any) => (
-											<div key={cal.id} className="flex items-center justify-between p-4 bg-slate-50/80 rounded-3xl border border-transparent hover:border-slate-200 hover:bg-white transition-all cursor-pointer group">
-												<div className="flex items-center gap-4">
-													<div className="group-hover:scale-110 transition-transform">
-														<BookOpen size={20}/>
+										<>
+											{categoriasConPuntos.map((cat) => (
+												<div
+													key={cat.id}
+													className="flex items-center justify-between p-4 bg-slate-50/80 rounded-3xl border border-transparent hover:border-slate-200 hover:bg-white transition-all"
+												>
+													<div className="flex items-center gap-4">
+														<div className="p-2 bg-indigo-100 text-indigo-600 rounded-lg">
+															<Trophy size={18} />
+														</div>
+														<p className="font-black text-slate-800 text-sm">{cat.nombre}</p>
 													</div>
-													<div>
-														<p className="font-black text-slate-800 text-sm">{cal.materia}</p>
-														<p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Examen Final</p>
-													</div>
+													<span className="px-4 py-1.5 bg-indigo-100 text-indigo-700 rounded-xl text-[11px] font-black uppercase shadow-sm">
+														{cat.valor} pts
+													</span>
 												</div>
-												<span className="px-4 py-1.5 bg-emerald-100 text-emerald-700 rounded-xl text-[11px] font-black uppercase shadow-sm">
-													{cal.nota}
-												</span>
-											</div>
-										))
+											))}
+											{calificacionesRecientes.map((cal: { id: string; materia?: string; nota?: string }) => (
+												<div key={cal.id} className="flex items-center justify-between p-4 bg-slate-50/80 rounded-3xl border border-transparent hover:border-slate-200 hover:bg-white transition-all">
+													<div className="flex items-center gap-4">
+														<BookOpen size={20} className="text-slate-500" />
+														<div>
+															<p className="font-black text-slate-800 text-sm">{cal.materia}</p>
+															<p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Nota</p>
+														</div>
+													</div>
+													<span className="px-4 py-1.5 bg-emerald-100 text-emerald-700 rounded-xl text-[11px] font-black uppercase shadow-sm">
+														{cal.nota}
+													</span>
+												</div>
+											))}
+										</>
 									)}
 								</div>
 							</div>
