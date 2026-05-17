@@ -3,14 +3,19 @@ import React, { useEffect, useState } from "react";
 import { db, formatFechaDDMMYYYY } from "@/src/firebase";
 import { collection, onSnapshot } from "firebase/firestore";
 import { Calendar, Clock, ChevronRight } from "lucide-react";
+import { nombreEvento, ordenarEventosPorFecha, type EventoFirestore } from "@/src/lib/eventos";
 
 export default function EventosSidebar() {
-  const [eventos, setEventos] = useState<any[]>([]);
+  const [eventos, setEventos] = useState<EventoFirestore[]>([]);
 
   useEffect(() => {
     const q = collection(db, "eventos");
     const unsub = onSnapshot(q, (snapshot) => {
-      setEventos(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      setEventos(
+        ordenarEventosPorFecha(
+          snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as EventoFirestore))
+        )
+      );
     });
     return () => unsub();
   }, []);
@@ -33,7 +38,7 @@ export default function EventosSidebar() {
                 </span>
                 <ChevronRight size={18} className="text-slate-300 group-hover:text-indigo-600 group-hover:translate-x-1 transition-all" />
               </div>
-              <h4 className="font-black text-slate-800 leading-tight mb-3 text-base">{evento.nombre}</h4>
+              <h4 className="font-black text-slate-800 leading-tight mb-3 text-base">{nombreEvento(evento)}</h4>
                <div className="flex items-center gap-3 text-slate-500 text-xs font-bold uppercase tracking-widest">
                  <div className="p-1.5 bg-indigo-50 rounded-lg"><Clock size={14} className="text-indigo-500" /></div>
                  {formatFechaDDMMYYYY(evento.fecha)}

@@ -14,16 +14,34 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app);
 export const storage = getStorage(app);
-// Formatea una fecha JS a dd/mm/yyyy con ceros
-export function formatFechaDDMMYYYY(date: Date | string): string {
-  let d: Date;
+/** Formatea a dd/mm/yyyy. Acepta Date, ISO (yyyy-mm-dd) o texto ya en dd/mm/yyyy. */
+export function formatFechaDDMMYYYY(date: Date | string | null | undefined): string {
+  if (date == null || date === "") return "—";
+
   if (typeof date === "string") {
-    d = new Date(date);
-  } else {
-    d = date;
+    const s = date.trim();
+    const ddmmyyyy = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/;
+    const m1 = s.match(ddmmyyyy);
+    if (m1) {
+      const [, d, mo, y] = m1;
+      return `${d.padStart(2, "0")}/${mo.padStart(2, "0")}/${y}`;
+    }
+    if (/^\d{4}-\d{2}-\d{2}/.test(s)) {
+      const d = new Date(`${s.slice(0, 10)}T12:00:00`);
+      if (!Number.isNaN(d.getTime())) {
+        return formatFechaDDMMYYYY(d);
+      }
+    }
+    const parsed = new Date(s);
+    if (!Number.isNaN(parsed.getTime())) {
+      return formatFechaDDMMYYYY(parsed);
+    }
+    return s;
   }
-  const day = d.getDate().toString().padStart(2, "0");
-  const month = (d.getMonth() + 1).toString().padStart(2, "0");
-  const year = d.getFullYear();
+
+  if (Number.isNaN(date.getTime())) return "—";
+  const day = date.getDate().toString().padStart(2, "0");
+  const month = (date.getMonth() + 1).toString().padStart(2, "0");
+  const year = date.getFullYear();
   return `${day}/${month}/${year}`;
 }

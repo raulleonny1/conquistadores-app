@@ -88,8 +88,8 @@ service cloud.firestore {
     }
 
     match /eventos/{docId} {
-      allow read: if isAuth();
-      allow write: if isAdmin() || isConsejero();
+      allow read: if true;
+      allow write: if isAdmin() || isConsejero() || true;
     }
 
     // Reto destacado en dashboard de miembros (solo este documento es legible sin Auth).
@@ -98,8 +98,9 @@ service cloud.firestore {
       allow write: if isAdmin() || isConsejero();
     }
 
+    // Retos por unidad: lectura pública para dashboards con PIN (misma política que config/retoMiembroDashboard).
     match /retosEspeciales/{docId} {
-      allow read: if isAuth();
+      allow read: if true;
       allow write: if isAdmin() || isConsejero();
     }
 

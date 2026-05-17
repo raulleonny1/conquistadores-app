@@ -1,7 +1,8 @@
 "use client";
 import React, { useEffect, useState } from 'react';
-import { db } from "../../src/firebase";
-import { collection, getDocs, query, where, doc, getDoc, onSnapshot } from "firebase/firestore";
+import { db, formatFechaDDMMYYYY } from "../../src/firebase";
+import { collection, getDocs, query, where, doc, onSnapshot } from "firebase/firestore";
+import { nombreEvento, ordenarEventosPorFecha, type EventoFirestore } from "@/src/lib/eventos";
 import {
 	DEFAULT_RETO_MIEMBRO,
 	mergeRetoConfig,
@@ -29,6 +30,13 @@ import {
 	resumenTareasDesdeHistorial,
 	type ResumenTareasMiembro,
 } from "@/src/lib/progresoConquistador";
+import RetoEspecialCard from "@/src/components/RetoEspecialCard";
+import {
+	ordenarRetosPorFecha,
+	tituloRetoMiembro,
+	type RetoEspecialDoc,
+} from "@/src/lib/retosEspeciales";
+import { toast } from "react-hot-toast";
 
 interface Usuario {
 	nombre?: string;
@@ -57,7 +65,7 @@ function App() {
 	const [especialidades, setEspecialidades] = useState<Especialidad[]>([]);
 	const [calificacionesRecientes, setCalificacionesRecientes] = useState<any[]>([]);
 	const [puntosCategorias, setPuntosCategorias] = useState<Record<string, number>>({});
-	const [proximosEventos, setProximosEventos] = useState<any[]>([]);
+	const [proximosEventos, setProximosEventos] = useState<EventoFirestore[]>([]);
 	const [progresoClase, setProgresoClase] = useState(0);
 	const [siguienteClase, setSiguienteClase] = useState<string | null>(null);
 	const [resumenTareas, setResumenTareas] = useState<ResumenTareasMiembro>({
@@ -66,6 +74,8 @@ function App() {
 	});
 	const [historialSemanal, setHistorialSemanal] = useState<{ puntos?: Record<string, unknown> }[]>([]);
 	const [retoMiembro, setRetoMiembro] = useState<RetoMiembroDashboardConfig>(DEFAULT_RETO_MIEMBRO);
+	const [unidadMiembro, setUnidadMiembro] = useState("");
+	const [retoConsejero, setRetoConsejero] = useState<RetoEspecialDoc | null>(null);
 
 	useEffect(() => {
 		const unsub = onSnapshot(
@@ -96,6 +106,7 @@ function App() {
 					const data = snap.docs[0].data();
 					const clase = (data.clase as string) || "";
 					setUser({ ...data });
+					setUnidadMiembro((data.unidad as string) || "");
 					setEspecialidades(data.especialidades || []);
 					setSiguienteClase(getSiguienteClase(clase));
 					const pctGuardado =
@@ -111,9 +122,6 @@ function App() {
 					query(collection(db, "calificaciones"), where("pin", "==", pin))
 				);
 				setCalificacionesRecientes(califSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
-
-				const eventosSnap = await getDocs(collection(db, "eventos"));
-				setProximosEventos(eventosSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
 
 				const semSnap = await getDocs(
 					query(collection(db, "calificacionesSemanal"), where("pin", "==", pin))
@@ -132,6 +140,38 @@ function App() {
 	useEffect(() => {
 		setResumenTareas(resumenTareasDesdeHistorial(historialSemanal, puntosCategorias));
 	}, [historialSemanal, puntosCategorias]);
+
+	useEffect(() => {
+		const unsubEventos = onSnapshot(collection(db, "eventos"), (snap) => {
+			const lista = ordenarEventosPorFecha(
+				snap.docs.map((d) => ({ id: d.id, ...d.data() } as EventoFirestore))
+			);
+			setProximosEventos(lista);
+		});
+		return () => unsubEventos();
+	}, []);
+
+	useEffect(() => {
+		if (!unidadMiembro.trim()) {
+			setRetoConsejero(null);
+			return;
+		}
+		const q = query(
+			collection(db, "retosEspeciales"),
+			where("unidad", "==", unidadMiembro.trim())
+		);
+		const unsub = onSnapshot(
+			q,
+			(snap) => {
+				const lista = ordenarRetosPorFecha(
+					snap.docs.map((d) => ({ id: d.id, ...d.data() } as RetoEspecialDoc))
+				);
+				setRetoConsejero(lista[0] ?? null);
+			},
+			() => setRetoConsejero(null)
+		);
+		return () => unsub();
+	}, [unidadMiembro]);
 
 	if (loading) return <div className="text-center mt-10 text-lg text-indigo-700">Cargando datos...</div>;
 	if (error) return <div className="text-center mt-10 text-lg text-red-700">{error}</div>;
@@ -331,7 +371,7 @@ function App() {
 								{proximosEventos.length === 0 ? (
 									<div className="text-slate-400 text-xs">No hay eventos próximos.</div>
 								) : (
-									proximosEventos.map((evento: any) => (
+									proximosEventos.map((evento) => (
 										<div key={evento.id} className="p-5 rounded-4xl bg-slate-50 border border-slate-100 hover:bg-white hover:shadow-xl transition-all cursor-pointer group active:scale-95">
 											<div className="flex items-center justify-between mb-3">
 												<span className={`px-3 py-1 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-sm ${evento.color || 'bg-orange-100 text-orange-600'}`}>
@@ -339,11 +379,18 @@ function App() {
 												</span>
 												<ChevronRight size={18} className="text-slate-300 group-hover:text-indigo-600 group-hover:translate-x-1 transition-all" />
 											</div>
-											<h4 className="font-black text-slate-800 leading-tight mb-3 text-base">{evento.titulo}</h4>
+											<h4 className="font-black text-slate-800 leading-tight mb-2 text-base">{nombreEvento(evento)}</h4>
 											<div className="flex items-center gap-3 text-slate-500 text-xs font-bold uppercase tracking-widest">
 												<div className="p-1.5 bg-indigo-50 rounded-lg"><Clock size={14} className="text-indigo-500" /></div>
-												{evento.fecha}
+												{formatFechaDDMMYYYY(evento.fecha)}
+												{evento.hora ? ` · ${evento.hora}` : ""}
 											</div>
+											{evento.lugar ? (
+												<p className="mt-2 text-xs font-semibold text-slate-500">Lugar: {evento.lugar}</p>
+											) : null}
+											{evento.observacion ? (
+												<p className="mt-1 text-xs text-slate-400">{evento.observacion}</p>
+											) : null}
 										</div>
 									))
 								)}
@@ -352,39 +399,28 @@ function App() {
 								Calendario Completo
 							</button>
 						</div>
-						{retoMiembro.activo && (
-							<div className="relative overflow-hidden rounded-3xl bg-linear-to-br from-violet-600 via-indigo-700 to-slate-900 p-6 text-white shadow-2xl ring-1 ring-white/10 sm:rounded-[2.5rem] sm:p-8">
-								{retoMiembro.mostrarIconoFondo && (
-									<div className="pointer-events-none absolute -right-4 bottom-0 top-0 flex items-center opacity-[0.1] sm:-right-2">
-										<Trophy className="h-36 w-36 shrink-0 text-white sm:h-44 sm:w-44" strokeWidth={1.15} />
-									</div>
-								)}
-								<div className="relative z-10">
-									<span className="mb-3 inline-block rounded-full border border-white/25 bg-white/15 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.18em] text-white/95">
-										{retoMiembro.etiqueta}
-									</span>
-									<h4 className="mb-6 text-xl font-black leading-snug tracking-tight text-balance sm:text-2xl md:text-3xl">
-										{retoMiembro.titulo}
-									</h4>
-									{retoMiembro.urlBoton?.trim() ? (
-										<a
-											href={retoMiembro.urlBoton.trim()}
-											target="_blank"
-											rel="noopener noreferrer"
-											className="flex min-h-[48px] w-full items-center justify-center rounded-2xl bg-white px-4 py-3.5 text-center text-xs font-black uppercase tracking-[0.15em] text-indigo-900 shadow-lg transition active:scale-[0.98] sm:text-sm"
-										>
-											{retoMiembro.textoBoton}
-										</a>
-									) : (
-										<button
-											type="button"
-											className="flex min-h-[48px] w-full cursor-default items-center justify-center rounded-2xl bg-white px-4 py-3.5 text-center text-xs font-black uppercase tracking-[0.15em] text-indigo-900 shadow-lg sm:text-sm"
-										>
-											{retoMiembro.textoBoton}
-										</button>
-									)}
-								</div>
-							</div>
+						{retoConsejero ? (
+							<RetoEspecialCard
+								etiqueta="Reto Especial"
+								titulo={tituloRetoMiembro(retoConsejero)}
+								descripcion={retoConsejero.descripcion}
+								textoBoton="¡Aceptar Reto!"
+								onAceptar={() =>
+									toast.success(
+										`¡Reto aceptado! Al completarlo, tu consejero te asignará ${retoConsejero.puntos} pts en calificaciones.`
+									)
+								}
+							/>
+						) : (
+							retoMiembro.activo && (
+								<RetoEspecialCard
+									etiqueta={retoMiembro.etiqueta}
+									titulo={retoMiembro.titulo}
+									textoBoton={retoMiembro.textoBoton}
+									urlBoton={retoMiembro.urlBoton}
+									mostrarIconoFondo={retoMiembro.mostrarIconoFondo}
+								/>
+							)
 						)}
 					</div>
 				</div>
