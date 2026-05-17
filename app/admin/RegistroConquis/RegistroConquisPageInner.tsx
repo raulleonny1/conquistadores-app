@@ -25,6 +25,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { buildWhatsappUrl, mensajePinConquistador } from "@/src/utils/whatsapp";
+import { MessageCircle } from "lucide-react";
 
 type EspecialidadObj = {
   area: string;
@@ -288,6 +290,19 @@ export default function RegistroConquisPageInner({ unidades: initialUnidades, co
     setDeleteDialogOpen(true);
   };
 
+  const whatsappUrlFromRegistro = (m: Pick<RegistroConquis, "nombre" | "apellido" | "pin" | "unidad" | "consejero" | "clase" | "whatsapp">) =>
+    buildWhatsappUrl(
+      m.whatsapp,
+      mensajePinConquistador({
+        nombre: m.nombre,
+        apellido: m.apellido,
+        pin: m.pin,
+        unidad: m.unidad,
+        consejero: m.consejero,
+        clase: m.clase,
+      })
+    );
+
   const confirmarEliminacion = async () => {
     if (!selectedForDelete?.id) return;
 
@@ -422,7 +437,18 @@ export default function RegistroConquisPageInner({ unidades: initialUnidades, co
           </select>
         </div>
 
-        <div className="md:col-span-2 flex flex-col gap-3 md:flex-row md:justify-end">
+        <div className="md:col-span-2 flex flex-col gap-3 md:flex-row md:flex-wrap md:justify-end md:items-center">
+          {editMode && form.pin && form.whatsapp && whatsappUrlFromRegistro(form) && (
+            <a
+              href={whatsappUrlFromRegistro(form)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-green-600 px-6 py-2 text-sm font-bold text-white hover:bg-green-700 md:w-auto"
+            >
+              <MessageCircle size={18} />
+              Enviar información por WhatsApp
+            </a>
+          )}
           {editMode && (
             <button
               type="button"
@@ -441,7 +467,7 @@ export default function RegistroConquisPageInner({ unidades: initialUnidades, co
           </button>
         </div>
       </form>
-      <div className="bg-white rounded-3xl p-6 shadow-md border border-slate-200 max-w-3xl mx-auto">
+      <div className="bg-white rounded-3xl p-6 shadow-md border border-slate-200 max-w-5xl mx-auto">
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
             <h3 className="text-lg font-bold text-blue-700">Conquistadores registrados</h3>
@@ -478,18 +504,51 @@ export default function RegistroConquisPageInner({ unidades: initialUnidades, co
                 <TableHead>Nombre</TableHead>
                 <TableHead>Unidad</TableHead>
                 <TableHead>Consejero</TableHead>
+                <TableHead>WhatsApp</TableHead>
                 <TableHead>PIN</TableHead>
                 <TableHead>Acciones</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredConquis.map((m) => (
+              {filteredConquis.map((m) => {
+                const waUrl = whatsappUrlFromRegistro(m);
+                return (
                 <TableRow key={m.id} className="border-b">
-                  <TableCell className="font-semibold">{m.nombre}</TableCell>
+                  <TableCell className="font-semibold">
+                    {[m.nombre, m.apellido].filter(Boolean).join(" ")}
+                  </TableCell>
                   <TableCell>{m.unidad}</TableCell>
                   <TableCell>{m.consejero}</TableCell>
+                  <TableCell>
+                    {m.whatsapp ? (
+                      <span className="text-slate-700">{m.whatsapp}</span>
+                    ) : (
+                      <span className="text-slate-400 italic">Sin número</span>
+                    )}
+                  </TableCell>
                   <TableCell className="font-mono font-bold text-blue-700">{m.pin}</TableCell>
                   <TableCell className="p-2 flex flex-wrap gap-1">
+                    {waUrl ? (
+                      <Button
+                        size="sm"
+                        className="bg-green-600 text-white hover:bg-green-700"
+                        asChild
+                      >
+                        <a href={waUrl} target="_blank" rel="noopener noreferrer">
+                          <MessageCircle className="mr-1 h-4 w-4" />
+                          Enviar PIN
+                        </a>
+                      </Button>
+                    ) : (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled
+                        title="Agrega un número de WhatsApp al registro"
+                      >
+                        Enviar PIN
+                      </Button>
+                    )}
                     <Button variant="secondary" size="sm" onClick={() => iniciarEdicion(m)}>
                       Editar
                     </Button>
@@ -498,7 +557,8 @@ export default function RegistroConquisPageInner({ unidades: initialUnidades, co
                     </Button>
                   </TableCell>
                 </TableRow>
-              ))}
+              );
+              })}
             </TableBody>
           </Table>
         )}

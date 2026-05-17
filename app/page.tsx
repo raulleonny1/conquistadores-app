@@ -5,8 +5,6 @@ import { collection, getDocs, query, where } from 'firebase/firestore';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { logInfo, logError } from "@/src/lib/logger";
-import { handleError } from "@/src/lib/errorHandler";
-
 export default function Home() {
     // Función para agregar dígitos al PIN
     const handleKeypad = (num: string) => {

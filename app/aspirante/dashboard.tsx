@@ -1,7 +1,7 @@
 "use client";
 import React, { useState, useEffect } from "react";
 import { db, formatFechaDDMMYYYY } from "../../src/firebase";
-import { collection, doc, getDoc, onSnapshot, query, where } from "firebase/firestore";
+import { collection, doc, getDoc, getDocs, onSnapshot, query, where } from "firebase/firestore";
 import { LogOut, ShieldCheck, TrendingUp, Trophy, BookOpen, Medal, Map, CheckCircle2, Clock, Bell } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 
@@ -25,18 +25,28 @@ export default function AspiranteDashboard() {
 
   useEffect(() => {
     if (!pin) return;
-    const ref = doc(db, "aspirantesGuiaMayor", pin);
-    getDoc(ref).then(snap => {
+    (async () => {
+      const ref = doc(db, "aspirantesGuiaMayor", pin);
+      const snap = await getDoc(ref);
       if (snap.exists()) {
         const data = snap.data();
         setUser(data);
         setEspecialidades(Array.isArray(data.especialidades) ? data.especialidades : []);
         setLoading(false);
-      } else {
-        setError("No existe aspirante con ese PIN.");
-        setLoading(false);
+        return;
       }
-    });
+      const q = query(collection(db, "aspirantesGuiaMayor"), where("pin", "==", pin));
+      const result = await getDocs(q);
+      if (!result.empty) {
+        const data = result.docs[0].data();
+        setUser(data);
+        setEspecialidades(Array.isArray(data.especialidades) ? data.especialidades : []);
+        setLoading(false);
+        return;
+      }
+      setError("No existe aspirante con ese PIN.");
+      setLoading(false);
+    })();
   }, [pin]);
 
   useEffect(() => {
