@@ -13,6 +13,24 @@ export default function RegistrosPage() {
           <button onClick={() => router.push('/admin/unidades')} className="bg-purple-50 border border-purple-500 text-purple-600 rounded-xl p-6 font-bold shadow hover:bg-purple-100 transition-all text-lg">Unidades</button>
           <button onClick={() => router.push('/admin/especialidades')} className="bg-amber-50 border border-amber-500 text-amber-600 rounded-xl p-6 font-bold shadow hover:bg-amber-100 transition-all text-lg">Registro de Especialidades</button>
           <button onClick={() => router.push('/admin/consejero')} className="bg-green-50 border border-green-500 text-green-600 rounded-xl p-6 font-bold shadow hover:bg-green-100 transition-all text-lg">Consejeros</button>
+          <button
+            onClick={() => router.push('/admin/registros/actividades-conquistadores')}
+            className="bg-cyan-50 border border-cyan-500 text-cyan-700 rounded-xl p-6 font-bold shadow hover:bg-cyan-100 transition-all text-lg"
+          >
+            Registro puntos actividades conquistadores
+          </button>
+          <button
+            onClick={() => router.push('/admin/registros/actividades-aspirantes')}
+            className="bg-rose-50 border border-rose-500 text-rose-700 rounded-xl p-6 font-bold shadow hover:bg-rose-100 transition-all text-lg"
+          >
+            Registro puntos actividades aspirantes
+          </button>
+          <button
+            onClick={() => router.push('/admin/registros/actividades-consejeros')}
+            className="bg-emerald-50 border border-emerald-600 text-emerald-800 rounded-xl p-6 font-bold shadow hover:bg-emerald-100 transition-all text-lg md:col-span-2"
+          >
+            Registro puntos consejeros y asociados
+          </button>
         </div>
         <button onClick={() => router.push('/admin')} className="mt-4 bg-teal-600 text-white px-6 py-2 rounded font-bold shadow hover:bg-teal-800 transition">Regresar al menú</button>
       </div>

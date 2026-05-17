@@ -65,6 +65,7 @@ function App() {
 	const [especialidades, setEspecialidades] = useState<Especialidad[]>([]);
 	const [calificacionesRecientes, setCalificacionesRecientes] = useState<any[]>([]);
 	const [puntosCategorias, setPuntosCategorias] = useState<Record<string, number>>({});
+	const [etiquetasActividades, setEtiquetasActividades] = useState<Record<string, string>>({});
 	const [proximosEventos, setProximosEventos] = useState<EventoFirestore[]>([]);
 	const [progresoClase, setProgresoClase] = useState(0);
 	const [siguienteClase, setSiguienteClase] = useState<string | null>(null);
@@ -94,7 +95,16 @@ function App() {
 		if (!pin) return;
 
 		const unsubConquis = onSnapshot(doc(db, "calificacionesConquis", pin), (conquisSnap) => {
-			setPuntosCategorias(conquisSnap.exists() ? conquisSnap.data().puntos || {} : {});
+			if (conquisSnap.exists()) {
+				const data = conquisSnap.data();
+				setPuntosCategorias(data.puntos || {});
+				setEtiquetasActividades(
+					(data.etiquetasActividades as Record<string, string>) || {}
+				);
+			} else {
+				setPuntosCategorias({});
+				setEtiquetasActividades({});
+			}
 		});
 
 		(async () => {
@@ -188,8 +198,8 @@ function App() {
 	const siguienteNivel =
 		user.siguienteNivel || siguienteClase || "Nivel máximo (Guía)";
 	const rangoActual = user.clase || user.rango || "Sin clase";
-	const categoriasConPuntos = getCategoriasConPuntos(puntosCategorias);
-	const totalPuntos = sumarPuntos(puntosCategorias);
+	const categoriasConPuntos = getCategoriasConPuntos(puntosCategorias, etiquetasActividades);
+	const totalPuntos = sumarPuntos(puntosCategorias, etiquetasActividades);
 
 	return (
 		<>

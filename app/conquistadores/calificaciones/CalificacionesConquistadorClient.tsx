@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { db } from "../../../src/firebase";
-import { doc, getDoc, setDoc } from "firebase/firestore";
+import { doc, onSnapshot, setDoc } from "firebase/firestore";
 import { Star, Award } from "lucide-react";
 import HistorialSemanal from "./HistorialSemanal";
 import { CATEGORIAS_PUNTOS, getCategoriasConPuntos, sumarPuntos } from "@/src/lib/categoriasPuntos";
@@ -12,20 +12,20 @@ export default function CalificacionesConquistadorClient() {
   const searchParams = useSearchParams();
   const pin = searchParams.get("pin") || "";
   const [puntos, setPuntos] = useState<Record<string, number | string>>({});
+  const [etiquetasActividades, setEtiquetasActividades] = useState<Record<string, string>>({});
   const [nombre, setNombre] = useState("");
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!pin) return;
 
-    const fetchCalificaciones = async () => {
-      setLoading(true);
-      const ref = doc(db, "calificacionesConquis", pin);
-      const snap = await getDoc(ref);
-
+    setLoading(true);
+    const ref = doc(db, "calificacionesConquis", pin);
+    const unsub = onSnapshot(ref, async (snap) => {
       if (snap.exists()) {
         const data = snap.data();
         setPuntos(data.puntos || {});
+        setEtiquetasActividades((data.etiquetasActividades as Record<string, string>) || {});
         setNombre(data.nombre || "");
       } else {
         const initialPuntos = CATEGORIAS_PUNTOS.reduce(
@@ -37,17 +37,17 @@ export default function CalificacionesConquistadorClient() {
           puntos: initialPuntos,
         });
         setPuntos(initialPuntos);
+        setEtiquetasActividades({});
         setNombre("");
       }
-
       setLoading(false);
-    };
+    });
 
-    fetchCalificaciones();
+    return () => unsub();
   }, [pin]);
 
-  const categoriasConPuntos = getCategoriasConPuntos(puntos);
-  const total = sumarPuntos(puntos);
+  const categoriasConPuntos = getCategoriasConPuntos(puntos, etiquetasActividades);
+  const total = sumarPuntos(puntos, etiquetasActividades);
 
   if (!pin) {
     return (

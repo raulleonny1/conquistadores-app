@@ -1,159 +1,244 @@
 "use client";
 import React, { useState, useEffect } from "react";
 import { db, formatFechaDDMMYYYY } from "../../../src/firebase";
-import { collection, addDoc, getDocs, doc, updateDoc, deleteDoc } from "firebase/firestore";
-import { ArrowLeft, PlusCircle } from "lucide-react";
+import {
+  collection,
+  addDoc,
+  doc,
+  updateDoc,
+  deleteDoc,
+  onSnapshot,
+} from "firebase/firestore";
+import { ArrowLeft, PlusCircle, Trash2 } from "lucide-react";
+import { toast } from "react-hot-toast";
+
+type CalificacionCatalogo = {
+  id: string;
+  nombre?: string;
+  puntos?: string | number;
+  fecha?: string;
+  pin?: string;
+};
+
+function esCatalogoAdmin(data: Record<string, unknown>): boolean {
+  const pin = data.pin;
+  return pin === undefined || pin === null || String(pin).trim() === "";
+}
 
 export default function CalificacionesPage() {
   const [nombre, setNombre] = useState("");
   const [puntos, setPuntos] = useState("");
-  const [items, setItems] = useState<{ nombre: string; puntos: string }[]>([]);
   const [loading, setLoading] = useState(false);
-  const [calificaciones, setCalificaciones] = useState<any[]>([]);
+  const [calificaciones, setCalificaciones] = useState<CalificacionCatalogo[]>([]);
   const [editId, setEditId] = useState<string | null>(null);
   const [editNombre, setEditNombre] = useState("");
   const [editPuntos, setEditPuntos] = useState("");
 
-  // Cargar calificaciones (no es necesario mantener un listener en tiempo real)
-  const fetchCalificaciones = async () => {
-    const snapshot = await getDocs(collection(db, "calificaciones"));
-    setCalificaciones(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-  };
-
   useEffect(() => {
-    fetchCalificaciones();
+    const unsub = onSnapshot(
+      collection(db, "calificaciones"),
+      (snapshot) => {
+        const lista = snapshot.docs
+          .map((d) => ({ id: d.id, ...d.data() } as CalificacionCatalogo))
+          .filter((c) => esCatalogoAdmin(c as Record<string, unknown>));
+        lista.sort((a, b) => {
+          const fa = a.fecha || "";
+          const fb = b.fecha || "";
+          return fb.localeCompare(fa);
+        });
+        setCalificaciones(lista);
+      },
+      (err) => {
+        console.error(err);
+        toast.error("No se pudo cargar la lista de calificaciones.");
+      }
+    );
+    return () => unsub();
   }, []);
-  const handleAdd = () => {
-    if (!nombre || !puntos) return;
-    setItems([...items, { nombre, puntos }]);
-    setNombre("");
-    setPuntos("");
-  };
 
-  // Editar calificación
-  const handleEdit = (calificacion: any) => {
-    setEditId(calificacion.id);
-    setEditNombre(calificacion.nombre);
-    setEditPuntos(calificacion.puntos);
-  };
-
-  const handleEditSave = async () => {
-    if (!editId) return;
-    const ref = doc(db, "calificaciones", editId);
-    await updateDoc(ref, {
-      nombre: editNombre,
-      puntos: editPuntos
-    });
-    setEditId(null);
-    setEditNombre("");
-    setEditPuntos("");
-    await fetchCalificaciones();
-  };
-
-  // Eliminar calificación
-  const handleDelete = async (id: string) => {
-    await deleteDoc(doc(db, "calificaciones", id));
-  };
-  const handleSave = async () => {
+  const handleAdd = async () => {
+    if (!nombre.trim() || !puntos.trim()) {
+      toast.error("Escribe nombre y puntos antes de agregar.");
+      return;
+    }
     setLoading(true);
     try {
-      for (const item of items) {
-        await addDoc(collection(db, "calificaciones"), {
-          nombre: item.nombre,
-          puntos: item.puntos,
-          fecha: formatFechaDDMMYYYY(new Date())
-        });
-      }
-      alert("Calificaciones guardadas correctamente.");
-      setItems([]);
+      await addDoc(collection(db, "calificaciones"), {
+        nombre: nombre.trim(),
+        puntos: puntos.trim(),
+        fecha: formatFechaDDMMYYYY(new Date()),
+      });
+      setNombre("");
+      setPuntos("");
+      toast.success("Calificación agregada. Aparece abajo al instante.");
     } catch (err) {
-      alert("Error al guardar calificaciones.");
+      console.error(err);
+      toast.error("Error al guardar en Firebase.");
     }
     setLoading(false);
   };
 
+  const handleEdit = (calificacion: CalificacionCatalogo) => {
+    setEditId(calificacion.id);
+    setEditNombre(calificacion.nombre || "");
+    setEditPuntos(String(calificacion.puntos ?? ""));
+  };
+
+  const handleEditSave = async () => {
+    if (!editId) return;
+    if (!editNombre.trim() || !editPuntos.trim()) {
+      toast.error("Nombre y puntos son obligatorios.");
+      return;
+    }
+    try {
+      await updateDoc(doc(db, "calificaciones", editId), {
+        nombre: editNombre.trim(),
+        puntos: editPuntos.trim(),
+      });
+      setEditId(null);
+      setEditNombre("");
+      setEditPuntos("");
+      toast.success("Calificación actualizada.");
+    } catch {
+      toast.error("Error al actualizar.");
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!window.confirm("¿Eliminar esta calificación del catálogo?")) return;
+    try {
+      await deleteDoc(doc(db, "calificaciones", id));
+      toast.success("Eliminada.");
+    } catch {
+      toast.error("Error al eliminar.");
+    }
+  };
+
   return (
-    <div className="max-w-xl mx-auto mt-10">
+    <div className="mx-auto mt-10 max-w-xl px-4 pb-12">
       <button
-        onClick={() => window.location.href = '/admin'}
-        className="bg-indigo-600 text-white font-bold px-6 py-2 rounded-xl mb-6 hover:bg-indigo-800 transition-all"
+        type="button"
+        onClick={() => {
+          window.location.href = "/admin";
+        }}
+        className="mb-6 rounded-xl bg-indigo-600 px-6 py-2 font-bold text-white transition-all hover:bg-indigo-800"
       >
-        <ArrowLeft className="inline mr-2" /> Retornar a Admin
+        <ArrowLeft className="mr-2 inline" /> Retornar a Admin
       </button>
-      <h1 className="text-2xl font-bold mb-6">Registrar Calificaciones</h1>
+      <h1 className="mb-2 text-2xl font-bold">Registrar calificaciones</h1>
+      <p className="mb-6 text-sm text-slate-600">
+        Escribe nombre y puntos, pulsa agregar y se guarda en Firebase. El listado de abajo se
+        actualiza al instante.
+      </p>
+
       <form
-        onSubmit={e => { e.preventDefault(); handleAdd(); }}
-        className="space-y-3 mb-8"
+        onSubmit={(e) => {
+          e.preventDefault();
+          handleAdd();
+        }}
+        className="mb-8 space-y-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
       >
         <input
           placeholder="Nombre de lo que se va a calificar"
           value={nombre}
-          onChange={e => setNombre(e.target.value)}
-          className="border p-2 w-full"
+          onChange={(e) => setNombre(e.target.value)}
+          className="w-full rounded-lg border p-2"
+          disabled={loading}
         />
         <input
           placeholder="Puntos"
           value={puntos}
-          onChange={e => setPuntos(e.target.value)}
-          className="border p-2 w-full"
+          onChange={(e) => setPuntos(e.target.value)}
+          className="w-full rounded-lg border p-2"
           type="number"
+          min={0}
+          disabled={loading}
         />
-        <button type="submit" className="bg-amber-700 text-white px-4 py-2 rounded flex items-center gap-2">
-          <PlusCircle size={18} /> Agregar
+        <button
+          type="submit"
+          disabled={loading}
+          className="flex w-full items-center justify-center gap-2 rounded-lg bg-amber-700 px-4 py-2 font-bold text-white hover:bg-amber-800 disabled:opacity-60"
+        >
+          <PlusCircle size={18} />
+          {loading ? "Guardando…" : "Agregar a la lista"}
         </button>
       </form>
-      <div className="mb-8">
-        <h2 className="font-bold mb-2">Lista de calificaciones a registrar:</h2>
-        <ul className="space-y-2">
-          {items.map((item, idx) => (
-            <li key={idx} className="flex gap-4 items-center">
-              <span className="font-semibold text-indigo-700">{item.nombre}</span>
-              <span className="bg-indigo-100 text-indigo-800 px-3 py-1 rounded-lg font-bold">{item.puntos} puntos</span>
-            </li>
-          ))}
-        </ul>
-      </div>
 
       <div className="mb-8">
-        <h2 className="font-bold mb-2">Calificaciones guardadas en el sistema:</h2>
-        <ul className="space-y-2">
-          {calificaciones.map((calificacion) => (
-            <li key={calificacion.id} className="flex gap-4 items-center">
-              {editId === calificacion.id ? (
-                <>
-                  <input
-                    value={editNombre}
-                    onChange={e => setEditNombre(e.target.value)}
-                    className="border p-1"
-                  />
-                  <input
-                    value={editPuntos}
-                    onChange={e => setEditPuntos(e.target.value)}
-                    className="border p-1 w-20"
-                    type="number"
-                  />
-                  <button onClick={handleEditSave} className="bg-green-600 text-white px-2 py-1 rounded">Guardar</button>
-                  <button onClick={() => setEditId(null)} className="bg-gray-400 text-white px-2 py-1 rounded">Cancelar</button>
-                </>
-              ) : (
-                <>
-                  <span className="font-semibold text-indigo-700">{calificacion.nombre}</span>
-                  <span className="bg-indigo-100 text-indigo-800 px-3 py-1 rounded-lg font-bold">{calificacion.puntos} puntos</span>
-                  <button onClick={() => handleEdit(calificacion)} className="bg-blue-600 text-white px-2 py-1 rounded">Editar</button>
-                  <button onClick={() => handleDelete(calificacion.id)} className="bg-red-600 text-white px-2 py-1 rounded">Eliminar</button>
-                </>
-              )}
-            </li>
-          ))}
-        </ul>
+        <h2 className="mb-2 font-bold">
+          Calificaciones en el sistema ({calificaciones.length})
+        </h2>
+        {calificaciones.length === 0 ? (
+          <p className="text-sm italic text-slate-400">
+            Aún no hay ítems. Agrega uno con el botón de arriba.
+          </p>
+        ) : (
+          <ul className="space-y-2">
+            {calificaciones.map((calificacion) => (
+              <li
+                key={calificacion.id}
+                className="flex flex-wrap items-center gap-2 rounded-lg border border-slate-100 bg-slate-50 px-3 py-2"
+              >
+                {editId === calificacion.id ? (
+                  <>
+                    <input
+                      value={editNombre}
+                      onChange={(e) => setEditNombre(e.target.value)}
+                      className="rounded border p-1"
+                    />
+                    <input
+                      value={editPuntos}
+                      onChange={(e) => setEditPuntos(e.target.value)}
+                      className="w-20 rounded border p-1"
+                      type="number"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleEditSave}
+                      className="rounded bg-green-600 px-2 py-1 text-white"
+                    >
+                      Guardar
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEditId(null)}
+                      className="rounded bg-gray-400 px-2 py-1 text-white"
+                    >
+                      Cancelar
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <span className="font-semibold text-indigo-700">
+                      {calificacion.nombre}
+                    </span>
+                    <span className="rounded-lg bg-indigo-100 px-3 py-1 font-bold text-indigo-800">
+                      {calificacion.puntos} pts
+                    </span>
+                    {calificacion.fecha && (
+                      <span className="text-xs text-slate-500">{calificacion.fecha}</span>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => handleEdit(calificacion)}
+                      className="rounded bg-blue-600 px-2 py-1 text-xs text-white hover:bg-blue-800"
+                    >
+                      Editar
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDelete(calificacion.id)}
+                      className="inline-flex items-center gap-1 rounded bg-red-600 px-2 py-1 text-xs text-white hover:bg-red-800"
+                    >
+                      <Trash2 size={14} /> Eliminar
+                    </button>
+                  </>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
-      <button
-        onClick={handleSave}
-        className="bg-green-700 text-white px-6 py-2 rounded-xl font-bold hover:bg-green-900 transition-all"
-        disabled={loading || items.length === 0}
-      >
-        Guardar en el sistema
-      </button>
     </div>
   );
 }

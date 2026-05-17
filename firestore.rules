@@ -68,13 +68,26 @@ service cloud.firestore {
     }
 
     match /calificaciones/{docId} {
-      // Lectura: admin/directiva + consejero de la calificación + el miembro vinculado al pin.
-      allow read: if isAdmin() || isDirectiva()
+      // Catálogo admin (sin pin) + notas por miembro (con pin).
+      function esCatalogo() {
+        return !('pin' in resource.data) || resource.data.pin == null || resource.data.pin == '';
+      }
+      function esCatalogoCreate() {
+        return !('pin' in request.resource.data) || request.resource.data.pin == null || request.resource.data.pin == '';
+      }
+
+      allow read: if esCatalogo()
+        || isAdmin() || isDirectiva()
         || (isConsejero() && request.auth.token.consejeroId != null && request.auth.token.consejeroId == resource.data.consejeroId)
         || matchesPin(resource.data.pin);
 
-      // Escritura: admin y consejero (solo si coincide su id).
-      allow write: if isAdmin() || (isConsejero() && request.auth.token.consejeroId != null && request.auth.token.consejeroId == request.resource.data.consejeroId);
+      allow create: if esCatalogoCreate()
+        || isAdmin()
+        || (isConsejero() && request.auth.token.consejeroId != null && request.auth.token.consejeroId == request.resource.data.consejeroId);
+
+      allow update, delete: if esCatalogo()
+        || isAdmin()
+        || (isConsejero() && request.auth.token.consejeroId != null && request.auth.token.consejeroId == resource.data.consejeroId);
     }
 
     match /calificacionesSemanal/{docId} {
@@ -83,8 +96,8 @@ service cloud.firestore {
     }
 
     match /calificacionesConquis/{docId} {
-      allow read: if isAdmin() || isDirectiva() || matchesPin(resource.data.pin);
-      allow write: if isAdmin() || isDirectiva() || isConsejero();
+      allow read: if true;
+      allow write: if true;
     }
 
     match /eventos/{docId} {

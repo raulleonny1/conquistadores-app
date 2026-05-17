@@ -31,11 +31,15 @@ export function nombreCategoria(id: string): string {
 
 /** Solo categorías con puntos > 0, en orden oficial. */
 export function getCategoriasConPuntos(
-  puntos: Record<string, unknown> | undefined | null
+  puntos: Record<string, unknown> | undefined | null,
+  etiquetasActividades?: Record<string, string> | null
 ): { id: string; nombre: string; valor: number }[] {
   if (!puntos) return [];
 
   const resultado: { id: string; nombre: string; valor: number }[] = [];
+
+  const nombreMostrar = (key: string) =>
+    etiquetasActividades?.[key]?.trim() || nombreCategoria(key);
 
   for (const cat of CATEGORIAS_PUNTOS) {
     const valor = toNumberPuntos(puntos[cat.id]);
@@ -48,7 +52,7 @@ export function getCategoriasConPuntos(
     if (IDS_OFICIALES.has(key)) continue;
     const valor = toNumberPuntos(puntos[key]);
     if (valor > 0) {
-      resultado.push({ id: key, nombre: nombreCategoria(key), valor });
+      resultado.push({ id: key, nombre: nombreMostrar(key), valor });
     }
   }
 
@@ -56,8 +60,11 @@ export function getCategoriasConPuntos(
 }
 
 /** Total solo de categorías con puntos registrados (> 0). */
-export function sumarPuntos(puntos: Record<string, unknown> | undefined | null): number {
-  return getCategoriasConPuntos(puntos).reduce((acc, c) => acc + c.valor, 0);
+export function sumarPuntos(
+  puntos: Record<string, unknown> | undefined | null,
+  etiquetasActividades?: Record<string, string> | null
+): number {
+  return getCategoriasConPuntos(puntos, etiquetasActividades).reduce((acc, c) => acc + c.valor, 0);
 }
 
 /** Columnas del historial semanal: solo categorías que aparecen con puntos en algún registro. */

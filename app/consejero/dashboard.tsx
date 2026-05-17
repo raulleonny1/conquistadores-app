@@ -2,18 +2,25 @@
 import React, { useEffect, useState } from "react";
 import { toast } from "react-hot-toast";
 import { db } from "../../src/firebase";
-import { collection, getDocs, query, where, onSnapshot } from "firebase/firestore";
+import { collection, doc, getDocs, query, where, onSnapshot } from "firebase/firestore";
+import {
+  pinCalificacionesAsociado,
+  pinCalificacionesConsejero,
+} from "@/src/lib/actividadesCalificacion";
+import { getCategoriasConPuntos, sumarPuntos } from "@/src/lib/categoriasPuntos";
 import RetoEspecialConsejeroPanel from "@/src/components/RetoEspecialConsejeroPanel";
 import ActividadesConsejeroCard from "@/src/components/ActividadesConsejeroCard";
 import type { RetoEspecialDoc } from "@/src/lib/retosEspeciales";
 import {
   Users,
   Award,
+  BookOpen,
   ChevronRight,
   UserCircle,
   Bell,
   LayoutDashboard,
   LogOut,
+  Trophy,
 } from "lucide-react";
 
 export default function ConsejeroDashboard({ consejeroId }: { consejeroId: string }) {
@@ -25,6 +32,16 @@ export default function ConsejeroDashboard({ consejeroId }: { consejeroId: strin
   const [showUnidadModal, setShowUnidadModal] = useState<string | null>(null);
   const [detallesMiembros, setDetallesMiembros] = useState<Record<string, any[]>>({});
   const [retosEspeciales, setRetosEspeciales] = useState<RetoEspecialDoc[]>([]);
+  const [pinCalificaciones, setPinCalificaciones] = useState("");
+  const [totalPuntos, setTotalPuntos] = useState(0);
+  const [misPuntos, setMisPuntos] = useState<
+    { id: string; materia: string; nota: string; icono: React.ReactNode }[]
+  >([]);
+  const [puntosAsociado, setPuntosAsociado] = useState<
+    { id: string; materia: string; nota: string; icono: React.ReactNode }[]
+  >([]);
+  const [totalPuntosAsociado, setTotalPuntosAsociado] = useState(0);
+  const [nombreAsociado, setNombreAsociado] = useState("");
 
   useEffect(() => {
     let isMounted = true;
@@ -36,10 +53,18 @@ export default function ConsejeroDashboard({ consejeroId }: { consejeroId: strin
       const cData = docSnap.exists() ? docSnap.data() : undefined;
       if (!isMounted) return;
 
+      const asociadoNombre = (cData?.consejeroAsociado as string | undefined)?.trim() || "";
       setConsejero({
         nombre: cData?.nombre || "",
-        consejeroAsociado: cData?.consejeroAsociado || undefined,
+        consejeroAsociado: asociadoNombre || undefined,
       });
+      setNombreAsociado(asociadoNombre);
+      setPinCalificaciones(
+        pinCalificacionesConsejero({
+          id: consejeroId,
+          pin: cData?.pin as string | undefined,
+        })
+      );
 
       const unidadesArr = Array.isArray(cData?.unidades) ? cData.unidades : [];
       setUnidades(unidadesArr);
@@ -77,6 +102,70 @@ export default function ConsejeroDashboard({ consejeroId }: { consejeroId: strin
       unsubscribeRetos();
     };
   }, [consejeroId]);
+
+  useEffect(() => {
+    if (!pinCalificaciones) return;
+    const ref = doc(db, "calificacionesConquis", pinCalificaciones);
+    const unsub = onSnapshot(ref, (snap) => {
+      const puntos = snap.exists() ? snap.data().puntos || {} : {};
+      const etiquetas =
+        (snap.exists()
+          ? (snap.data().etiquetasActividades as Record<string, string>)
+          : undefined) || {};
+      const categorias = getCategoriasConPuntos(puntos, etiquetas);
+      setMisPuntos(
+        categorias.map((cat) => ({
+          id: cat.id,
+          materia: cat.nombre,
+          nota: `${cat.valor} pts`,
+          icono:
+            cat.id.startsWith("actividad_") ? (
+              <div className="rounded-lg bg-amber-100 p-2 text-amber-700">
+                <Trophy size={20} />
+              </div>
+            ) : (
+              <div className="rounded-lg bg-indigo-100 p-2 text-indigo-600">
+                <BookOpen size={20} />
+              </div>
+            ),
+        }))
+      );
+      setTotalPuntos(sumarPuntos(puntos, etiquetas));
+    });
+    return () => unsub();
+  }, [pinCalificaciones]);
+
+  useEffect(() => {
+    if (!consejeroId || !nombreAsociado) {
+      setPuntosAsociado([]);
+      setTotalPuntosAsociado(0);
+      return;
+    }
+    const pinAsoc = pinCalificacionesAsociado(consejeroId);
+    const ref = doc(db, "calificacionesConquis", pinAsoc);
+    const unsub = onSnapshot(ref, (snap) => {
+      const puntos = snap.exists() ? snap.data().puntos || {} : {};
+      const etiquetas =
+        (snap.exists()
+          ? (snap.data().etiquetasActividades as Record<string, string>)
+          : undefined) || {};
+      const categorias = getCategoriasConPuntos(puntos, etiquetas);
+      setPuntosAsociado(
+        categorias.map((cat) => ({
+          id: cat.id,
+          materia: cat.nombre,
+          nota: `${cat.valor} pts`,
+          icono: (
+            <div className="rounded-lg bg-teal-100 p-2 text-teal-700">
+              <Trophy size={20} />
+            </div>
+          ),
+        }))
+      );
+      setTotalPuntosAsociado(sumarPuntos(puntos, etiquetas));
+    });
+    return () => unsub();
+  }, [consejeroId, nombreAsociado]);
 
   if (loading) {
     return <div className="text-center mt-10 text-lg text-blue-700">Cargando datos...</div>;
@@ -139,13 +228,76 @@ export default function ConsejeroDashboard({ consejeroId }: { consejeroId: strin
           <h1 className="mb-2 text-3xl font-extrabold text-slate-900 sm:text-4xl">
             {"\u00a1"}Hola, <span className="text-emerald-600">{primerNombre}</span>!
           </h1>
-          <div className="flex w-fit items-center gap-2 rounded-full border border-white/40 bg-white/50 px-4 py-2 shadow-sm">
-            <span className="text-sm font-medium text-slate-600">Consejero asociado:</span>
-            <span className="text-sm font-bold text-emerald-700">
-              {consejero?.consejeroAsociado || "Sin asignar"}
-            </span>
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex w-fit items-center gap-2 rounded-full border border-white/40 bg-white/50 px-4 py-2 shadow-sm">
+              <span className="text-sm font-medium text-slate-600">Consejero asociado:</span>
+              <span className="text-sm font-bold text-emerald-700">
+                {consejero?.consejeroAsociado || "Sin asignar"}
+              </span>
+            </div>
+            <div className="flex w-fit items-center gap-2 rounded-full border border-amber-200/60 bg-amber-50/90 px-4 py-2 shadow-sm">
+              <Trophy className="h-4 w-4 text-amber-600" />
+              <span className="text-sm font-black text-amber-900">{totalPuntos} pts totales</span>
+            </div>
           </div>
         </section>
+
+        {(misPuntos.length > 0 || puntosAsociado.length > 0) && (
+          <section className="mb-8 rounded-3xl border border-white/80 bg-white/90 p-6 shadow-lg backdrop-blur-sm">
+            <h2 className="mb-4 flex items-center gap-2 text-lg font-bold text-slate-800">
+              <Award className="text-emerald-600" size={22} />
+              Puntos del consejero ({totalPuntos} pts)
+            </h2>
+            {misPuntos.length === 0 ? (
+              <p className="mb-4 text-sm text-slate-500">Sin puntos registrados para el consejero.</p>
+            ) : (
+            <div className="grid gap-3 sm:grid-cols-2">
+              {misPuntos.map((item) => (
+                <div
+                  key={item.id}
+                  className="flex items-center justify-between gap-3 rounded-2xl border border-slate-100 bg-slate-50/80 p-4"
+                >
+                  <div className="flex items-center gap-3">
+                    {item.icono}
+                    <span className="font-semibold text-slate-800">{item.materia}</span>
+                  </div>
+                  <span className="rounded-xl bg-emerald-100 px-3 py-1 text-xs font-bold text-emerald-800">
+                    {item.nota}
+                  </span>
+                </div>
+              ))}
+            </div>
+            )}
+
+            {nombreAsociado && (
+              <>
+                <h3 className="mb-3 mt-6 flex items-center gap-2 text-base font-bold text-teal-800">
+                  Puntos del asociado: {nombreAsociado} ({totalPuntosAsociado} pts)
+                </h3>
+                {puntosAsociado.length === 0 ? (
+                  <p className="text-sm text-slate-500">Sin puntos registrados para el asociado.</p>
+                ) : (
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    {puntosAsociado.map((item) => (
+                      <div
+                        key={item.id}
+                        className="flex items-center justify-between gap-3 rounded-2xl border border-teal-100 bg-teal-50/50 p-4"
+                      >
+                        <div className="flex items-center gap-3">
+                          {item.icono}
+                          <span className="font-semibold text-slate-800">{item.materia}</span>
+                        </div>
+                        <span className="rounded-xl bg-teal-100 px-3 py-1 text-xs font-bold text-teal-800">
+                          {item.nota}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+          </section>
+        )}
 
         <section className="mb-8">
           <RetoEspecialConsejeroPanel

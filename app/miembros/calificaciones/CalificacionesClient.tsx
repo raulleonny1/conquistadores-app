@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { db } from "../../../src/firebase";
-import { doc, getDoc, collection, getDocs, query, where } from "firebase/firestore";
+import { doc, onSnapshot, collection, getDocs, query, where } from "firebase/firestore";
 import { useSearchParams } from "next/navigation";
 import { BookOpen, Star, Award } from "lucide-react";
 import { getCategoriasConPuntos, sumarPuntos } from "@/src/lib/categoriasPuntos";
@@ -11,6 +11,7 @@ export default function CalificacionesClient() {
   const searchParams = useSearchParams();
   const pin = searchParams.get("pin") || "";
   const [puntosCategorias, setPuntosCategorias] = useState<Record<string, unknown>>({});
+  const [etiquetasActividades, setEtiquetasActividades] = useState<Record<string, string>>({});
   const [calificacionesRecientes, setCalificacionesRecientes] = useState<
     { id: string; materia?: string; nota?: string }[]
   >([]);
@@ -26,17 +27,24 @@ export default function CalificacionesClient() {
     });
 
     const refConquis = doc(db, "calificacionesConquis", pin);
-    getDoc(refConquis).then((snap) => {
+    const unsub = onSnapshot(refConquis, (snap) => {
       if (snap.exists()) {
-        setPuntosCategorias(snap.data().puntos || {});
-        setNombre(snap.data().nombre || "");
+        const data = snap.data();
+        setPuntosCategorias(data.puntos || {});
+        setEtiquetasActividades((data.etiquetasActividades as Record<string, string>) || {});
+        setNombre(data.nombre || "");
+      } else {
+        setPuntosCategorias({});
+        setEtiquetasActividades({});
       }
       setLoading(false);
     });
+
+    return () => unsub();
   }, [pin]);
 
-  const categoriasConPuntos = getCategoriasConPuntos(puntosCategorias);
-  const total = sumarPuntos(puntosCategorias);
+  const categoriasConPuntos = getCategoriasConPuntos(puntosCategorias, etiquetasActividades);
+  const total = sumarPuntos(puntosCategorias, etiquetasActividades);
 
   if (loading) return <div className="text-center mt-10 text-lg text-indigo-700">Cargando datos...</div>;
 

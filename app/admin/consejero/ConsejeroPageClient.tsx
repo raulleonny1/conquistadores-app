@@ -3,8 +3,28 @@
 import React, { useState, useEffect } from 'react';
 import { toast } from 'react-hot-toast';
 import { db } from '../../../src/firebase';
-import { collection, addDoc, getDocs } from 'firebase/firestore';
+import { collection, addDoc, doc, getDocs, updateDoc } from 'firebase/firestore';
 import { handleError } from '@/src/lib/errorHandler';
+
+function crearPinEnSet(pinsOcupados: Set<string>): string {
+  for (let intento = 0; intento < 80; intento++) {
+    const pin = String(Math.floor(1000 + Math.random() * 9000));
+    if (!pinsOcupados.has(pin)) return pin;
+  }
+  let pin = String(Date.now()).slice(-4);
+  while (pinsOcupados.has(pin)) pin = String(Math.floor(1000 + Math.random() * 9000));
+  return pin;
+}
+
+async function generarPinConsejeroUnico(): Promise<string> {
+  const snap = await getDocs(collection(db, 'consejeros'));
+  const pinsOcupados = new Set(
+    snap.docs.map((d) => String(d.data().pin ?? '').trim()).filter(Boolean)
+  );
+  const pin = crearPinEnSet(pinsOcupados);
+  pinsOcupados.add(pin);
+  return pin;
+}
 
 type ConsejeroPageClientProps = {
   initialUnidadesRegistradas?: string[];
@@ -55,12 +75,14 @@ export default function ConsejeroPage({ initialUnidadesRegistradas }: ConsejeroP
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     try {
+      const pin = await generarPinConsejeroUnico();
       await addDoc(collection(db, 'consejeros'), {
-        nombre: form.nombre,
+        nombre: form.nombre.trim(),
         unidades: form.unidades,
-        consejeroAsociado: form.consejeroAsociado
+        consejeroAsociado: form.consejeroAsociado.trim(),
+        pin,
       });
-      toast.success('Consejero registrado en Firebase');
+      toast.success(`Consejero registrado. PIN de acceso: ${pin}`);
       setForm({ nombre: '', unidades: [], consejeroAsociado: '' });
       setRefresh(r => r + 1);
     } catch (error) {
@@ -109,6 +131,9 @@ export default function ConsejeroPage({ initialUnidadesRegistradas }: ConsejeroP
             ))}
           </div>
         </div>
+        <p className="text-xs text-green-800">
+          El PIN de 4 dígitos se genera automáticamente al guardar (inicio de sesión en la página principal).
+        </p>
         <button type="submit" className="bg-green-700 text-white px-6 py-2 rounded-full font-semibold shadow hover:bg-green-900 transition">
           Guardar
         </button>
@@ -132,7 +157,31 @@ function ConsejerosList({ refresh, unidadesRegistradas }: { refresh: number; uni
   useEffect(() => {
     const fetchConsejeros = async () => {
       const querySnapshot = await getDocs(collection(db, 'consejeros'));
-      setConsejeros(querySnapshot.docs.map((doc: any) => ({ id: doc.id, ...doc.data() })));
+      const pinsOcupados = new Set(
+        querySnapshot.docs.map((d) => String(d.data().pin ?? '').trim()).filter(Boolean)
+      );
+      const lista: Consejero[] = [];
+      let pinsAsignados = 0;
+
+      for (const docSnap of querySnapshot.docs) {
+        const data = docSnap.data() as Omit<Consejero, 'id'>;
+        let pin = String(data.pin ?? '').trim();
+        if (!pin) {
+          pin = crearPinEnSet(pinsOcupados);
+          pinsOcupados.add(pin);
+          await updateDoc(doc(db, 'consejeros', docSnap.id), { pin });
+          pinsAsignados++;
+        }
+        lista.push({ id: docSnap.id, ...data, pin });
+      }
+
+      lista.sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
+      setConsejeros(lista);
+      if (pinsAsignados > 0) {
+        toast.success(
+          `PIN asignado automáticamente a ${pinsAsignados} consejero(s) que no tenían uno.`
+        );
+      }
     };
     fetchConsejeros();
   }, [refresh]);
@@ -175,17 +224,19 @@ function ConsejerosList({ refresh, unidadesRegistradas }: { refresh: number; uni
     e.preventDefault();
     if (!editId) return;
     try {
-      await import('firebase/firestore').then(({ doc, updateDoc }) =>
-        updateDoc(doc(db, 'consejeros', editId), {
-          nombre: editForm.nombre,
-          unidades: editForm.unidades,
-          consejeroAsociado: editForm.consejeroAsociado
-        })
-      );
+      await updateDoc(doc(db, 'consejeros', editId), {
+        nombre: editForm.nombre.trim(),
+        unidades: editForm.unidades,
+        consejeroAsociado: editForm.consejeroAsociado.trim(),
+      });
       setEditId(null);
       setEditForm({ nombre: '', unidades: [], consejeroAsociado: '' });
-      // Refrescar lista
-      setConsejeros(consejeros.map(c => c.id === editId ? { ...c, ...editForm } : c));
+      setConsejeros(
+        consejeros.map((c) =>
+          c.id === editId ? { ...c, ...editForm, pin: c.pin } : c
+        )
+      );
+      toast.success('Consejero actualizado.');
     } catch (error) {
       handleError(error, 'Error al editar');
     }
@@ -239,11 +290,10 @@ function ConsejerosList({ refresh, unidadesRegistradas }: { refresh: number; uni
               <div className="font-bold text-green-700">{c.nombre}</div>
               <div className="mt-2 text-green-800 text-sm">Unidades: {Array.isArray(c.unidades) ? c.unidades.join(', ') : ''}</div>
               <div className="mt-2 text-green-800 text-sm">Consejero asociado: {c.consejeroAsociado || 'Sin asignar'}</div>
-              {/* Mostrar el PIN si existe */}
-              {c.pin && (
-                <div className="mt-2 text-green-900 text-xs font-mono">PIN: {c.pin}</div>
-              )}
-              <div className="mt-2 flex gap-2">
+              <div className="mt-2 rounded-lg bg-green-100 px-2 py-1 text-sm font-mono font-bold text-green-900">
+                PIN: {c.pin || '…'}
+              </div>
+              <div className="mt-2 flex flex-wrap gap-2">
                 <button onClick={() => handleEdit(c)} className="bg-yellow-500 text-white px-3 py-1 rounded-full font-semibold shadow hover:bg-yellow-700 transition">Editar</button>
                 <button onClick={() => handleDelete(c.id!)} className="bg-red-600 text-white px-3 py-1 rounded-full font-semibold shadow hover:bg-red-800 transition">Eliminar</button>
               </div>

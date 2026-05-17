@@ -5,12 +5,13 @@ import { useRouter } from "next/navigation";
 import { db } from "@/src/firebase";
 import { collection, doc, getDoc, getDocs, query, where } from "firebase/firestore";
 import { ArrowLeft, Medal, Search, Trophy, UserRound } from "lucide-react";
+import { expandirConsejerosYAsociados } from "@/src/lib/actividadesCalificacion";
 
 type Participante = {
   id: string;
   nombre: string;
   pin: string;
-  tipo: "conquistador" | "aspirante";
+  tipo: "conquistador" | "aspirante" | "consejero" | "asociado";
 };
 
 type TotalesPorPin = Record<string, number>;
@@ -62,7 +63,9 @@ export default function RankinPage() {
   const [loading, setLoading] = useState(true);
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [search, setSearch] = useState("");
-  const [tipoFiltro, setTipoFiltro] = useState<"todos" | "conquistador" | "aspirante">("todos");
+  const [tipoFiltro, setTipoFiltro] = useState<
+    "todos" | "conquistador" | "aspirante" | "consejero"
+  >("todos");
   const [participantes, setParticipantes] = useState<Participante[]>([]);
   const [totalesPorPin, setTotalesPorPin] = useState<TotalesPorPin>({});
   const [selectedPin, setSelectedPin] = useState<string>("");
@@ -74,9 +77,10 @@ export default function RankinPage() {
     const loadParticipantes = async () => {
       setLoading(true);
       try {
-        const [conquisSnap, aspirantesSnap] = await Promise.all([
+        const [conquisSnap, aspirantesSnap, consejerosSnap] = await Promise.all([
           getDocs(collection(db, "RegistroConquis")),
           getDocs(collection(db, "aspirantesGuiaMayor")),
+          getDocs(collection(db, "consejeros")),
         ]);
 
         const conquis: Participante[] = conquisSnap.docs.map((d) => {
@@ -100,7 +104,16 @@ export default function RankinPage() {
           };
         });
 
-        const merged = [...conquis, ...aspirantes]
+        const consejeros: Participante[] = expandirConsejerosYAsociados(consejerosSnap.docs).map(
+          (c) => ({
+            id: c.listaId,
+            nombre: c.nombre,
+            pin: c.pin,
+            tipo: c.rol === "asociado" ? ("asociado" as const) : ("consejero" as const),
+          })
+        );
+
+        const merged = [...conquis, ...aspirantes, ...consejeros]
           .filter((p) => Boolean(p.pin))
           .sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
 
@@ -182,7 +195,11 @@ export default function RankinPage() {
   const filteredParticipantes = useMemo(() => {
     const term = search.trim().toLowerCase();
     const filteredByType =
-      tipoFiltro === "todos" ? participantes : participantes.filter((p) => p.tipo === tipoFiltro);
+      tipoFiltro === "todos"
+        ? participantes
+        : tipoFiltro === "consejero"
+          ? participantes.filter((p) => p.tipo === "consejero" || p.tipo === "asociado")
+          : participantes.filter((p) => p.tipo === tipoFiltro);
     const filteredBySearch = term
       ? filteredByType.filter((p) => p.nombre.toLowerCase().includes(term))
       : filteredByType;
@@ -206,7 +223,9 @@ export default function RankinPage() {
         <div className="mb-6 flex items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
           <div>
             <h1 className="text-2xl font-black text-slate-800">Ranking General</h1>
-            <p className="text-sm text-slate-500">Puntos totales y detalle por evento para conquistadores y aspirantes.</p>
+            <p className="text-sm text-slate-500">
+              Puntos totales y detalle por evento para conquistadores, aspirantes y consejeros.
+            </p>
           </div>
           <button
             type="button"
@@ -252,6 +271,17 @@ export default function RankinPage() {
               >
                 Aspirantes
               </button>
+              <button
+                type="button"
+                onClick={() => setTipoFiltro("consejero")}
+                className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                  tipoFiltro === "consejero"
+                    ? "bg-indigo-600 text-white"
+                    : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                }`}
+              >
+                Consejeros
+              </button>
             </div>
 
             <div className="relative mb-4">
@@ -290,7 +320,13 @@ export default function RankinPage() {
                           <div>
                             <p className="font-semibold text-slate-800">#{rank} {p.nombre}</p>
                             <p className="mt-1 text-xs uppercase tracking-wide text-slate-500">
-                              {p.tipo === "conquistador" ? "Conquistador" : "Aspirante"}
+                              {p.tipo === "conquistador"
+                                ? "Conquistador"
+                                : p.tipo === "aspirante"
+                                  ? "Aspirante"
+                                  : p.tipo === "asociado"
+                                    ? "Consejero asociado"
+                                    : "Consejero"}
                             </p>
                           </div>
                           <span className="rounded-full bg-amber-100 px-2 py-1 text-xs font-bold text-amber-800">

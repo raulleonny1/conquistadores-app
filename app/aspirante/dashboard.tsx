@@ -62,7 +62,11 @@ export default function AspiranteDashboard() {
     const ref = doc(db, "calificacionesConquis", pin);
     const unsub = onSnapshot(ref, (snap) => {
       const puntos = snap.exists() ? snap.data().puntos || {} : {};
-      const categorias = getCategoriasConPuntos(puntos);
+      const etiquetas =
+        (snap.exists()
+          ? (snap.data().etiquetasActividades as Record<string, string>)
+          : undefined) || {};
+      const categorias = getCategoriasConPuntos(puntos, etiquetas);
       setCalificacionesRecientes(
         categorias.map((cat) => ({
           id: cat.id,
@@ -80,7 +84,7 @@ export default function AspiranteDashboard() {
             ),
         }))
       );
-      setTotalPuntos(sumarPuntos(puntos));
+      setTotalPuntos(sumarPuntos(puntos, etiquetas));
     });
     return () => unsub();
   }, [pin]);
