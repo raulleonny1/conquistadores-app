@@ -132,28 +132,43 @@ export default function RegistroConquisPageInner({ unidades: initialUnidades, co
     return () => unsub();
   }, []);
   useEffect(() => {
-    if (initialUnidades && initialConsejeros) return;
+    if (!initialUnidades?.length) {
+      const loadUnidades = async () => {
+        try {
+          const unidadesSnapshot = await getDocs(collection(db, "unidades"));
+          setUnidades(
+            unidadesSnapshot.docs.map((docSnap) => {
+              const data = docSnap.data() as Partial<Unidad>;
+              return { nombre: data.nombre || "", consejero: data.consejero || "" };
+            })
+          );
+        } catch (err) {
+          handleError(err, "Error cargando unidades");
+        }
+      };
+      loadUnidades();
+    }
+  }, [initialUnidades]);
 
-    const loadInitialData = async () => {
-      try {
-        const unidadesSnapshot = await getDocs(collection(db, "unidades"));
-        setUnidades(unidadesSnapshot.docs.map((doc) => {
-          const data = doc.data() as Partial<Unidad>;
-          return { nombre: data.nombre || "", consejero: data.consejero || "" };
-        }));
-
-        const consejerosSnapshot = await getDocs(collection(db, "consejeros"));
-        setConsejeros(consejerosSnapshot.docs.map((doc) => {
-          const data = doc.data() as Partial<Consejero>;
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, "consejeros"), (snapshot) => {
+      setConsejeros(
+        snapshot.docs.map((docSnap) => {
+          const data = docSnap.data() as Partial<Consejero>;
           return { nombre: data.nombre || "", unidades: data.unidades || [] };
-        }));
-      } catch (err) {
-        handleError(err, "Error cargando datos iniciales");
-      }
-    };
+        })
+      );
+    });
+    return () => unsub();
+  }, []);
 
-    loadInitialData();
-  }, [initialUnidades, initialConsejeros]);
+  const consejerosDisponibles = useMemo(() => {
+    if (!form.unidad) return consejeros;
+    const paraUnidad = consejeros.filter(
+      (c) => Array.isArray(c.unidades) && c.unidades.includes(form.unidad)
+    );
+    return paraUnidad.length > 0 ? paraUnidad : consejeros;
+  }, [consejeros, form.unidad]);
 
   const filteredConquis = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -174,14 +189,14 @@ export default function RegistroConquisPageInner({ unidades: initialUnidades, co
   const handleInput = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     if (name === "unidad") {
-      const unidadObj = unidades.find(u => u.nombre === value);
-      // Buscar consejero en Firebase (colección consejeros)
-      let consejero = "Sin asignar";
-      const consejeroFirebase = consejeros.find(c => Array.isArray(c.unidades) && c.unidades.includes(value));
-      if (consejeroFirebase) {
-        consejero = consejeroFirebase.nombre;
-      } else if (unidadObj && unidadObj.consejero) {
-        consejero = unidadObj.consejero;
+      const paraUnidad = consejeros.filter(
+        (c) => Array.isArray(c.unidades) && c.unidades.includes(value)
+      );
+      let consejero = form.consejero;
+      if (paraUnidad.length === 1) {
+        consejero = paraUnidad[0].nombre;
+      } else if (!paraUnidad.some((c) => c.nombre === form.consejero)) {
+        consejero = "";
       }
       setForm({ ...form, unidad: value, consejero });
     } else {
@@ -411,13 +426,40 @@ export default function RegistroConquisPageInner({ unidades: initialUnidades, co
         </div>
 
         <div className="flex flex-col gap-1">
-          <label className="text-sm font-semibold text-slate-700">Consejero</label>
-          <input
-            type="text"
-            value={form.consejero || "Sin asignar"}
-            readOnly
-            className="w-full rounded-lg border border-slate-200 bg-slate-100 px-4 py-2 text-sm text-slate-700 shadow-sm"
-          />
+          <label htmlFor="consejero" className="text-sm font-semibold text-slate-700">
+            Consejero
+          </label>
+          <select
+            id="consejero"
+            name="consejero"
+            value={form.consejero}
+            onChange={handleInput}
+            className="w-full rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-200"
+          >
+            <option value="">Selecciona consejero</option>
+            {consejerosDisponibles.map((c) => (
+              <option key={c.nombre} value={c.nombre}>
+                {c.nombre}
+              </option>
+            ))}
+          </select>
+          {consejeros.length === 0 ? (
+            <p className="text-xs text-amber-700">
+              No hay consejeros registrados.{" "}
+              <Link href="/admin/consejero" className="font-semibold underline">
+                Registrar consejero
+              </Link>
+            </p>
+          ) : form.unidad &&
+            !consejeros.some((c) => c.unidades.includes(form.unidad)) ? (
+            <p className="text-xs text-amber-700">
+              Ningún consejero asesora «{form.unidad}». Asigna unidades en{" "}
+              <Link href="/admin/consejero" className="font-semibold underline">
+                Registro de Consejero
+              </Link>
+              .
+            </p>
+          ) : null}
         </div>
 
         <div className="flex flex-col gap-1">
