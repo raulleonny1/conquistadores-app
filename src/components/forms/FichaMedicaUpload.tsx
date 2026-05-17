@@ -11,6 +11,8 @@ type FichaMedicaUploadProps = {
   onArchivoChange: (file: File | null) => void;
   urlActual?: string;
   nombreActual?: string;
+  /** Si true, no muestra asterisco de obligatorio (p. ej. registro admin). */
+  opcional?: boolean;
 };
 
 export default function FichaMedicaUpload({
@@ -18,6 +20,7 @@ export default function FichaMedicaUpload({
   onArchivoChange,
   urlActual,
   nombreActual,
+  opcional = false,
 }: FichaMedicaUploadProps) {
   const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0] ?? null;
@@ -28,7 +31,12 @@ export default function FichaMedicaUpload({
   return (
     <div className="md:col-span-2 flex flex-col gap-3 rounded-xl border border-indigo-100 bg-indigo-50/40 p-4">
       <label className="text-sm font-semibold text-slate-700">
-        Ficha médica <span className="text-red-500">*</span>
+        Ficha médica{" "}
+        {opcional ? (
+          <span className="font-normal text-slate-500">(opcional)</span>
+        ) : (
+          <span className="text-red-500">*</span>
+        )}
       </label>
       <p className="text-xs text-slate-500">
         PDF, Word o imagen. Puedes elegir un archivo o tomar foto con la cámara del celular.

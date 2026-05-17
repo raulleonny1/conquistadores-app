@@ -8,7 +8,6 @@ export const CAMPOS_OBLIGATORIOS_ASPIRANTE = [
   "edad",
   "nacimiento",
   "genero",
-  "fichaMedicaUrl",
   "cargo",
   "asociacion",
 ] as const;

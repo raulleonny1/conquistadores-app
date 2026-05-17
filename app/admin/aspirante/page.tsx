@@ -117,10 +117,6 @@ export default function AspirantePage() {
       toast.error("Selecciona la asociación / misión.");
       return false;
     }
-    if (!fichaArchivo && !fichaMedicaUrl) {
-      toast.error("Sube la ficha médica (PDF, Word o foto).");
-      return false;
-    }
     return true;
   };
 
@@ -130,17 +126,8 @@ export default function AspirantePage() {
     setLoading(true);
     try {
       const docId = editId ?? generarPin();
-      let ficha = {
-        fichaMedicaUrl,
-        fichaMedicaNombre,
-        fichaMedicaTipo: "",
-      };
 
-      if (fichaArchivo) {
-        ficha = await guardarFichaMedica(fichaArchivo, docId);
-      }
-
-      const payload = {
+      const payload: Record<string, string> = {
         nombre: form.nombre.trim(),
         apellido: form.apellido.trim(),
         edad: form.edad,
@@ -148,8 +135,17 @@ export default function AspirantePage() {
         genero: form.genero,
         asociacion: form.asociacion,
         cargo: CARGO_ASPIRANTE,
-        ...ficha,
       };
+
+      if (fichaArchivo) {
+        Object.assign(payload, await guardarFichaMedica(fichaArchivo, docId));
+      } else if (fichaMedicaUrl.trim()) {
+        Object.assign(payload, {
+          fichaMedicaUrl,
+          fichaMedicaNombre,
+          fichaMedicaTipo: "",
+        });
+      }
 
       if (editId) {
         await updateDoc(doc(db, "aspirantesGuiaMayor", editId), payload);
@@ -365,6 +361,7 @@ export default function AspirantePage() {
               onArchivoChange={setFichaArchivo}
               urlActual={fichaMedicaUrl}
               nombreActual={fichaMedicaNombre}
+              opcional
             />
 
             <div className="md:col-span-2 flex flex-wrap gap-2">
