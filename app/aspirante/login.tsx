@@ -3,14 +3,13 @@ import React, { useState } from "react";
 import { db } from "../../src/firebase";
 import { doc, getDoc } from "firebase/firestore";
 import CompletarRegistroAspirante from "../../src/components/forms/CompletarRegistroAspirante";
+import { registroAspiranteCompleto } from "@/src/constants/aspirante";
 
 export default function LoginAspirante() {
   const [pin, setPin] = useState("");
   const [registroIncompleto, setRegistroIncompleto] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-
-  const camposObligatorios = ["nombre", "edad", "nacimiento", "sexo", "direccion", "telefono", "email", "iglesia", "club"];
 
   const handleLogin = async () => {
     setLoading(true);
@@ -24,7 +23,7 @@ export default function LoginAspirante() {
         return;
       }
       const data = snap.data();
-      const incompleto = !camposObligatorios.every(c => data[c]);
+      const incompleto = !registroAspiranteCompleto(data);
       setRegistroIncompleto(incompleto);
       if (!incompleto) {
         // Aquí iría la redirección al dashboard del sistema

@@ -1,128 +1,85 @@
 "use client";
+
 import React, { useState, useEffect } from "react";
-import { db, formatFechaDDMMYYYY } from "../../../src/firebase";
+import { db, formatFechaDDMMYYYY } from "@/src/firebase";
 import {
   collection,
-  addDoc,
   onSnapshot,
   deleteDoc,
   doc,
   updateDoc,
-  getDoc,
   setDoc,
-  getDocs
 } from "firebase/firestore";
 import { tarjetaGuiaMayor } from "@/src/data/tarjetaGuiaMayor";
-import { TarjetaGuiaMayor } from "@/src/types";
-import FirmaDigital from "@/src/components/ui/FirmaDigital";
-import { guardarFirma } from "@/src/lib/guardarFirma";
+import { guardarFichaMedica } from "@/src/lib/guardarFichaMedica";
+import {
+  ASOCIACIONES_MISION,
+  CARGO_ASPIRANTE,
+  nombreCompletoAspirante,
+} from "@/src/constants/aspirante";
+import { buildWhatsappUrl } from "@/src/utils/whatsapp";
+import FichaMedicaUpload from "@/src/components/forms/FichaMedicaUpload";
 import { ArrowLeft } from "lucide-react";
+import { toast } from "react-hot-toast";
 
-// Eliminado menú, ahora es un solo formulario
+type AspiranteDoc = {
+  id: string;
+  nombre: string;
+  apellido: string;
+  edad: string;
+  nacimiento: string;
+  genero: string;
+  asociacion: string;
+  cargo: string;
+  pin: string;
+  telefono?: string;
+  fichaMedicaUrl?: string;
+  fichaMedicaNombre?: string;
+  fichaMedicaTipo?: string;
+  fechaRegistro?: string;
+};
 
-const AspirantePage = () => {
-    // Detectar combinación *611 para redirigir
-    useEffect(() => {
-      let buffer = "";
-      const handleKeyDown = (e: KeyboardEvent) => {
-        buffer += e.key;
-        if (buffer.includes("*611")) {
-          window.location.href = "/admin/evaluar-guia-mayor";
-          buffer = "";
-        }
-        if (buffer.length > 5) buffer = "";
-      };
-      window.addEventListener("keydown", handleKeyDown);
-      return () => window.removeEventListener("keydown", handleKeyDown);
-    }, []);
-    // ...existing code...
+const formInicial = {
+  nombre: "",
+  apellido: "",
+  edad: "",
+  nacimiento: "",
+  genero: "",
+  asociacion: ASOCIACIONES_MISION[0] as string,
+  cargo: CARGO_ASPIRANTE,
+};
 
-    // Estados necesarios
-    const [aspiranteId, setAspiranteId] = useState<string>("");
-    const [actividades, setActividades] = useState<Array<{nombre:string,completado:boolean,evaluador:string,fecha:string,hora:string,firma:string}>>([]);
-    const [firmaIndex, setFirmaIndex] = useState<number | null>(null);
-    const [evaluador, setEvaluador] = useState<string>("");
-    let tarjetaDoc: TarjetaGuiaMayor | null;
-      const seleccionarAspirante = async (aspirante:any) => {
-        setAspiranteId(aspirante.id);
-        setEvaluador(aspirante.evaluador || "");
-        const ref = doc(db, "tarjetaGuiaMayor", aspirante.id);
-        const snap = await getDoc(ref);
-        if (!snap.exists()) {
-          const actividadesIniciales = tarjetaGuiaMayor.flatMap(grupo =>
-            grupo.actividades.map(act => ({
-              nombre: act,
-              completado: false,
-              evaluador: "",
-              fecha: "",
-              hora: "",
-              firma: ""
-            }))
-          );
-          await setDoc(ref, {
-            aspiranteId: aspirante.id,
-            aspiranteNombre: aspirante.nombre,
-            fechaInicio: new Date().toLocaleDateString(),
-            actividades: actividadesIniciales
-          });
-          setActividades(actividadesIniciales);
-        } else {
-          tarjetaDoc = { id: snap.id, ...(snap.data() as Omit<TarjetaGuiaMayor, "id">) };
-          setActividades((snap.data() as any).actividades);
-        }
-      };
-     const actualizarActividad = async (index:number, estado:boolean) => {
-       if (!aspiranteId) return;
-       const nuevas = [...actividades];
-       nuevas[index].completado = estado;
-       nuevas[index].evaluador = evaluador;
-       nuevas[index].fecha = new Date().toLocaleDateString();
-       nuevas[index].hora = new Date().toLocaleTimeString();
-       setActividades(nuevas);
-       const ref = doc(db, "tarjetaGuiaMayor", aspiranteId);
-       await updateDoc(ref, {
-         actividades: nuevas
-       });
-     };
-  const [form, setForm] = useState({
-    nombre: "",
-    edad: "",
-    nacimiento: "",
-    sexo: "",
-    direccion: "",
-    telefono: "",
-    email: "",
-    iglesia: "",
-    distrito: "",
-    asociacion: "",
-    pastor: "",
-    director: "",
-    club: "",
-    anioIngreso: "",
-    cargoActual: "",
-    unidad: "",
-    aniosClub: "",
-    clase: ""
-  });
-  const [unidadesRegistradas, setUnidadesRegistradas] = useState<string[]>([]);
-  useEffect(() => {
-    getDocs(collection(db, "unidades")).then(snapshot => {
-      setUnidadesRegistradas(snapshot.docs.map(doc => doc.data().nombre));
-    });
-  }, []);
+export default function AspirantePage() {
+  const [form, setForm] = useState(formInicial);
+  const [fichaArchivo, setFichaArchivo] = useState<File | null>(null);
+  const [fichaMedicaUrl, setFichaMedicaUrl] = useState("");
+  const [fichaMedicaNombre, setFichaMedicaNombre] = useState("");
   const [editId, setEditId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [aspirantes, setAspirantes] = useState<any[]>([]);
-  // Generar PIN aleatorio
+  const [aspirantes, setAspirantes] = useState<AspiranteDoc[]>([]);
+
   const generarPin = () => Math.floor(1000 + Math.random() * 9000).toString();
 
-  // Cargar aspirantes en tiempo real
   useEffect(() => {
-    const unsub = onSnapshot(collection(db, "aspirantesGuiaMayor"), snap => {
-      setAspirantes(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    const unsub = onSnapshot(collection(db, "aspirantesGuiaMayor"), (snap) => {
+      setAspirantes(
+        snap.docs.map((docSnap) => ({
+          id: docSnap.id,
+          ...(docSnap.data() as Omit<AspiranteDoc, "id">),
+        }))
+      );
     });
     return () => unsub();
   }, []);
+
+  const resetForm = () => {
+    setForm(formInicial);
+    setFichaArchivo(null);
+    setFichaMedicaUrl("");
+    setFichaMedicaNombre("");
+    setEditId(null);
+  };
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     if (e.target.name === "nacimiento") {
       const nacimiento = e.target.value;
@@ -143,107 +100,129 @@ const AspirantePage = () => {
     }
   };
 
+  const validarFormulario = () => {
+    if (!form.nombre.trim() || !form.apellido.trim()) {
+      toast.error("Nombre y apellido son obligatorios.");
+      return false;
+    }
+    if (!form.nacimiento || !form.edad) {
+      toast.error("Fecha de nacimiento y edad son obligatorias.");
+      return false;
+    }
+    if (!form.genero) {
+      toast.error("Selecciona el género.");
+      return false;
+    }
+    if (!form.asociacion) {
+      toast.error("Selecciona la asociación / misión.");
+      return false;
+    }
+    if (!fichaArchivo && !fichaMedicaUrl) {
+      toast.error("Sube la ficha médica (PDF, Word o foto).");
+      return false;
+    }
+    return true;
+  };
+
   const handleSave = async () => {
+    if (!validarFormulario()) return;
+
     setLoading(true);
     try {
+      const docId = editId ?? generarPin();
+      let ficha = {
+        fichaMedicaUrl,
+        fichaMedicaNombre,
+        fichaMedicaTipo: "",
+      };
+
+      if (fichaArchivo) {
+        ficha = await guardarFichaMedica(fichaArchivo, docId);
+      }
+
+      const payload = {
+        nombre: form.nombre.trim(),
+        apellido: form.apellido.trim(),
+        edad: form.edad,
+        nacimiento: form.nacimiento,
+        genero: form.genero,
+        asociacion: form.asociacion,
+        cargo: CARGO_ASPIRANTE,
+        ...ficha,
+      };
+
       if (editId) {
-        await updateDoc(doc(db, "aspirantesGuiaMayor", editId), {
-          ...form
-        });
-        alert("Aspirante actualizado correctamente.");
-        setEditId(null);
+        await updateDoc(doc(db, "aspirantesGuiaMayor", editId), payload);
+        toast.success("Aspirante actualizado.");
       } else {
-        const pin = generarPin();
-        // Registrar aspirante usando el pin como ID
-        await setDoc(doc(db, "aspirantesGuiaMayor", pin), {
-          ...form,
-          pin,
-          fechaRegistro: formatFechaDDMMYYYY(new Date())
+        await setDoc(doc(db, "aspirantesGuiaMayor", docId), {
+          ...payload,
+          pin: docId,
+          fechaRegistro: formatFechaDDMMYYYY(new Date()),
         });
-        // Crear tarjetaGuiaMayor
-        await setDoc(doc(db, "tarjetaGuiaMayor", pin), {
-          aspiranteId: pin,
-          aspiranteNombre: form.nombre,
+        await setDoc(doc(db, "tarjetaGuiaMayor", docId), {
+          aspiranteId: docId,
+          aspiranteNombre: nombreCompletoAspirante(form),
           fechaInicio: new Date().toLocaleDateString(),
-          actividades: tarjetaGuiaMayor.flatMap(grupo =>
-            grupo.actividades.map(act => ({
+          actividades: tarjetaGuiaMayor.flatMap((grupo) =>
+            grupo.actividades.map((act) => ({
               nombre: act,
               completado: false,
               evaluador: "",
               fecha: "",
               hora: "",
-              firma: ""
+              firma: "",
             }))
-          )
+          ),
         });
-        alert("Aspirante registrado correctamente. PIN: " + pin);
+        toast.success(`Aspirante registrado. PIN: ${docId}`);
       }
-      setForm({
-        nombre: "",
-        edad: "",
-        nacimiento: "",
-        sexo: "",
-        direccion: "",
-        telefono: "",
-        email: "",
-        iglesia: "",
-        distrito: "",
-        asociacion: "",
-        pastor: "",
-        director: "",
-        club: "",
-        anioIngreso: "",
-        cargoActual: "",
-        clase: "",
-        unidad: "",
-        aniosClub: ""
-      });
-    } catch (err) {
-      alert("Error al guardar datos.");
+      resetForm();
+    } catch {
+      toast.error("Error al guardar en Firebase.");
     }
     setLoading(false);
   };
 
-  const handleEdit = (a: any) => {
+  const handleEdit = (a: AspiranteDoc) => {
     setForm({
-      nombre: a.nombre,
-      edad: a.edad,
-      nacimiento: a.nacimiento,
-      sexo: a.sexo,
-      direccion: a.direccion,
-      telefono: a.telefono,
-      email: a.email,
-      iglesia: a.iglesia,
-      distrito: a.distrito,
-      asociacion: a.asociacion,
-      pastor: a.pastor,
-      director: a.director,
-      club: a.club,
-      anioIngreso: a.anioIngreso,
-      cargoActual: a.cargoActual,
-      unidad: a.unidad,
-      aniosClub: a.aniosClub,
-      clase: a.clase || ""
+      nombre: a.nombre || "",
+      apellido: a.apellido || "",
+      edad: a.edad || "",
+      nacimiento: a.nacimiento || "",
+      genero: a.genero || (a as { sexo?: string }).sexo || "",
+      asociacion: a.asociacion || ASOCIACIONES_MISION[0],
+      cargo: CARGO_ASPIRANTE,
     });
+    setFichaMedicaUrl(a.fichaMedicaUrl || "");
+    setFichaMedicaNombre(a.fichaMedicaNombre || "");
+    setFichaArchivo(null);
     setEditId(a.id);
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const handleDelete = async (id: string) => {
     if (!window.confirm("¿Eliminar este aspirante?")) return;
     await deleteDoc(doc(db, "aspirantesGuiaMayor", id));
+    toast.success("Aspirante eliminado.");
   };
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans text-slate-900">
-      <div className="max-w-4xl mx-auto mt-10">
-        <div className="flex justify-between mb-6">
+      <div className="max-w-3xl mx-auto mt-10 px-4 pb-16">
+        <div className="flex flex-wrap justify-between gap-4 mb-6">
           <button
-            onClick={() => window.location.href = '/admin/registros'}
+            type="button"
+            onClick={() => {
+              window.location.href = "/admin/registros";
+            }}
             className="bg-indigo-600 text-white font-bold px-6 py-2 rounded-xl hover:bg-indigo-800 transition-all"
           >
-            <ArrowLeft className="inline mr-2" /> Retornar a Admin
+            <ArrowLeft className="inline mr-2" />
+            Retornar a Admin
           </button>
           <button
+            type="button"
             onClick={() => {
               window.location.href = "/";
             }}
@@ -252,202 +231,237 @@ const AspirantePage = () => {
             Cerrar sesión
           </button>
         </div>
+
         <section className="bg-white rounded-3xl shadow-xl p-8">
-          <h2 className="text-2xl font-bold mb-6 text-indigo-700">Registrar Aspirante a Guía Mayor</h2>
-          <form className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-            <input name="nombre" value={form.nombre} onChange={handleChange} placeholder="Nombre completo" className="border p-2 rounded-xl" />
-            <input name="edad" value={form.edad} onChange={handleChange} placeholder="Edad" className="border p-2 rounded-xl" type="number" />
-            <input name="nacimiento" value={form.nacimiento} onChange={handleChange} placeholder="Fecha de nacimiento" className="border p-2 rounded-xl" type="date" />
-            <select name="sexo" value={form.sexo} onChange={handleChange} className="border p-2 rounded-xl">
-              <option value="">Sexo</option>
-              <option value="Hombre">Hombre</option>
-              <option value="Mujer">Mujer</option>
-            </select>
-            <input name="direccion" value={form.direccion} onChange={handleChange} placeholder="Dirección" className="border p-2 rounded-xl" />
-            <input name="telefono" value={form.telefono} onChange={handleChange} placeholder="Teléfono" className="border p-2 rounded-xl" />
-            <input name="email" value={form.email} onChange={handleChange} placeholder="Email" className="border p-2 rounded-xl" type="email" />
-            <select name="iglesia" value={form.iglesia} onChange={handleChange} className="border p-2 rounded-xl">
-              <option value="">Iglesia local</option>
-              <option value="Iglesia Florida Norte">Iglesia Florida Norte</option>
-            </select>
-            <input name="distrito" value={form.distrito} onChange={handleChange} placeholder="Distrito" className="border p-2 rounded-xl" />
-            <select name="asociacion" value={form.asociacion} onChange={handleChange} className="border p-2 rounded-xl">
-              <option value="">Asociación / Misión</option>
-              <option value="Misión Ecuatoriana del Sur">Misión Ecuatoriana del Sur</option>
-            </select>
-            <input name="pastor" value={form.pastor} onChange={handleChange} placeholder="Pastor" className="border p-2 rounded-xl" />
-            <select name="director" value={form.director} onChange={handleChange} className="border p-2 rounded-xl">
-              <option value="">Director de conquistadores</option>
-              <option value="Jenniffer Cargua">Jenniffer Cargua</option>
-            </select>
-            <select name="club" value={form.club} onChange={handleChange} className="border p-2 rounded-xl">
-              <option value="">Club*</option>
-              <option value="Club Caleb">Club Caleb</option>
-            </select>
-            <input name="anioIngreso" value={form.anioIngreso} onChange={handleChange} placeholder="Año de ingreso" className="border p-2 rounded-xl" type="number" />
-            <select name="cargoActual" value={form.cargoActual} onChange={handleChange} className="border p-2 rounded-xl">
-              <option value="">Cargo actual</option>
-              <option value="Conquistador">Conquistador</option>
-              <option value="Consejero">Consejero</option>
-              <option value="Instructor">Instructor</option>
-              <option value="Tesorero">Tesorero</option>
-            </select>
-            <select name="unidad" value={form.unidad} onChange={handleChange} className="border p-2 rounded-xl">
-              <option value="">Unidad</option>
-              {unidadesRegistradas.map((u) => (
-                <option key={u} value={u}>{u}</option>
-              ))}
-            </select>
-            <input name="aniosClub" value={form.aniosClub} onChange={handleChange} placeholder="Años en el club" className="border p-2 rounded-xl" type="number" />
-            <select name="clase" value={form.clase} onChange={handleChange} className="border p-2 rounded-xl">
-              <option value="">Clase</option>
-              <option value="Amigo">Amigo</option>
-              <option value="Compañero">Compañero</option>
-              <option value="Explorador">Explorador</option>
-              <option value="Pionero">Pionero</option>
-              <option value="Excursionista">Excursionista</option>
-              <option value="Guía">Guía</option>
-            </select>
-          </form>
-          <button
-            onClick={handleSave}
-            className="bg-indigo-700 text-white px-6 py-2 rounded-xl font-bold hover:bg-indigo-900 transition-all"
-            disabled={loading}
+          <h2 className="text-2xl font-bold mb-2 text-indigo-700">
+            Registrar Aspirante a Guía Mayor
+          </h2>
+          <p className="text-sm text-slate-500 mb-6">
+            Los datos se guardan en Firebase para consultas futuras.
+          </p>
+
+          <form
+            className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6"
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleSave();
+            }}
           >
-            {editId ? "Actualizar Aspirante" : "Guardar Aspirante"}
-          </button>
-          {/* Lista de aspirantes registrados */}
+            <div className="flex flex-col gap-1">
+              <label htmlFor="nombre" className="text-sm font-semibold text-slate-700">
+                Nombre
+              </label>
+              <input
+                id="nombre"
+                name="nombre"
+                value={form.nombre}
+                onChange={handleChange}
+                placeholder="Nombre"
+                className="border border-slate-200 p-2 rounded-xl"
+                required
+              />
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <label htmlFor="apellido" className="text-sm font-semibold text-slate-700">
+                Apellido
+              </label>
+              <input
+                id="apellido"
+                name="apellido"
+                value={form.apellido}
+                onChange={handleChange}
+                placeholder="Apellido"
+                className="border border-slate-200 p-2 rounded-xl"
+                required
+              />
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <label htmlFor="nacimiento" className="text-sm font-semibold text-slate-700">
+                Fecha de nacimiento
+              </label>
+              <input
+                id="nacimiento"
+                name="nacimiento"
+                type="date"
+                value={form.nacimiento}
+                onChange={handleChange}
+                className="border border-slate-200 p-2 rounded-xl"
+                required
+              />
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <label htmlFor="edad" className="text-sm font-semibold text-slate-700">
+                Edad
+              </label>
+              <input
+                id="edad"
+                name="edad"
+                type="number"
+                value={form.edad}
+                readOnly
+                className="border border-slate-200 p-2 rounded-xl bg-slate-100"
+              />
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <label htmlFor="genero" className="text-sm font-semibold text-slate-700">
+                Género
+              </label>
+              <select
+                id="genero"
+                name="genero"
+                value={form.genero}
+                onChange={handleChange}
+                className="border border-slate-200 p-2 rounded-xl"
+                required
+              >
+                <option value="">Selecciona género</option>
+                <option value="Hombre">Hombre</option>
+                <option value="Mujer">Mujer</option>
+              </select>
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <label htmlFor="cargo" className="text-sm font-semibold text-slate-700">
+                Cargo
+              </label>
+              <select
+                id="cargo"
+                name="cargo"
+                value={form.cargo}
+                disabled
+                className="border border-slate-200 p-2 rounded-xl bg-slate-100 text-slate-700"
+              >
+                <option value={CARGO_ASPIRANTE}>{CARGO_ASPIRANTE}</option>
+              </select>
+            </div>
+
+            <div className="flex flex-col gap-1 md:col-span-2">
+              <label htmlFor="asociacion" className="text-sm font-semibold text-slate-700">
+                Asociación / Misión
+              </label>
+              <select
+                id="asociacion"
+                name="asociacion"
+                value={form.asociacion}
+                onChange={handleChange}
+                className="border border-slate-200 p-2 rounded-xl"
+                required
+              >
+                <option value="">Selecciona asociación / misión</option>
+                {ASOCIACIONES_MISION.map((a) => (
+                  <option key={a} value={a}>
+                    {a}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <FichaMedicaUpload
+              archivoSeleccionado={fichaArchivo}
+              onArchivoChange={setFichaArchivo}
+              urlActual={fichaMedicaUrl}
+              nombreActual={fichaMedicaNombre}
+            />
+
+            <div className="md:col-span-2 flex flex-wrap gap-2">
+              <button
+                type="submit"
+                disabled={loading}
+                className="bg-indigo-700 text-white px-6 py-2 rounded-xl font-bold hover:bg-indigo-900 transition-all disabled:opacity-60"
+              >
+                {loading ? "Guardando..." : editId ? "Actualizar Aspirante" : "Guardar Aspirante"}
+              </button>
+              {editId && (
+                <button
+                  type="button"
+                  onClick={resetForm}
+                  className="bg-gray-400 text-white px-6 py-2 rounded-xl font-bold hover:bg-gray-500"
+                >
+                  Cancelar edición
+                </button>
+              )}
+            </div>
+          </form>
+
           <div className="mt-10">
-            <h2 className="font-bold mb-4 text-indigo-700">Aspirantes Registrados</h2>
-            <ul className="space-y-3">
-              {aspirantes.map(a => (
-                <li key={a.id} className="bg-indigo-50 rounded-xl p-4 flex flex-col md:flex-row md:items-center gap-4 border border-indigo-200">
-                  <div className="flex-1">
-                    <span className="font-bold text-indigo-800">{a.nombre}</span><br />
-                    <span className="text-xs text-slate-400">Edad: {a.edad}</span><br />
-                    <span className="text-xs text-slate-400">Club: {a.club || 'Sin club'}</span><br />
-                    <span className="text-xs text-slate-400">Cargo: {a.cargoActual || 'Sin cargo'}</span>
-                  </div>
-                  <div className="flex flex-col md:flex-row md:items-center gap-2">
-                    <span className="bg-indigo-100 text-indigo-800 px-3 py-1 rounded-lg font-mono">PIN: {a.pin}</span>
-                    <a
-                      href={`https://wa.me/${a.telefono}?text=Hola%20${encodeURIComponent(a.nombre)}%2C%20tu%20PIN%20de%20acceso%20es%20${a.pin}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="bg-green-600 text-white px-4 py-2 rounded-xl font-bold hover:bg-green-800 transition-all"
+            <h3 className="font-bold mb-4 text-indigo-700">Aspirantes registrados</h3>
+            {aspirantes.length === 0 ? (
+              <p className="text-slate-500 text-sm">No hay aspirantes registrados.</p>
+            ) : (
+              <ul className="space-y-3">
+                {aspirantes.map((a) => {
+                  const nombre = nombreCompletoAspirante(a);
+                  const waUrl =
+                    a.telefono &&
+                    buildWhatsappUrl(
+                      a.telefono,
+                      `Hola ${nombre}, tu PIN de acceso es ${a.pin}.`
+                    );
+                  return (
+                    <li
+                      key={a.id}
+                      className="bg-indigo-50 rounded-xl p-4 flex flex-col gap-3 border border-indigo-200"
                     >
-                      Enviar PIN por WhatsApp
-                    </a>
-                    <button
-                      onClick={() => handleEdit(a)}
-                      className="bg-yellow-500 text-white px-3 py-1 rounded-lg font-bold hover:bg-yellow-700 transition-all"
-                    >Editar</button>
-                    <button
-                      onClick={() => handleDelete(a.id)}
-                      className="bg-red-600 text-white px-3 py-1 rounded-lg font-bold hover:bg-red-800 transition-all"
-                    >Eliminar</button>
-                  </div>
-                </li>
-              ))}
-            </ul>
+                      <div>
+                        <span className="font-bold text-indigo-800">{nombre}</span>
+                        <div className="mt-1 text-xs text-slate-500 space-y-0.5">
+                          <p>Edad: {a.edad || "—"} · Género: {a.genero || "—"}</p>
+                          <p>Asociación: {a.asociacion || "—"} · Cargo: {a.cargo || CARGO_ASPIRANTE}</p>
+                          {a.fichaMedicaUrl && (
+                            <p>
+                              <a
+                                href={a.fichaMedicaUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-indigo-600 underline"
+                              >
+                                Ver ficha médica
+                              </a>
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="bg-indigo-100 text-indigo-800 px-3 py-1 rounded-lg font-mono text-sm">
+                          PIN: {a.pin}
+                        </span>
+                        {waUrl && (
+                          <a
+                            href={waUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="bg-green-600 text-white px-4 py-2 rounded-xl text-sm font-bold hover:bg-green-800"
+                          >
+                            Enviar PIN por WhatsApp
+                          </a>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => handleEdit(a)}
+                          className="bg-yellow-500 text-white px-3 py-1 rounded-lg text-sm font-bold hover:bg-yellow-700"
+                        >
+                          Editar
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDelete(a.id)}
+                          className="bg-red-600 text-white px-3 py-1 rounded-lg text-sm font-bold hover:bg-red-800"
+                        >
+                          Eliminar
+                        </button>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
           </div>
         </section>
-      {/* Render de actividades agrupadas por sección */}
-      {actividades && actividades.length > 0 && (
-        <div className="mt-8">
-          {/* Calcular progreso */}
-          <h3 className="font-bold text-indigo-700 mb-4">Actividades Guía Mayor</h3>
-          {/* Progreso visual */}
-          <div className="mb-4">
-            {/* Progreso solo de la sección actual (Desarrollo Espiritual) */}
-            {(() => {
-              // Buscar primer grupo (Desarrollo Espiritual)
-              const primerGrupo = tarjetaGuiaMayor[0];
-              const actividadesSeccion = primerGrupo.actividades.map(act => {
-                const index = actividades.findIndex(a => a.nombre === act);
-                return actividades[index];
-              });
-              const completadas = actividadesSeccion.filter(a => a && a.completado).length;
-              return (
-                <span className="font-bold text-green-700">Progreso: {completadas} / {actividadesSeccion.length} requisitos</span>
-              );
-            })()}
-          </div>
-          {tarjetaGuiaMayor.map((grupo, idxGrupo) => {
-            // Filtrar actividades por sección
-            const actividadesSeccion = grupo.actividades.map(act => {
-              // Buscar la actividad en el array plano
-              const index = actividades.findIndex(a => a.nombre === act);
-              return { ...actividades[index], index };
-            });
-            // Calcular progreso de la sección
-            const completadas = actividadesSeccion.filter(a => a && a.completado).length;
-            return (
-              <div key={idxGrupo} className="mb-6">
-                <h4 className="text-lg font-semibold text-indigo-600 mb-2">{grupo.seccion}</h4>
-                <div className="mb-2">
-                  <span className="font-bold text-green-700">Progreso: {completadas} / {actividadesSeccion.length} requisitos</span>
-                </div>
-                {actividadesSeccion.map((a, i) => (
-                  <div key={i} className="flex gap-2 items-center mb-2">
-                    <input
-                      type="checkbox"
-                      checked={a.completado}
-                      onChange={e => {
-                        if (e.target.checked && !a.firma) {
-                          setFirmaIndex(a.index);
-                        } else {
-                          actualizarActividad(a.index, e.target.checked);
-                        }
-                      }}
-                    />
-                    <span>{a.nombre}</span>
-                    {a.completado && (
-                      <span className="text-xs text-gray-500 ml-2">
-                        ✔ {a.fecha} - {a.evaluador}
-                        {a.firma ? (
-                          <a href={a.firma} target="_blank" rel="noopener noreferrer" className="ml-2 text-blue-600 underline">Ver firma</a>
-                        ) : null}
-                      </span>
-                    )}
-                    {firmaIndex === a.index && (
-                      <div className="flex flex-col gap-2 mt-2">
-                        <span className="text-sm text-indigo-700 font-semibold">Firma digital: usa tu dedo o mouse para firmar y validar la actividad.</span>
-                        <FirmaDigital
-                          onSave={async (firmaBase64: string) => {
-                            const urlFirma = await guardarFirma(firmaBase64, aspiranteId, a.index);
-                            const nuevas = [...actividades];
-                            nuevas[a.index] = {
-                              ...nuevas[a.index],
-                              completado: true,
-                              evaluador: evaluador,
-                              fecha: new Date().toLocaleDateString(),
-                              hora: new Date().toLocaleTimeString(),
-                              firma: urlFirma
-                            };
-                            setFirmaIndex(null);
-                            setActividades(nuevas);
-                            const ref = doc(db, "tarjetaGuiaMayor", aspiranteId);
-                            await updateDoc(ref, {
-                              actividades: nuevas
-                            });
-                          }}
-                        />
-                      </div>
-                    )}
-                    {a.firma && (
-                      <img src={a.firma} width={120} className="mt-2" />
-                    )}
-                  </div>
-                ))}
-              </div>
-            );
-          })}
-        </div>
-      )}
+      </div>
     </div>
-  </div>
- );
-};
-
-export default AspirantePage;
+  );
+}

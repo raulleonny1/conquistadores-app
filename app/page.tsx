@@ -5,6 +5,7 @@ import { collection, getDocs, query, where } from 'firebase/firestore';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { logInfo, logError } from "@/src/lib/logger";
+import { registroAspiranteCompleto } from "@/src/constants/aspirante";
 export default function Home() {
     // Función para agregar dígitos al PIN
     const handleKeypad = (num: string) => {
@@ -85,8 +86,7 @@ export default function Home() {
         if (!snapshotAspirante.empty) {
           const aspiranteDoc = snapshotAspirante.docs[0];
           const data = aspiranteDoc.data();
-          const camposObligatorios = ["nombre", "edad", "nacimiento", "sexo", "direccion", "telefono", "email", "iglesia", "club"];
-          const registroCompleto = camposObligatorios.every(c => data[c]);
+          const registroCompleto = registroAspiranteCompleto(data);
           setError('');
           logInfo('Login aspirante exitoso: ' + pin);
           if (!registroCompleto) {

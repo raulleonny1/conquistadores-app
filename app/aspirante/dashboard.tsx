@@ -134,7 +134,11 @@ export default function AspiranteDashboard() {
                 ¡Hola, {user.nombre ? user.nombre.split(' ')[0] : 'Aspirante'}! 👋
               </h1>
               <p className="text-indigo-100 text-base md:text-xl font-medium">
-                Club: <span className="font-bold underline decoration-pink-400 decoration-4 underline-offset-4">{user.club || 'Sin club'}</span>
+                {user.asociacion ? (
+                  <>Asociación: <span className="font-bold underline decoration-pink-400 decoration-4 underline-offset-4">{user.asociacion}</span></>
+                ) : user.club ? (
+                  <>Club: <span className="font-bold underline decoration-pink-400 decoration-4 underline-offset-4">{user.club}</span></>
+                ) : null}
               </p>
             </div>
             <div className="bg-white/95 backdrop-blur-xl p-5 rounded-[2.5rem] shadow-2xl flex items-center justify-center md:justify-start gap-4 border border-white mx-auto md:mx-0 w-full max-w-sm md:w-auto transform hover:scale-105 transition-transform cursor-default">
