@@ -6,6 +6,12 @@ import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { logInfo, logError } from "@/src/lib/logger";
 import { registroAspiranteCompleto } from "@/src/constants/aspirante";
+import {
+  LOGO_APLICACION_HEIGHT,
+  LOGO_APLICACION_SRC,
+  LOGO_APLICACION_VERSION,
+  LOGO_APLICACION_WIDTH,
+} from "@/src/constants/branding";
 export default function Home() {
     // Función para agregar dígitos al PIN
     const handleKeypad = (num: string) => {
@@ -105,30 +111,38 @@ export default function Home() {
 
   return (
     <div className="min-h-screen relative flex items-center justify-center font-sans overflow-hidden bg-slate-900">
-      {/* Video de fondo */}
-      <video
-        autoPlay
-        loop
-        muted
-        playsInline
-        className="absolute inset-0 w-full h-full object-cover z-0 opacity-70"
-      >
-        <source src="/fondo-login.mp4" type="video/mp4" />
-        Tu navegador no soporta el video de fondo.
-      </video>
-      {/* Overlay para glassmorphism */}
-      <div className="absolute inset-0 bg-linear-to-b from-slate-900/40 via-indigo-900/60 to-slate-900/90 z-0" />
+      <div
+        className="absolute inset-0 z-0 bg-linear-to-br from-slate-900 via-indigo-950 to-slate-900"
+        aria-hidden
+      />
+      <div className="absolute inset-0 z-0 bg-linear-to-b from-slate-900/40 via-indigo-900/60 to-slate-900/90" />
       {/* Contenido principal */}
       <div className="relative z-10 w-full max-w-md px-6 py-8 flex flex-col items-center">
         {/* Logo y encabezado */}
         <div className="mb-8 text-center animate-in fade-in slide-in-from-bottom-4 duration-700">
-          <div className="bg-white/20 backdrop-blur-xl p-4 rounded-4xl border border-white/30 inline-flex mb-4 shadow-2xl shadow-indigo-500/20">
-            <Image src="/logoconquis.png" alt="Logo Conquistadores" width={80} height={80} className="w-20 h-20" />
+          <div className="relative mx-auto mb-5 flex h-32 w-32 items-center justify-center sm:h-36 sm:w-36">
+            <div
+              className="absolute inset-0 rounded-[2rem] bg-white/15 blur-xl"
+              aria-hidden
+            />
+            <div className="relative h-full w-full overflow-hidden rounded-[2rem] border border-white/35 bg-white/20 p-3 shadow-2xl shadow-indigo-900/40 backdrop-blur-xl ring-1 ring-white/25">
+              <Image
+                key={LOGO_APLICACION_VERSION}
+                src={LOGO_APLICACION_SRC}
+                alt="Logo Club Caleb - Conquistadores"
+                width={LOGO_APLICACION_WIDTH}
+                height={LOGO_APLICACION_HEIGHT}
+                priority
+                unoptimized
+                className="h-full w-full object-contain"
+                sizes="(max-width: 640px) 128px, 144px"
+              />
+            </div>
           </div>
-          <h1 className="text-white text-3xl font-black tracking-tight mb-1">
+          <h1 className="mb-1 text-3xl font-black tracking-tight text-white sm:text-4xl">
             CLUB <span className="text-indigo-400">CALEB</span>
           </h1>
-          <p className="text-indigo-100/80 font-medium text-sm tracking-wide">
+          <p className="text-sm font-medium tracking-wide text-indigo-100/80 sm:text-base">
             CENTRO DE COMANDO
           </p>
         </div>

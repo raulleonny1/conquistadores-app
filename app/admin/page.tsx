@@ -27,6 +27,99 @@ import { useRouter } from 'next/navigation';
 
 import { collection, getDocs, updateDoc, doc } from 'firebase/firestore';
 import { db } from '../../src/firebase';
+
+type MenuItem = {
+  id: string;
+  title: string;
+  description: string;
+  icon: React.ReactNode;
+  color: string;
+  bgColor: string;
+  hoverColor: string;
+};
+
+function SortableMenuCard({
+  item,
+  onSelectTab,
+}: {
+  item: MenuItem;
+  onSelectTab: (id: string) => void;
+}) {
+  const router = useRouter();
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: item.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  const navigateForItem = () => {
+    const routes: Record<string, string> = {
+      registros: "/admin/registros",
+      frases: "/admin/frases",
+      RegistroConquis: "/admin/RegistroConquis",
+      unidades: "/admin/unidades",
+      consejero: "/admin/consejero",
+      especialidades: "/admin/especialidades",
+      calificaciones: "/admin/calificaciones",
+      calendario: "/admin/calendario",
+      aspirante: "/admin/aspirante",
+      directiva: "/admin/directiva",
+      rankin: "/admin/rankin",
+    };
+    const path = routes[item.id];
+    if (path) router.push(path);
+    else onSelectTab(item.id);
+  };
+
+  let dragStarted = false;
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      {...attributes}
+      {...listeners}
+      onPointerDown={() => {
+        dragStarted = false;
+      }}
+      onPointerMove={() => {
+        dragStarted = true;
+      }}
+      onPointerUp={() => {
+        if (!dragStarted) navigateForItem();
+      }}
+      className={`group relative bg-white p-8 rounded-3xl border-2 ${item.color.split(" ")[0]} transition-all duration-500 cursor-pointer overflow-hidden shadow-sm hover:shadow-xl hover:-translate-y-2 flex flex-col items-center text-center`}
+    >
+      <div
+        className={`absolute -bottom-10 -right-10 w-24 h-24 rounded-full ${item.bgColor} opacity-0 group-hover:opacity-100 transition-all duration-500 scale-150`}
+      />
+      <div
+        className={`relative z-10 p-4 rounded-2xl ${item.bgColor} ${item.color.split(" ")[1]} mb-6 transition-transform duration-500 group-hover:scale-110 group-hover:rotate-3`}
+      >
+        {item.icon}
+      </div>
+      <h3 className="relative z-10 text-xl font-bold text-slate-800 mb-3">{item.title}</h3>
+      <p className="relative z-10 text-sm text-slate-500 leading-relaxed mb-6">
+        {item.description}
+      </p>
+      <div
+        className={`relative z-10 flex items-center gap-1 font-bold text-xs uppercase tracking-widest ${item.color.split(" ")[1]}`}
+      >
+        Gestionar <ChevronRight className="w-3 h-3" />
+      </div>
+    </div>
+  );
+}
+
 const AdminPage = () => {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<string | null>(null);
@@ -100,114 +193,6 @@ const AdminPage = () => {
     }
     // Las tarjetas de registro (aspirante, RegistroConquis, unidades, consejero, especialidades, calificaciones, calendario) solo deben aparecer en /admin/registros
   ]);
-  // dnd-kit sortable item
-  function SortableMenuCard({ item, index }: { item: any, index: number }) {
-    const {
-      attributes,
-      listeners,
-      setNodeRef,
-      transform,
-      transition,
-      isDragging
-    } = useSortable({ id: item.id });
-
-    const style = {
-      transform: CSS.Transform.toString(transform),
-      transition,
-      opacity: isDragging ? 0.5 : 1
-    };
-
-    // Solución: solo navegar si no se está arrastrando
-    let dragStarted = false;
-    if (item.id === 'registros') {
-      return (
-        <div
-          ref={setNodeRef}
-          style={style}
-          {...attributes}
-          {...listeners}
-          key={item.id}
-          onPointerDown={() => { dragStarted = false; }}
-          onPointerMove={() => { dragStarted = true; }}
-          onPointerUp={() => {
-            if (!dragStarted) {
-              router.push('/admin/registros');
-            }
-          }}
-          className={`group relative bg-white p-8 rounded-3xl border-2 ${item.color.split(' ')[0]} transition-all duration-500 cursor-pointer overflow-hidden shadow-sm hover:shadow-xl hover:-translate-y-2 flex flex-col items-center text-center`}
-        >
-          <div className={`absolute -bottom-10 -right-10 w-24 h-24 rounded-full ${item.bgColor} opacity-0 group-hover:opacity-100 transition-all duration-500 scale-150`}></div>
-          <div className={`relative z-10 p-4 rounded-2xl ${item.bgColor} ${item.color.split(' ')[1]} mb-6 transition-transform duration-500 group-hover:scale-110 group-hover:rotate-3`}>
-            {item.icon}
-          </div>
-          <h3 className="relative z-10 text-xl font-bold text-slate-800 mb-3">
-            {item.title}
-          </h3>
-          <p className="relative z-10 text-sm text-slate-500 leading-relaxed mb-6">
-            {item.description}
-          </p>
-          <div className={`relative z-10 flex items-center gap-1 font-bold text-xs uppercase tracking-widest ${item.color.split(' ')[1]}`}>
-            Gestionar <ChevronRight className="w-3 h-3" />
-          </div>
-        </div>
-      );
-    }
-    // ...existing code...
-    return (
-      <div
-        ref={setNodeRef}
-        style={style}
-        {...attributes}
-        {...listeners}
-        key={item.id}
-        onPointerDown={() => { dragStarted = false; }}
-        onPointerMove={() => { dragStarted = true; }}
-        onPointerUp={() => {
-          if (!dragStarted) {
-            if (item.id === 'frases') {
-              router.push('/admin/frases');
-            } else if (item.id === 'RegistroConquis') {
-              router.push('/admin/RegistroConquis');
-            } else if (item.id === 'unidades') {
-              router.push('/admin/unidades');
-            } else if (item.id === 'consejero') {
-              router.push('/admin/consejero');
-            } else if (item.id === 'especialidades') {
-              router.push('/admin/especialidades');
-            } else if (item.id === 'calificaciones') {
-              router.push('/admin/calificaciones');
-            } else if (item.id === 'calendario') {
-              router.push('/admin/calendario');
-            } else if (item.id === 'aspirante') {
-              router.push('/admin/aspirante');
-            } else if (item.id === 'directiva') {
-              router.push('/admin/directiva');
-            } else if (item.id === 'rankin') {
-              router.push('/admin/rankin');
-            } else {
-              setActiveTab(item.id);
-            }
-          }
-        }}
-        className={`group relative bg-white p-8 rounded-3xl border-2 ${item.color.split(' ')[0]} transition-all duration-500 cursor-pointer overflow-hidden shadow-sm hover:shadow-xl hover:-translate-y-2 flex flex-col items-center text-center`}
-      >
-        {/* Círculo de fondo que crece en hover */}
-        <div className={`absolute -bottom-10 -right-10 w-24 h-24 rounded-full ${item.bgColor} opacity-0 group-hover:opacity-100 transition-all duration-500 scale-150`}></div>
-        <div className={`relative z-10 p-4 rounded-2xl ${item.bgColor} ${item.color.split(' ')[1]} mb-6 transition-transform duration-500 group-hover:scale-110 group-hover:rotate-3`}>
-          {item.icon}
-        </div>
-        <h3 className="relative z-10 text-xl font-bold text-slate-800 mb-3">
-          {item.title}
-        </h3>
-        <p className="relative z-10 text-sm text-slate-500 leading-relaxed mb-6">
-          {item.description}
-        </p>
-        <div className={`relative z-10 flex items-center gap-1 font-bold text-xs uppercase tracking-widest ${item.color.split(' ')[1]}`}>
-          Gestionar <ChevronRight className="w-3 h-3" />
-        </div>
-      </div>
-    );
-  }
 
           const handleLogout = () => {
             router.push('/');
@@ -342,8 +327,12 @@ const AdminPage = () => {
                     strategy={verticalListSortingStrategy}
                   >
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-                      {menuItems.map((item, idx) => (
-                        <SortableMenuCard key={item.id} item={item} index={idx} />
+                      {menuItems.map((item) => (
+                        <SortableMenuCard
+                          key={item.id}
+                          item={item}
+                          onSelectTab={setActiveTab}
+                        />
                       ))}
                     </div>
                   </SortableContext>
