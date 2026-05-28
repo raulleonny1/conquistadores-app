@@ -17,9 +17,9 @@ import {
   CARGO_ASPIRANTE,
   nombreCompletoAspirante,
 } from "@/src/constants/aspirante";
-import { buildWhatsappUrl } from "@/src/utils/whatsapp";
+import { buildWhatsappUrl, mensajePinAspirante } from "@/src/utils/whatsapp";
 import FichaMedicaUpload from "@/src/components/forms/FichaMedicaUpload";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, MessageCircle } from "lucide-react";
 import { toast } from "react-hot-toast";
 
 type AspiranteDoc = {
@@ -33,6 +33,7 @@ type AspiranteDoc = {
   cargo: string;
   pin: string;
   telefono?: string;
+  whatsapp?: string;
   fichaMedicaUrl?: string;
   fichaMedicaNombre?: string;
   fichaMedicaTipo?: string;
@@ -47,7 +48,12 @@ const formInicial = {
   genero: "",
   asociacion: ASOCIACIONES_MISION[0] as string,
   cargo: CARGO_ASPIRANTE,
+  telefono: "",
 };
+
+function numeroWhatsappAspirante(a: Pick<AspiranteDoc, "telefono" | "whatsapp">): string {
+  return (a.whatsapp || a.telefono || "").trim();
+}
 
 export default function AspirantePage() {
   const [form, setForm] = useState(formInicial);
@@ -127,6 +133,8 @@ export default function AspirantePage() {
     try {
       const docId = editId ?? generarPin();
 
+      const telefono = form.telefono.trim();
+
       const payload: Record<string, string> = {
         nombre: form.nombre.trim(),
         apellido: form.apellido.trim(),
@@ -135,6 +143,8 @@ export default function AspirantePage() {
         genero: form.genero,
         asociacion: form.asociacion,
         cargo: CARGO_ASPIRANTE,
+        telefono,
+        whatsapp: telefono,
       };
 
       if (fichaArchivo) {
@@ -189,12 +199,43 @@ export default function AspirantePage() {
       genero: a.genero || (a as { sexo?: string }).sexo || "",
       asociacion: a.asociacion || ASOCIACIONES_MISION[0],
       cargo: CARGO_ASPIRANTE,
+      telefono: numeroWhatsappAspirante(a),
     });
     setFichaMedicaUrl(a.fichaMedicaUrl || "");
     setFichaMedicaNombre(a.fichaMedicaNombre || "");
     setFichaArchivo(null);
     setEditId(a.id);
     window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const whatsappUrlFromForm = () => {
+    const pin = editId ?? "";
+    if (!form.telefono.trim() || !pin) return "";
+    return buildWhatsappUrl(
+      form.telefono,
+      mensajePinAspirante({
+        nombre: form.nombre,
+        apellido: form.apellido,
+        pin,
+        asociacion: form.asociacion,
+        cargo: form.cargo,
+      })
+    );
+  };
+
+  const whatsappUrlFromAspirante = (a: AspiranteDoc) => {
+    const numero = numeroWhatsappAspirante(a);
+    if (!numero || !a.pin) return "";
+    return buildWhatsappUrl(
+      numero,
+      mensajePinAspirante({
+        nombre: a.nombre,
+        apellido: a.apellido,
+        pin: a.pin,
+        asociacion: a.asociacion,
+        cargo: a.cargo,
+      })
+    );
   };
 
   const handleDelete = async (id: string) => {
@@ -336,6 +377,25 @@ export default function AspirantePage() {
             </div>
 
             <div className="flex flex-col gap-1 md:col-span-2">
+              <label htmlFor="telefono" className="text-sm font-semibold text-slate-700">
+                WhatsApp
+              </label>
+              <input
+                id="telefono"
+                name="telefono"
+                type="tel"
+                value={form.telefono}
+                onChange={handleChange}
+                placeholder="WhatsApp (ej. 0991234567 o +593991234567)"
+                className="border border-slate-200 p-2 rounded-xl"
+              />
+              <p className="text-xs text-slate-500">
+                Opcional al registrar; puedes agregarlo después en Editar para enviar el PIN y datos
+                del aspirante.
+              </p>
+            </div>
+
+            <div className="flex flex-col gap-1 md:col-span-2">
               <label htmlFor="asociacion" className="text-sm font-semibold text-slate-700">
                 Asociación / Misión
               </label>
@@ -364,7 +424,7 @@ export default function AspirantePage() {
               opcional
             />
 
-            <div className="md:col-span-2 flex flex-wrap gap-2">
+            <div className="md:col-span-2 flex flex-wrap gap-2 items-center">
               <button
                 type="submit"
                 disabled={loading}
@@ -372,6 +432,17 @@ export default function AspirantePage() {
               >
                 {loading ? "Guardando..." : editId ? "Actualizar Aspirante" : "Guardar Aspirante"}
               </button>
+              {editId && whatsappUrlFromForm() && (
+                <a
+                  href={whatsappUrlFromForm()}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 bg-green-600 text-white px-5 py-2 rounded-xl font-bold hover:bg-green-800 transition-all"
+                >
+                  <MessageCircle className="w-4 h-4" />
+                  Enviar información por WhatsApp
+                </a>
+              )}
               {editId && (
                 <button
                   type="button"
@@ -392,12 +463,8 @@ export default function AspirantePage() {
               <ul className="space-y-3">
                 {aspirantes.map((a) => {
                   const nombre = nombreCompletoAspirante(a);
-                  const waUrl =
-                    a.telefono &&
-                    buildWhatsappUrl(
-                      a.telefono,
-                      `Hola ${nombre}, tu PIN de acceso es ${a.pin}.`
-                    );
+                  const numero = numeroWhatsappAspirante(a);
+                  const waUrl = whatsappUrlFromAspirante(a);
                   return (
                     <li
                       key={a.id}
@@ -408,6 +475,14 @@ export default function AspirantePage() {
                         <div className="mt-1 text-xs text-slate-500 space-y-0.5">
                           <p>Edad: {a.edad || "—"} · Género: {a.genero || "—"}</p>
                           <p>Asociación: {a.asociacion || "—"} · Cargo: {a.cargo || CARGO_ASPIRANTE}</p>
+                          <p>
+                            WhatsApp:{" "}
+                            {numero ? (
+                              <span className="text-slate-700">{numero}</span>
+                            ) : (
+                              <span className="text-amber-700">Sin número — usa Editar para agregarlo</span>
+                            )}
+                          </p>
                           {a.fichaMedicaUrl && (
                             <p>
                               <a
@@ -426,15 +501,25 @@ export default function AspirantePage() {
                         <span className="bg-indigo-100 text-indigo-800 px-3 py-1 rounded-lg font-mono text-sm">
                           PIN: {a.pin}
                         </span>
-                        {waUrl && (
+                        {waUrl ? (
                           <a
                             href={waUrl}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="bg-green-600 text-white px-4 py-2 rounded-xl text-sm font-bold hover:bg-green-800"
+                            className="inline-flex items-center gap-1 bg-green-600 text-white px-4 py-2 rounded-xl text-sm font-bold hover:bg-green-800"
                           >
-                            Enviar PIN por WhatsApp
+                            <MessageCircle className="w-4 h-4" />
+                            Enviar por WhatsApp
                           </a>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => handleEdit(a)}
+                            className="bg-slate-200 text-slate-700 px-4 py-2 rounded-xl text-sm font-semibold hover:bg-slate-300"
+                            title="Edita el registro y agrega WhatsApp"
+                          >
+                            Agregar WhatsApp
+                          </button>
                         )}
                         <button
                           type="button"

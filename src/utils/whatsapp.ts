@@ -35,3 +35,20 @@ export function mensajePinConquistador(data: {
   if (data.clase) lineas.push(`Clase: ${data.clase}.`);
   return lineas.join(" ");
 }
+
+export function mensajePinAspirante(data: {
+  nombre: string;
+  apellido?: string;
+  pin: string;
+  asociacion?: string;
+  cargo?: string;
+}): string {
+  const nombreCompleto = [data.nombre, data.apellido].filter(Boolean).join(" ").trim();
+  const lineas = [
+    `Hola ${nombreCompleto}, tu PIN de acceso como aspirante a Guía Mayor es ${data.pin}.`,
+  ];
+  if (data.asociacion) lineas.push(`Asociación / Misión: ${data.asociacion}.`);
+  if (data.cargo) lineas.push(`Cargo: ${data.cargo}.`);
+  lineas.push("Guarda este PIN para ingresar a la app del club.");
+  return lineas.join(" ");
+}

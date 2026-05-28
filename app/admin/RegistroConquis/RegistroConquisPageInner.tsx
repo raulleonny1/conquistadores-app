@@ -26,6 +26,10 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { buildWhatsappUrl, mensajePinConquistador } from "@/src/utils/whatsapp";
+import {
+  canonicalizarUnidad,
+  consejeroAsesoraUnidad,
+} from "@/src/lib/unidades";
 import { MessageCircle } from "lucide-react";
 
 type EspecialidadObj = {
@@ -162,13 +166,40 @@ export default function RegistroConquisPageInner({ unidades: initialUnidades, co
     return () => unsub();
   }, []);
 
+  const catalogoUnidades = useMemo(
+    () => unidades.map((u) => u.nombre).filter(Boolean),
+    [unidades]
+  );
+
+  /** Consejeros de Firebase con unidades alineadas al catálogo oficial (`unidades`). */
+  const consejerosDesdeRegistro = useMemo(
+    () =>
+      consejeros.map((c) => ({
+        ...c,
+        unidades: (c.unidades ?? []).map((u) =>
+          canonicalizarUnidad(u, catalogoUnidades)
+        ),
+      })),
+    [consejeros, catalogoUnidades]
+  );
+
   const consejerosDisponibles = useMemo(() => {
-    if (!form.unidad) return consejeros;
-    const paraUnidad = consejeros.filter(
-      (c) => Array.isArray(c.unidades) && c.unidades.includes(form.unidad)
+    if (!form.unidad) return consejerosDesdeRegistro;
+    const paraUnidad = consejerosDesdeRegistro.filter((c) =>
+      consejeroAsesoraUnidad(c.unidades, form.unidad)
     );
-    return paraUnidad.length > 0 ? paraUnidad : consejeros;
-  }, [consejeros, form.unidad]);
+    return paraUnidad.length > 0 ? paraUnidad : consejerosDesdeRegistro;
+  }, [consejerosDesdeRegistro, form.unidad]);
+
+  const hayConsejeroParaUnidad = useMemo(
+    () =>
+      form.unidad
+        ? consejerosDesdeRegistro.some((c) =>
+            consejeroAsesoraUnidad(c.unidades, form.unidad)
+          )
+        : true,
+    [consejerosDesdeRegistro, form.unidad]
+  );
 
   const filteredConquis = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -189,8 +220,8 @@ export default function RegistroConquisPageInner({ unidades: initialUnidades, co
   const handleInput = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     if (name === "unidad") {
-      const paraUnidad = consejeros.filter(
-        (c) => Array.isArray(c.unidades) && c.unidades.includes(value)
+      const paraUnidad = consejerosDesdeRegistro.filter((c) =>
+        consejeroAsesoraUnidad(c.unidades, value)
       );
       let consejero = form.consejero;
       if (paraUnidad.length === 1) {
@@ -443,15 +474,14 @@ export default function RegistroConquisPageInner({ unidades: initialUnidades, co
               </option>
             ))}
           </select>
-          {consejeros.length === 0 ? (
+          {consejerosDesdeRegistro.length === 0 ? (
             <p className="text-xs text-amber-700">
               No hay consejeros registrados.{" "}
               <Link href="/admin/consejero" className="font-semibold underline">
                 Registrar consejero
               </Link>
             </p>
-          ) : form.unidad &&
-            !consejeros.some((c) => c.unidades.includes(form.unidad)) ? (
+          ) : form.unidad && !hayConsejeroParaUnidad ? (
             <p className="text-xs text-amber-700">
               Ningún consejero asesora «{form.unidad}». Asigna unidades en{" "}
               <Link href="/admin/consejero" className="font-semibold underline">
