@@ -27,6 +27,7 @@ import { useRouter } from 'next/navigation';
 
 import { collection, getDocs, updateDoc, doc } from 'firebase/firestore';
 import { db } from '../../src/firebase';
+import CumpleanosProximos from '@/src/components/admin/CumpleanosProximos';
 
 type MenuItem = {
   id: string;
@@ -309,6 +310,8 @@ const AdminPage = () => {
                     Acceso exclusivo para directiva y secretaría.
                   </p>
                 </div>
+
+                <CumpleanosProximos />
 
                 {/* Rejilla de Menú */}
                 <DndContext

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { getDocs, doc, updateDoc, deleteDoc, addDoc, collection, onSnapshot } from "firebase/firestore";
 import { db } from "@/src/firebase";
 import { especialidadesBase } from "@/src/data/especialidades";
@@ -91,6 +91,7 @@ export default function RegistroConquisPageInner({ unidades: initialUnidades, co
   const [unidades, setUnidades] = useState<Unidad[]>(initialUnidades ?? []);
   const [consejeros, setConsejeros] = useState<Consejero[]>(initialConsejeros ?? []);
   const [editId, setEditId] = useState<string | null>(null);
+  const editarDesdeUrlAplicado = useRef(false);
   const clasesOficiales = [
     "Amigo",
     "Compañero",
@@ -310,7 +311,26 @@ export default function RegistroConquisPageInner({ unidades: initialUnidades, co
       pin: miembro.pin || ""
     });
     setEditMode(true);
+    setTimeout(() => {
+      document.getElementById("campo-nacimiento")?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 300);
   };
+
+  useEffect(() => {
+    if (editarDesdeUrlAplicado.current || loading || conquis.length === 0) return;
+    const id =
+      typeof window !== "undefined"
+        ? new URLSearchParams(window.location.search).get("editar")
+        : null;
+    if (!id) return;
+    const m = conquis.find((c) => c.id === id);
+    if (m) {
+      editarDesdeUrlAplicado.current = true;
+      iniciarEdicion(m);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  }, [loading, conquis]);
+
   const cancelarEdicion = () => {
     setEditId(null);
     setForm({
@@ -403,9 +423,9 @@ export default function RegistroConquisPageInner({ unidades: initialUnidades, co
         </div>
 
         <div className="flex flex-col gap-1">
-          <label htmlFor="fechaNacimiento" className="text-sm font-semibold text-slate-700">Fecha de nacimiento</label>
+          <label htmlFor="campo-nacimiento" className="text-sm font-semibold text-slate-700">Fecha de nacimiento</label>
           <input
-            id="fechaNacimiento"
+            id="campo-nacimiento"
             type="date"
             name="fechaNacimiento"
             value={form.fechaNacimiento}

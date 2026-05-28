@@ -40,12 +40,22 @@ const clasesOficiales = [
 ];
 
 export default function ConsejeroPage({ initialUnidadesRegistradas }: ConsejeroPageClientProps) {
+  const [editarDocIdDesdeUrl, setEditarDocIdDesdeUrl] = useState<string | null>(null);
+  const [editarAsociadoDesdeUrl, setEditarAsociadoDesdeUrl] = useState(false);
   const [form, setForm] = useState({
     nombre: '',
+    nacimiento: '',
     unidades: [] as string[],
     consejeroAsociado: '',
+    asociadoNacimiento: '',
   });
   const [unidadesRegistradas, setUnidadesRegistradas] = useState<string[]>(initialUnidadesRegistradas ?? []);
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    setEditarDocIdDesdeUrl(params.get("editar"));
+    setEditarAsociadoDesdeUrl(params.get("asociado") === "1");
+  }, []);
+
   useEffect(() => {
     if (initialUnidadesRegistradas) return;
     import('firebase/firestore').then(({ getDocs, collection }) => {
@@ -78,12 +88,14 @@ export default function ConsejeroPage({ initialUnidadesRegistradas }: ConsejeroP
       const pin = await generarPinConsejeroUnico();
       await addDoc(collection(db, 'consejeros'), {
         nombre: form.nombre.trim(),
+        nacimiento: form.nacimiento.trim(),
         unidades: form.unidades,
         consejeroAsociado: form.consejeroAsociado.trim(),
+        asociadoNacimiento: form.asociadoNacimiento.trim(),
         pin,
       });
       toast.success(`Consejero registrado. PIN de acceso: ${pin}`);
-      setForm({ nombre: '', unidades: [], consejeroAsociado: '' });
+      setForm({ nombre: '', nacimiento: '', unidades: [], consejeroAsociado: '', asociadoNacimiento: '' });
       setRefresh(r => r + 1);
     } catch (error) {
       handleError(error, 'Error al registrar en Firebase');
@@ -109,11 +121,29 @@ export default function ConsejeroPage({ initialUnidadesRegistradas }: ConsejeroP
           required
         />
         <input
+          id="campo-nacimiento"
+          name="nacimiento"
+          type="date"
+          value={form.nacimiento}
+          onChange={handleChange}
+          className="w-full p-2 rounded border"
+          title="Fecha de nacimiento del consejero"
+        />
+        <input
           name="consejeroAsociado"
           value={form.consejeroAsociado}
           onChange={handleChange}
           placeholder="Consejero asociado"
           className="w-full p-2 rounded border"
+        />
+        <input
+          id="campo-nacimiento-asociado"
+          name="asociadoNacimiento"
+          type="date"
+          value={form.asociadoNacimiento}
+          onChange={handleChange}
+          className="w-full p-2 rounded border"
+          title="Fecha de nacimiento del consejero asociado"
         />
         <div className="mb-4">
           <label className="block font-semibold mb-2 text-green-700">Unidades que puede asesorar:</label>
@@ -141,18 +171,48 @@ export default function ConsejeroPage({ initialUnidadesRegistradas }: ConsejeroP
 
       <div className="mt-8 w-full">
         <h3 className="text-xl font-bold text-green-700 mb-4">Consejeros Registrados</h3>
-        <ConsejerosList refresh={refresh} unidadesRegistradas={unidadesRegistradas} />
+        <ConsejerosList
+          refresh={refresh}
+          unidadesRegistradas={unidadesRegistradas}
+          editarDocIdDesdeUrl={editarDocIdDesdeUrl}
+          editarAsociadoDesdeUrl={editarAsociadoDesdeUrl}
+        />
       </div>
     </div>
   );
 }
 
-type Consejero = { id?: string; nombre: string; unidades: string[]; consejeroAsociado?: string; pin?: string };
+type Consejero = {
+  id?: string;
+  nombre: string;
+  nacimiento?: string;
+  unidades: string[];
+  consejeroAsociado?: string;
+  asociadoNacimiento?: string;
+  pin?: string;
+};
 
-function ConsejerosList({ refresh, unidadesRegistradas }: { refresh: number; unidadesRegistradas: string[] }) {
+function ConsejerosList({
+  refresh,
+  unidadesRegistradas,
+  editarDocIdDesdeUrl,
+  editarAsociadoDesdeUrl,
+}: {
+  refresh: number;
+  unidadesRegistradas: string[];
+  editarDocIdDesdeUrl?: string | null;
+  editarAsociadoDesdeUrl?: boolean;
+}) {
   const [consejeros, setConsejeros] = useState<Consejero[]>([]);
   const [editId, setEditId] = useState<string | null>(null);
-  const [editForm, setEditForm] = useState<{ nombre: string; unidades: string[]; consejeroAsociado: string }>({ nombre: '', unidades: [], consejeroAsociado: '' });
+  const editarDesdeUrlAplicado = React.useRef(false);
+  const [editForm, setEditForm] = useState<{
+    nombre: string;
+    nacimiento: string;
+    unidades: string[];
+    consejeroAsociado: string;
+    asociadoNacimiento: string;
+  }>({ nombre: '', nacimiento: '', unidades: [], consejeroAsociado: '', asociadoNacimiento: '' });
 
   useEffect(() => {
     const fetchConsejeros = async () => {
@@ -201,8 +261,31 @@ function ConsejerosList({ refresh, unidadesRegistradas }: { refresh: number; uni
 
   const handleEdit = (c: Consejero) => {
     setEditId(c.id || null);
-    setEditForm({ nombre: c.nombre, unidades: c.unidades, consejeroAsociado: c.consejeroAsociado || '' });
+    setEditForm({
+      nombre: c.nombre,
+      nacimiento: c.nacimiento || '',
+      unidades: c.unidades,
+      consejeroAsociado: c.consejeroAsociado || '',
+      asociadoNacimiento: c.asociadoNacimiento || '',
+    });
+    setTimeout(() => {
+      document.getElementById("campo-nacimiento")?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 200);
   };
+
+  useEffect(() => {
+    if (editarDesdeUrlAplicado.current || !editarDocIdDesdeUrl || consejeros.length === 0) return;
+    const c = consejeros.find((x) => x.id === editarDocIdDesdeUrl);
+    if (c) {
+      editarDesdeUrlAplicado.current = true;
+      handleEdit(c);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      setTimeout(() => {
+        const campoId = editarAsociadoDesdeUrl ? "campo-nacimiento-asociado" : "campo-nacimiento";
+        document.getElementById(campoId)?.scrollIntoView({ behavior: "smooth", block: "center" });
+      }, 400);
+    }
+  }, [editarDocIdDesdeUrl, editarAsociadoDesdeUrl, consejeros]);
 
   const handleEditChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setEditForm({ ...editForm, [e.target.name]: e.target.value });
@@ -226,11 +309,19 @@ function ConsejerosList({ refresh, unidadesRegistradas }: { refresh: number; uni
     try {
       await updateDoc(doc(db, 'consejeros', editId), {
         nombre: editForm.nombre.trim(),
+        nacimiento: editForm.nacimiento.trim(),
         unidades: editForm.unidades,
         consejeroAsociado: editForm.consejeroAsociado.trim(),
+        asociadoNacimiento: editForm.asociadoNacimiento.trim(),
       });
       setEditId(null);
-      setEditForm({ nombre: '', unidades: [], consejeroAsociado: '' });
+      setEditForm({
+        nombre: '',
+        nacimiento: '',
+        unidades: [],
+        consejeroAsociado: '',
+        asociadoNacimiento: '',
+      });
       setConsejeros(
         consejeros.map((c) =>
           c.id === editId ? { ...c, ...editForm, pin: c.pin } : c
@@ -258,11 +349,28 @@ function ConsejerosList({ refresh, unidadesRegistradas }: { refresh: number; uni
                 required
               />
               <input
+                id="campo-nacimiento"
+                name="nacimiento"
+                type="date"
+                value={editForm.nacimiento}
+                onChange={handleEditChange}
+                className="w-full p-2 rounded border"
+              />
+              <input
                 name="consejeroAsociado"
                 value={editForm.consejeroAsociado}
                 onChange={handleEditChange}
                 placeholder="Consejero asociado"
                 className="w-full p-2 rounded border"
+              />
+              <input
+                id="campo-nacimiento-asociado"
+                name="asociadoNacimiento"
+                type="date"
+                value={editForm.asociadoNacimiento}
+                onChange={handleEditChange}
+                className="w-full p-2 rounded border"
+                title="Nacimiento del asociado"
               />
               <div>
                 <label className="block font-semibold mb-2 text-green-700">Unidades:</label>

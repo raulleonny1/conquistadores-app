@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { db } from "../../../src/firebase";
 import { formatFechaDDMMYYYY } from "@/src/utils/formatoFecha";
 import { collection, addDoc, onSnapshot, deleteDoc, doc, updateDoc } from "firebase/firestore";
@@ -32,12 +32,14 @@ export default function DirectivaPage() {
   const [form, setForm] = useState({
     nombre: "",
     edad: "",
+    nacimiento: "",
     cargo: cargos[0],
     whatsapp: ""
   });
   const [editId, setEditId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [directiva, setDirectiva] = useState<any[]>([]);
+  const editarDesdeUrlAplicado = useRef(false);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -73,22 +75,41 @@ export default function DirectivaPage() {
         });
         alert("Directiva registrada correctamente. PIN: " + pin);
       }
-      setForm({ nombre: "", edad: "", cargo: cargos[0], whatsapp: "" });
+      setForm({ nombre: "", edad: "", nacimiento: "", cargo: cargos[0], whatsapp: "" });
     } catch (err) {
       alert("Error al guardar directiva.");
     }
     setLoading(false);
   };
 
-  const handleEdit = (d: any) => {
+  const handleEdit = (d: { id: string; nombre: string; edad: string; nacimiento?: string; cargo: string; whatsapp: string }) => {
     setForm({
       nombre: d.nombre,
       edad: d.edad,
+      nacimiento: d.nacimiento || "",
       cargo: d.cargo,
       whatsapp: d.whatsapp
     });
     setEditId(d.id);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    setTimeout(() => {
+      document.getElementById("campo-nacimiento")?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 300);
   };
+
+  useEffect(() => {
+    if (editarDesdeUrlAplicado.current || directiva.length === 0) return;
+    const id =
+      typeof window !== "undefined"
+        ? new URLSearchParams(window.location.search).get("editar")
+        : null;
+    if (!id) return;
+    const d = directiva.find((x) => x.id === id);
+    if (d) {
+      editarDesdeUrlAplicado.current = true;
+      handleEdit(d);
+    }
+  }, [directiva]);
 
   const handleDelete = async (id: string) => {
     if (!window.confirm("¿Eliminar este miembro de la directiva?")) return;
@@ -119,6 +140,15 @@ export default function DirectivaPage() {
           onChange={handleChange}
           className="border p-2 w-full"
           type="number"
+        />
+        <input
+          id="campo-nacimiento"
+          name="nacimiento"
+          type="date"
+          value={form.nacimiento}
+          onChange={handleChange}
+          className="border p-2 w-full"
+          aria-label="Fecha de nacimiento"
         />
         <select
           name="cargo"
@@ -154,7 +184,10 @@ export default function DirectivaPage() {
             <li key={d.id} className="bg-fuchsia-50 rounded-xl p-4 flex flex-col md:flex-row md:items-center gap-4 border border-fuchsia-200">
               <div className="flex-1">
                 <span className="font-bold text-fuchsia-800">{d.nombre}</span> <span className="text-slate-500">({d.cargo})</span><br />
-                <span className="text-xs text-slate-400">Edad: {d.edad}</span>
+                <span className="text-xs text-slate-400">
+                  Edad: {d.edad}
+                  {d.nacimiento ? ` · Nac.: ${formatFechaDDMMYYYY(d.nacimiento)}` : ""}
+                </span>
               </div>
               <div className="flex flex-col md:flex-row md:items-center gap-2">
                 <span className="bg-fuchsia-100 text-fuchsia-800 px-3 py-1 rounded-lg font-mono">PIN: {d.pin}</span>

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { db, formatFechaDDMMYYYY } from "@/src/firebase";
 import {
   collection,
@@ -63,6 +63,7 @@ export default function AspirantePage() {
   const [editId, setEditId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [aspirantes, setAspirantes] = useState<AspiranteDoc[]>([]);
+  const editarDesdeUrlAplicado = useRef(false);
 
   const generarPin = () => Math.floor(1000 + Math.random() * 9000).toString();
 
@@ -206,7 +207,24 @@ export default function AspirantePage() {
     setFichaArchivo(null);
     setEditId(a.id);
     window.scrollTo({ top: 0, behavior: "smooth" });
+    setTimeout(() => {
+      document.getElementById("campo-nacimiento")?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 300);
   };
+
+  useEffect(() => {
+    if (editarDesdeUrlAplicado.current || aspirantes.length === 0) return;
+    const id =
+      typeof window !== "undefined"
+        ? new URLSearchParams(window.location.search).get("editar")
+        : null;
+    if (!id) return;
+    const a = aspirantes.find((x) => x.id === id);
+    if (a) {
+      editarDesdeUrlAplicado.current = true;
+      handleEdit(a);
+    }
+  }, [aspirantes]);
 
   const whatsappUrlFromForm = () => {
     const pin = editId ?? "";
@@ -319,7 +337,7 @@ export default function AspirantePage() {
                 Fecha de nacimiento
               </label>
               <input
-                id="nacimiento"
+                id="campo-nacimiento"
                 name="nacimiento"
                 type="date"
                 value={form.nacimiento}
