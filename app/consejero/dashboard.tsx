@@ -7,6 +7,7 @@ import {
   pinCalificacionesAsociado,
   pinCalificacionesConsejero,
 } from "@/src/lib/actividadesCalificacion";
+import { consejeroPuedeCalificar } from "@/src/lib/consejeroPermisos";
 import { getCategoriasConPuntos, sumarPuntos } from "@/src/lib/categoriasPuntos";
 import RetoEspecialConsejeroPanel from "@/src/components/RetoEspecialConsejeroPanel";
 import ActividadesConsejeroCard from "@/src/components/ActividadesConsejeroCard";
@@ -42,6 +43,13 @@ export default function ConsejeroDashboard({ consejeroId }: { consejeroId: strin
   >([]);
   const [totalPuntosAsociado, setTotalPuntosAsociado] = useState(0);
   const [nombreAsociado, setNombreAsociado] = useState("");
+  const [puedeCalificar, setPuedeCalificar] = useState(false);
+
+  useEffect(() => {
+    if (consejeroId) {
+      localStorage.setItem("consejeroId", consejeroId);
+    }
+  }, [consejeroId]);
 
   useEffect(() => {
     let isMounted = true;
@@ -59,6 +67,7 @@ export default function ConsejeroDashboard({ consejeroId }: { consejeroId: strin
         consejeroAsociado: asociadoNombre || undefined,
       });
       setNombreAsociado(asociadoNombre);
+      setPuedeCalificar(consejeroPuedeCalificar(cData));
       setPinCalificaciones(
         pinCalificacionesConsejero({
           id: consejeroId,
@@ -369,47 +378,65 @@ export default function ConsejeroDashboard({ consejeroId }: { consejeroId: strin
             </div>
           )}
 
-          <SectionCard
-            title="Calificaciones"
-            description="Califica el desempeno de tu unidad."
-            icon={<Award className="h-6 w-6" />}
-            items={Object.values(detallesMiembros)
-              .flat()
-              .map((miembro: any) => (
-                <div key={miembro.pin || miembro.id} className="flex items-center justify-between gap-2">
-                  <div>
-                    <div className="font-bold text-blue-700">{miembro.nombre}</div>
-                    <div className="text-xs text-slate-600">PIN: {miembro.pin}</div>
+          {puedeCalificar ? (
+            <SectionCard
+              title="Calificaciones"
+              description="Califica el desempeno de tu unidad."
+              icon={<Award className="h-6 w-6" />}
+              items={Object.values(detallesMiembros)
+                .flat()
+                .map((miembro: any) => (
+                  <div key={miembro.pin || miembro.id} className="flex items-center justify-between gap-2">
+                    <div>
+                      <div className="font-bold text-blue-700">{miembro.nombre}</div>
+                      <div className="text-xs text-slate-600">PIN: {miembro.pin}</div>
+                    </div>
+                    <button
+                      type="button"
+                      className="shrink-0 rounded-xl bg-blue-600 px-4 py-2 text-xs font-bold text-white hover:bg-blue-800"
+                      onClick={() =>
+                        (window.location.href = `/consejero/calificaciones?conquistador=${miembro.pin}`)
+                      }
+                    >
+                      Evaluar
+                    </button>
                   </div>
+                ))}
+              emptyMessage="No hay miembros para calificar."
+              color="blue"
+              extra={
+                <div className="mt-4 flex justify-center">
                   <button
                     type="button"
-                    className="shrink-0 rounded-xl bg-blue-600 px-4 py-2 text-xs font-bold text-white hover:bg-blue-800"
-                    onClick={() =>
-                      (window.location.href = `/consejero/calificaciones?conquistador=${miembro.pin}`)
-                    }
+                    className="rounded-xl bg-green-600 px-6 py-2 text-sm font-bold text-white hover:bg-green-800"
+                    onClick={() => {
+                      const unidad = unidades[0] || "";
+                      if (unidad) {
+                        window.location.href = `/consejero/calificaciones-grupo?unidad=${encodeURIComponent(unidad)}&consejeroId=${consejeroId}`;
+                      } else toast.error("No hay unidad para calificar en grupo.");
+                    }}
                   >
-                    Evaluar
+                    Calificar en grupo
                   </button>
                 </div>
-              ))}
-            emptyMessage="No hay miembros para calificar."
-            color="blue"
-            extra={
-              <div className="mt-4 flex justify-center">
-                <button
-                  type="button"
-                  className="rounded-xl bg-green-600 px-6 py-2 text-sm font-bold text-white hover:bg-green-800"
-                  onClick={() => {
-                    const unidad = unidades[0] || "";
-                    if (unidad) window.location.href = `/consejero/calificaciones-grupo?unidad=${unidad}`;
-                    else toast.error("No hay unidad para calificar en grupo.");
-                  }}
-                >
-                  Calificar en grupo
-                </button>
+              }
+            />
+          ) : (
+            <div className="group rounded-3xl border border-amber-200 bg-amber-50/90 p-6 shadow-xl">
+              <div className="mb-4 flex items-start gap-3">
+                <div className="rounded-2xl bg-amber-500 p-3 text-white shadow-lg">
+                  <Award className="h-6 w-6" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-amber-900">Calificaciones</h3>
+                  <p className="mt-1 text-sm text-amber-800/90">
+                    Solo el administrador asigna puntos. Si la directiva te autoriza, el admin activará tu
+                    permiso de calificar en tu registro de consejero.
+                  </p>
+                </div>
               </div>
-            }
-          />
+            </div>
+          )}
 
           <ActividadesConsejeroCard />
         </div>

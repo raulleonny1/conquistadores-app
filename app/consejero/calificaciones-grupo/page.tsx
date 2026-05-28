@@ -5,6 +5,8 @@ import { handleError } from "@/src/lib/errorHandler";
 import { db } from "../../../src/firebase";
 import { addDoc, collection, doc, getDoc, getDocs, setDoc, query, where } from "firebase/firestore";
 import { useSearchParams, usePathname } from "next/navigation";
+import { useConsejeroPuedeCalificar } from "@/src/hooks/useConsejeroPuedeCalificar";
+import ConsejeroSinPermisoCalificar from "@/src/components/consejero/ConsejeroSinPermisoCalificar";
 
 const CATEGORIAS_PUNTOS = [
   { id: "puntualidad", nombre: "Puntualidad" },
@@ -48,9 +50,12 @@ function CalificacionesGrupoPage() {
   const [puntos, setPuntos] = useState("");
   const [seleccionados, setSeleccionados] = useState<{ [pin: string]: boolean }>({});
   const [loading, setLoading] = useState(true);
+  const { puedeCalificar, loading: loadingPermiso } = useConsejeroPuedeCalificar(
+    consejeroIdState || null
+  );
 
   useEffect(() => {
-    if (!unidad) return;
+    if (!unidad || !puedeCalificar) return;
     const fetchMiembros = async () => {
       const q = query(collection(db, "RegistroConquis"), where("unidad", "==", unidad));
       const snap = await getDocs(q);
@@ -58,7 +63,7 @@ function CalificacionesGrupoPage() {
       setLoading(false);
     };
     fetchMiembros();
-  }, [unidad]);
+  }, [unidad, puedeCalificar]);
 
   const handleCheck = (pin: string, checked: boolean) => {
     setSeleccionados(prev => ({ ...prev, [pin]: checked }));
@@ -66,6 +71,10 @@ function CalificacionesGrupoPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!puedeCalificar) {
+      toast.error("No tienes permiso para calificar. Contacta al administrador.");
+      return;
+    }
     if (!categoria || !fecha || !puntos) {
       toast.error("Completa todos los campos");
       return;
@@ -125,6 +134,18 @@ function CalificacionesGrupoPage() {
       handleError(error, "Error al guardar calificaciones");
     }
   };
+
+  if (loadingPermiso) {
+    return <div className="text-center mt-10 text-lg text-blue-700">Cargando...</div>;
+  }
+
+  if (!puedeCalificar) {
+    return (
+      <div className="mx-auto max-w-3xl p-8">
+        <ConsejeroSinPermisoCalificar consejeroId={consejeroIdState || null} />
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-3xl mx-auto p-4">

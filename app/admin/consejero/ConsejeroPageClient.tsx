@@ -93,6 +93,7 @@ export default function ConsejeroPage({ initialUnidadesRegistradas }: ConsejeroP
         consejeroAsociado: form.consejeroAsociado.trim(),
         asociadoNacimiento: form.asociadoNacimiento.trim(),
         pin,
+        puedeCalificar: false,
       });
       toast.success(`Consejero registrado. PIN de acceso: ${pin}`);
       setForm({ nombre: '', nacimiento: '', unidades: [], consejeroAsociado: '', asociadoNacimiento: '' });
@@ -190,6 +191,7 @@ type Consejero = {
   consejeroAsociado?: string;
   asociadoNacimiento?: string;
   pin?: string;
+  puedeCalificar?: boolean;
 };
 
 function ConsejerosList({
@@ -303,6 +305,24 @@ function ConsejerosList({
     });
   };
 
+  const togglePuedeCalificar = async (c: Consejero) => {
+    if (!c.id) return;
+    const activar = c.puedeCalificar !== true;
+    try {
+      await updateDoc(doc(db, 'consejeros', c.id), { puedeCalificar: activar });
+      setConsejeros((prev) =>
+        prev.map((x) => (x.id === c.id ? { ...x, puedeCalificar: activar } : x))
+      );
+      toast.success(
+        activar
+          ? `${c.nombre} puede calificar conquistadores y aspirantes.`
+          : `Calificación desactivada para ${c.nombre}. Solo admin asigna puntos.`
+      );
+    } catch (error) {
+      handleError(error, 'No se pudo actualizar el permiso de calificar');
+    }
+  };
+
   const handleEditSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!editId) return;
@@ -400,6 +420,24 @@ function ConsejerosList({
               <div className="mt-2 text-green-800 text-sm">Consejero asociado: {c.consejeroAsociado || 'Sin asignar'}</div>
               <div className="mt-2 rounded-lg bg-green-100 px-2 py-1 text-sm font-mono font-bold text-green-900">
                 PIN: {c.pin || '…'}
+              </div>
+              <div className="mt-3 rounded-lg border border-blue-200 bg-blue-50/80 p-3">
+                <p className="mb-2 text-xs font-semibold text-blue-900">
+                  Permiso para calificar (puntos a conquistadores y aspirantes)
+                </p>
+                <button
+                  type="button"
+                  onClick={() => togglePuedeCalificar(c)}
+                  className={`w-full rounded-full px-4 py-2 text-sm font-bold shadow transition ${
+                    c.puedeCalificar === true
+                      ? 'bg-blue-700 text-white hover:bg-blue-800'
+                      : 'bg-white text-blue-800 ring-2 ring-blue-300 hover:bg-blue-100'
+                  }`}
+                >
+                  {c.puedeCalificar === true
+                    ? 'Calificar: ACTIVADO — clic para desactivar'
+                    : 'Calificar: desactivado — clic para autorizar'}
+                </button>
               </div>
               <div className="mt-2 flex flex-wrap gap-2">
                 <button onClick={() => handleEdit(c)} className="bg-yellow-500 text-white px-3 py-1 rounded-full font-semibold shadow hover:bg-yellow-700 transition">Editar</button>

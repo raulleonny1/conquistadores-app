@@ -4,12 +4,11 @@ import { db } from "../../../src/firebase";
 import { addDoc, collection, doc, getDoc, query, setDoc, where, getDocs } from "firebase/firestore";
 import { useSearchParams } from "next/navigation";
 import {
-  Trophy,
   Star,
   Award,
-  LogOut
 } from "lucide-react";
-// Eliminado RegistroSemanal
+import { useConsejeroPuedeCalificar } from "@/src/hooks/useConsejeroPuedeCalificar";
+import ConsejeroSinPermisoCalificar from "@/src/components/consejero/ConsejeroSinPermisoCalificar";
 
 const CATEGORIAS_PUNTOS = [
   { id: "puntualidad", nombre: "Puntualidad" },
@@ -36,6 +35,8 @@ export default function CalificacionesConsejeroPage() {
 function CalificacionesConsejeroPageInner() {
   const searchParams = useSearchParams();
   const pin = searchParams.get("conquistador") || "";
+  const [consejeroId, setConsejeroId] = useState<string | null>(null);
+  const { puedeCalificar, loading: loadingPermiso } = useConsejeroPuedeCalificar(consejeroId);
   const [puntos, setPuntos] = useState<any>({});
   const [nombre, setNombre] = useState("");
   const [loading, setLoading] = useState(true);
@@ -50,7 +51,13 @@ function CalificacionesConsejeroPageInner() {
   };
 
   useEffect(() => {
-    if (!pin) return;
+    const fromUrl = searchParams.get("consejeroId");
+    const stored = typeof window !== "undefined" ? localStorage.getItem("consejeroId") : null;
+    setConsejeroId(fromUrl || stored);
+  }, [searchParams]);
+
+  useEffect(() => {
+    if (!pin || !puedeCalificar) return;
 
     const fetchCalificaciones = async () => {
       setLoading(true);
@@ -86,7 +93,7 @@ function CalificacionesConsejeroPageInner() {
     };
 
     fetchCalificaciones();
-  }, [pin]);
+  }, [pin, puedeCalificar]);
 
   const total = Object.values(puntos).reduce((acc: number, val) => {
     if (typeof val === "number") return acc + val;
@@ -94,8 +101,16 @@ function CalificacionesConsejeroPageInner() {
     return acc;
   }, 0);
 
-  if (loading) {
+  if (loadingPermiso || (puedeCalificar && loading)) {
     return <div className="text-center mt-10 text-lg text-indigo-700">Cargando datos...</div>;
+  }
+
+  if (!puedeCalificar) {
+    return (
+      <div className="mx-auto max-w-4xl p-8">
+        <ConsejeroSinPermisoCalificar consejeroId={consejeroId} />
+      </div>
+    );
   }
 
   return (

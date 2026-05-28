@@ -74,6 +74,9 @@ export default function Home() {
           const consejeroDoc = snapshotConsejero.docs[0];
           setError('');
           logInfo('Login consejero exitoso: ' + consejeroDoc.id);
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('consejeroId', consejeroDoc.id);
+          }
           router.push(`/consejero/${consejeroDoc.id}`);
           return;
         }
