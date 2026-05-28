@@ -111,11 +111,20 @@ export default function Home() {
 
   return (
     <div className="min-h-screen relative flex items-center justify-center font-sans overflow-hidden bg-slate-900">
+      <video
+        autoPlay
+        loop
+        muted
+        playsInline
+        className="absolute inset-0 z-0 h-full w-full object-cover opacity-70"
+        aria-hidden
+      >
+        <source src="/fondo-login.mp4" type="video/mp4" />
+      </video>
       <div
-        className="absolute inset-0 z-0 bg-linear-to-br from-slate-900 via-indigo-950 to-slate-900"
+        className="absolute inset-0 z-0 bg-linear-to-b from-slate-900/40 via-indigo-900/60 to-slate-900/90"
         aria-hidden
       />
-      <div className="absolute inset-0 z-0 bg-linear-to-b from-slate-900/40 via-indigo-900/60 to-slate-900/90" />
       {/* Contenido principal */}
       <div className="relative z-10 w-full max-w-md px-6 py-8 flex flex-col items-center">
         {/* Logo y encabezado */}
