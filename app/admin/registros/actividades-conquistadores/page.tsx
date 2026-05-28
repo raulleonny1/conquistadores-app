@@ -24,6 +24,7 @@ import {
   type ConquistadorRegistro,
 } from "@/src/lib/actividadesCalificacion";
 import { toNumberPuntos } from "@/src/lib/categoriasPuntos";
+import { nombreGrupoCoincide } from "@/src/lib/unidades";
 
 type Modo = "individual" | "grupo";
 
@@ -63,8 +64,16 @@ export default function RegistroActividadesConquistadoresPage() {
   const [pendientes, setPendientes] = useState<PendienteItem[]>([]);
   const [guardando, setGuardando] = useState(false);
   const [totalesPin, setTotalesPin] = useState<Record<string, number>>({});
+  const [unidadesOficiales, setUnidadesOficiales] = useState<string[]>([]);
 
   useEffect(() => {
+    const unsubUnidades = onSnapshot(collection(db, "unidades"), (snap) => {
+      const nombres = snap.docs
+        .map((d) => (d.data() as { nombre?: string }).nombre?.trim() || "")
+        .filter(Boolean);
+      setUnidadesOficiales(nombres);
+    });
+
     const unsubConquis = onSnapshot(collection(db, "RegistroConquis"), (snap) => {
       const lista: ConquistadorRegistro[] = snap.docs
         .map((d) => {
@@ -117,6 +126,7 @@ export default function RegistroActividadesConquistadoresPage() {
     });
 
     return () => {
+      unsubUnidades();
       unsubConquis();
       unsubCatalogo();
       unsubTotales();
@@ -147,9 +157,13 @@ export default function RegistroActividadesConquistadoresPage() {
   }, [conquistadores, busqueda]);
 
   const unidades = useMemo(() => {
-    const set = new Set(conquistadores.map((c) => c.unidad).filter(Boolean));
+    const set = new Set<string>();
+    unidadesOficiales.forEach((u) => set.add(u));
+    conquistadores.forEach((c) => {
+      if (c.unidad && c.unidad !== "Sin unidad") set.add(c.unidad);
+    });
     return Array.from(set).sort((a, b) => a.localeCompare(b, "es"));
-  }, [conquistadores]);
+  }, [conquistadores, unidadesOficiales]);
 
   const seleccionado = useMemo(
     () => conquistadores.find((c) => c.pin === pinSeleccionado),
@@ -158,14 +172,32 @@ export default function RegistroActividadesConquistadoresPage() {
 
   const miembrosUnidad = useMemo(() => {
     if (!unidadGrupo) return [];
-    return conquistadores.filter((c) => c.unidad === unidadGrupo);
+    return conquistadores.filter((c) => nombreGrupoCoincide(c.unidad, unidadGrupo));
   }, [conquistadores, unidadGrupo]);
+
+  const listaSidebar = useMemo(() => {
+    if (modo === "grupo" && unidadGrupo) {
+      return conquistadoresFiltrados.filter((c) =>
+        nombreGrupoCoincide(c.unidad, unidadGrupo)
+      );
+    }
+    return conquistadoresFiltrados;
+  }, [modo, unidadGrupo, conquistadoresFiltrados]);
 
   useEffect(() => {
     if (unidades.length > 0 && !unidadGrupo) {
       setUnidadGrupo(unidades[0]);
     }
   }, [unidades, unidadGrupo]);
+
+  useEffect(() => {
+    if (modo !== "grupo" || !unidadGrupo) return;
+    const next: Record<string, boolean> = {};
+    miembrosUnidad.forEach((m) => {
+      next[m.pin] = true;
+    });
+    setSeleccionadosGrupo(next);
+  }, [modo, unidadGrupo, miembrosUnidad]);
 
   useEffect(() => {
     setPendientes([]);
@@ -193,15 +225,17 @@ export default function RegistroActividadesConquistadoresPage() {
     toast.success(`Agregado: ${item.nombre} (+${item.puntos} pts)`);
   };
 
-  const agregarGrupoPendiente = () => {
+  const agregarGrupoPendiente = (pinsForzados?: string[]) => {
     const cat = catalogo.find((c) => c.id === catalogoGrupoId);
     if (!cat) {
       toast.error("Selecciona una calificacion del catalogo.");
       return;
     }
-    const pins = Object.keys(seleccionadosGrupo).filter((p) => seleccionadosGrupo[p]);
+    const pins =
+      pinsForzados ??
+      Object.keys(seleccionadosGrupo).filter((p) => seleccionadosGrupo[p]);
     if (pins.length === 0) {
-      toast.error("Marca al menos un conquistador.");
+      toast.error("Marca al menos un conquistador o usa «Toda la unidad».");
       return;
     }
     const nuevos: PendienteItem[] = pins.map((pin) => {
@@ -215,6 +249,14 @@ export default function RegistroActividadesConquistadoresPage() {
     });
     setPendientes((prev) => [...prev, ...nuevos]);
     toast.success(`${nuevos.length} registro(s) en la lista. Pulsa Guardar para subir a Firebase.`);
+  };
+
+  const agregarTodaLaUnidad = () => {
+    if (miembrosUnidad.length === 0) {
+      toast.error("No hay conquistadores en esta unidad.");
+      return;
+    }
+    agregarGrupoPendiente(miembrosUnidad.map((m) => m.pin));
   };
 
   const quitarPendiente = (id: string) => {
@@ -339,10 +381,19 @@ export default function RegistroActividadesConquistadoresPage() {
               <p className="mt-2 text-xs text-slate-500">{conquistadores.length} registrados</p>
             </div>
             <ul className="max-h-[28rem] overflow-y-auto p-2">
-              {conquistadoresFiltrados.length === 0 ? (
-                <li className="p-4 text-center text-sm text-slate-400">No hay conquistadores.</li>
+              {modo === "grupo" && unidadGrupo && (
+                <p className="mb-2 rounded-lg bg-cyan-50 px-3 py-2 text-xs font-semibold text-cyan-800">
+                  Unidad: {unidadGrupo} · {listaSidebar.length} miembro(s)
+                </p>
+              )}
+              {listaSidebar.length === 0 ? (
+                <li className="p-4 text-center text-sm text-slate-400">
+                  {modo === "grupo"
+                    ? "No hay conquistadores en esta unidad."
+                    : "No hay conquistadores."}
+                </li>
               ) : (
-                conquistadoresFiltrados.map((c) => {
+                listaSidebar.map((c) => {
                   const activo =
                     modo === "individual"
                       ? c.pin === pinSeleccionado
@@ -575,17 +626,28 @@ export default function RegistroActividadesConquistadoresPage() {
                 </div>
 
                 <p className="mb-4 text-sm text-slate-600">
-                  Marca conquistadores en la lista izquierda o usa los botones de arriba.
+                  Elige la unidad y la calificación del catálogo. Los miembros de la unidad se
+                  marcan solos; puedes desmarcar alguno si hace falta.
                 </p>
 
-                <button
-                  type="button"
-                  disabled={catalogo.length === 0}
-                  onClick={agregarGrupoPendiente}
-                  className="w-full rounded-xl bg-cyan-600 py-3 font-bold text-white hover:bg-cyan-700 disabled:opacity-50 sm:w-auto sm:px-8"
-                >
-                  Agregar grupo a la lista
-                </button>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    disabled={catalogo.length === 0 || miembrosUnidad.length === 0}
+                    onClick={agregarTodaLaUnidad}
+                    className="rounded-xl bg-cyan-700 py-3 px-6 font-bold text-white hover:bg-cyan-800 disabled:opacity-50"
+                  >
+                    Toda la unidad ({miembrosUnidad.length}) → lista
+                  </button>
+                  <button
+                    type="button"
+                    disabled={catalogo.length === 0}
+                    onClick={() => agregarGrupoPendiente()}
+                    className="rounded-xl border-2 border-cyan-600 py-3 px-6 font-bold text-cyan-800 hover:bg-cyan-50 disabled:opacity-50"
+                  >
+                    Solo marcados → lista
+                  </button>
+                </div>
               </>
             )}
 

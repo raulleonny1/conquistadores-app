@@ -25,6 +25,7 @@ import {
   type ConsejeroRegistro,
 } from "@/src/lib/actividadesCalificacion";
 import { toNumberPuntos } from "@/src/lib/categoriasPuntos";
+import { consejeroAsesoraUnidad } from "@/src/lib/unidades";
 
 type Modo = "individual" | "grupo";
 
@@ -143,7 +144,7 @@ export default function RegistroActividadesConsejerosPage() {
 
   const miembrosUnidad = useMemo(() => {
     if (!unidadGrupo) return [];
-    return consejeros.filter((c) => c.unidades.includes(unidadGrupo));
+    return consejeros.filter((c) => consejeroAsesoraUnidad(c.unidades, unidadGrupo));
   }, [consejeros, unidadGrupo]);
 
   useEffect(() => {

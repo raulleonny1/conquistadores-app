@@ -15,15 +15,21 @@ export default function RegistrosPage() {
           <button onClick={() => router.push('/admin/consejero')} className="bg-green-50 border border-green-500 text-green-600 rounded-xl p-6 font-bold shadow hover:bg-green-100 transition-all text-lg">Consejeros</button>
           <button
             onClick={() => router.push('/admin/registros/actividades-conquistadores')}
-            className="bg-cyan-50 border border-cyan-500 text-cyan-700 rounded-xl p-6 font-bold shadow hover:bg-cyan-100 transition-all text-lg"
+            className="bg-cyan-50 border border-cyan-500 text-cyan-700 rounded-xl p-6 font-bold shadow hover:bg-cyan-100 transition-all text-lg text-left"
           >
-            Registro puntos actividades conquistadores
+            Puntos actividades — Conquistadores
+            <span className="mt-2 block text-sm font-normal text-cyan-800/90">
+              Por persona o por unidad (toda la unidad de una vez)
+            </span>
           </button>
           <button
             onClick={() => router.push('/admin/registros/actividades-aspirantes')}
-            className="bg-rose-50 border border-rose-500 text-rose-700 rounded-xl p-6 font-bold shadow hover:bg-rose-100 transition-all text-lg"
+            className="bg-rose-50 border border-rose-500 text-rose-700 rounded-xl p-6 font-bold shadow hover:bg-rose-100 transition-all text-lg text-left"
           >
-            Registro puntos actividades aspirantes
+            Puntos actividades — Aspirantes
+            <span className="mt-2 block text-sm font-normal text-rose-800/90">
+              Por persona o por asociación / misión (grupo completo)
+            </span>
           </button>
           <button
             onClick={() => router.push('/admin/registros/actividades-consejeros')}

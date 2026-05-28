@@ -24,6 +24,7 @@ import {
   type CatalogoCalificacion,
 } from "@/src/lib/actividadesCalificacion";
 import { toNumberPuntos } from "@/src/lib/categoriasPuntos";
+import { nombreGrupoCoincide } from "@/src/lib/unidades";
 
 type Modo = "individual" | "grupo";
 
@@ -165,14 +166,32 @@ export default function RegistroActividadesAspirantesPage() {
 
   const miembrosAsociacion = useMemo(() => {
     if (!asociacionGrupo) return [];
-    return aspirantes.filter((a) => a.asociacion === asociacionGrupo);
+    return aspirantes.filter((a) => nombreGrupoCoincide(a.asociacion, asociacionGrupo));
   }, [aspirantes, asociacionGrupo]);
+
+  const listaSidebar = useMemo(() => {
+    if (modo === "grupo" && asociacionGrupo) {
+      return aspirantesFiltrados.filter((a) =>
+        nombreGrupoCoincide(a.asociacion, asociacionGrupo)
+      );
+    }
+    return aspirantesFiltrados;
+  }, [modo, asociacionGrupo, aspirantesFiltrados]);
 
   useEffect(() => {
     if (asociaciones.length > 0 && !asociacionGrupo) {
       setAsociacionGrupo(asociaciones[0]);
     }
   }, [asociaciones, asociacionGrupo]);
+
+  useEffect(() => {
+    if (modo !== "grupo" || !asociacionGrupo) return;
+    const next: Record<string, boolean> = {};
+    miembrosAsociacion.forEach((m) => {
+      next[m.pin] = true;
+    });
+    setSeleccionadosGrupo(next);
+  }, [modo, asociacionGrupo, miembrosAsociacion]);
 
   useEffect(() => {
     setPendientes([]);
@@ -200,15 +219,17 @@ export default function RegistroActividadesAspirantesPage() {
     toast.success(`Agregado: ${item.nombre} (+${item.puntos} pts)`);
   };
 
-  const agregarGrupoPendiente = () => {
+  const agregarGrupoPendiente = (pinsForzados?: string[]) => {
     const cat = catalogo.find((c) => c.id === catalogoGrupoId);
     if (!cat) {
       toast.error("Selecciona una calificacion del catalogo.");
       return;
     }
-    const pins = Object.keys(seleccionadosGrupo).filter((p) => seleccionadosGrupo[p]);
+    const pins =
+      pinsForzados ??
+      Object.keys(seleccionadosGrupo).filter((p) => seleccionadosGrupo[p]);
     if (pins.length === 0) {
-      toast.error("Marca al menos un aspirante.");
+      toast.error("Marca al menos un aspirante o usa «Todo el grupo».");
       return;
     }
     const nuevos: PendienteItem[] = pins.map((pin) => {
@@ -222,6 +243,14 @@ export default function RegistroActividadesAspirantesPage() {
     });
     setPendientes((prev) => [...prev, ...nuevos]);
     toast.success(`${nuevos.length} registro(s) en la lista. Pulsa Guardar para subir a Firebase.`);
+  };
+
+  const agregarTodoElGrupo = () => {
+    if (miembrosAsociacion.length === 0) {
+      toast.error("No hay aspirantes en esta asociación / misión.");
+      return;
+    }
+    agregarGrupoPendiente(miembrosAsociacion.map((m) => m.pin));
   };
 
   const quitarPendiente = (id: string) => {
@@ -340,7 +369,7 @@ export default function RegistroActividadesAspirantesPage() {
               }`}
             >
               <Users size={18} />
-              Por grupo (asociación)
+              Por grupo (asociación / misión)
             </button>
           </div>
         </div>
@@ -362,12 +391,19 @@ export default function RegistroActividadesAspirantesPage() {
               <p className="mt-2 text-xs text-slate-500">{aspirantes.length} registrados</p>
             </div>
             <ul className="max-h-[28rem] overflow-y-auto p-2">
-              {aspirantesFiltrados.length === 0 ? (
+              {modo === "grupo" && asociacionGrupo && (
+                <p className="mb-2 rounded-lg bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-800">
+                  Grupo: {asociacionGrupo} · {listaSidebar.length} aspirante(s)
+                </p>
+              )}
+              {listaSidebar.length === 0 ? (
                 <li className="p-4 text-center text-sm text-slate-400">
-                  No hay aspirantes. Regístralos en Admin / Aspirante.
+                  {modo === "grupo"
+                    ? "No hay aspirantes en esta asociación / misión."
+                    : "No hay aspirantes. Regístralos en Admin / Aspirante."}
                 </li>
               ) : (
-                aspirantesFiltrados.map((a) => {
+                listaSidebar.map((a) => {
                   const activo =
                     modo === "individual"
                       ? a.pin === pinSeleccionado
@@ -600,17 +636,28 @@ export default function RegistroActividadesAspirantesPage() {
                 </div>
 
                 <p className="mb-4 text-sm text-slate-600">
-                  Marca aspirantes en la lista izquierda o usa los botones de arriba.
+                  Los aspirantes de la asociación se marcan solos. En aspirantes el grupo es por
+                  asociación / misión (no por unidad del club).
                 </p>
 
-                <button
-                  type="button"
-                  disabled={catalogo.length === 0}
-                  onClick={agregarGrupoPendiente}
-                  className="w-full rounded-xl bg-rose-600 py-3 font-bold text-white hover:bg-rose-700 disabled:opacity-50 sm:w-auto sm:px-8"
-                >
-                  Agregar grupo a la lista
-                </button>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    disabled={catalogo.length === 0 || miembrosAsociacion.length === 0}
+                    onClick={agregarTodoElGrupo}
+                    className="rounded-xl bg-rose-700 py-3 px-6 font-bold text-white hover:bg-rose-800 disabled:opacity-50"
+                  >
+                    Todo el grupo ({miembrosAsociacion.length}) → lista
+                  </button>
+                  <button
+                    type="button"
+                    disabled={catalogo.length === 0}
+                    onClick={() => agregarGrupoPendiente()}
+                    className="rounded-xl border-2 border-rose-600 py-3 px-6 font-bold text-rose-800 hover:bg-rose-50 disabled:opacity-50"
+                  >
+                    Solo marcados → lista
+                  </button>
+                </div>
               </>
             )}
 

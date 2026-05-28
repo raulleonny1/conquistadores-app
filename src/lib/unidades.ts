@@ -25,3 +25,9 @@ export function consejeroAsesoraUnidad(
   const norm = normalizarUnidad(unidad);
   return unidadesConsejero.some((u) => normalizarUnidad(u) === norm);
 }
+
+/** Comparación flexible de nombres de unidad o asociación (ej. «del» vs «de»). */
+export function nombreGrupoCoincide(a: string, b: string): boolean {
+  if (!a.trim() || !b.trim()) return false;
+  return normalizarUnidad(a) === normalizarUnidad(b);
+}
