@@ -123,7 +123,7 @@ export function etiquetaTipoPersona(tipo: TipoPersonaClub): string {
 }
 
 export function filtrarCumpleanosProximos(
-  personas: Omit<CumpleanosPersona, "diasHasta"> & { diasHasta?: number }[],
+  personas: (Omit<CumpleanosPersona, "diasHasta">)[],
   ventanaDias = 14,
   hoy: Date = new Date()
 ): CumpleanosPersona[] {
