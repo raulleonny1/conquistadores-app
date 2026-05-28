@@ -50,15 +50,23 @@ service cloud.firestore {
     }
 
     match /consejeros/{consejeroId} {
-      allow read: if isAuth();
-      allow write: if isAdmin();
+      // La app usa PIN en cliente (sin Firebase Auth); lectura abierta como calificacionesConquis.
+      allow read: if true;
+      allow write: if true;
+    }
+
+    match /aspirantesGuiaMayor/{docId} {
+      allow read, write: if true;
+    }
+
+    match /directivaClub/{docId} {
+      allow read, write: if true;
     }
 
     match /RegistroConquis/{docId} {
-      // Admin / Directiva can read all.
-      // Consejeros can read documentos de su unidad.
-      // Miembros (con pin) can read su propio documento.
-      allow read: if isAdmin() || isDirectiva()
+      // Admin / Directiva pueden leer todo si hay Auth; sin Auth, lectura abierta para dashboards con PIN.
+      allow read: if true
+        || isAdmin() || isDirectiva()
         || (isConsejero() && request.auth.token.unidad != null && request.auth.token.unidad == resource.data.unidad)
         || matchesPin(resource.data.pin);
 

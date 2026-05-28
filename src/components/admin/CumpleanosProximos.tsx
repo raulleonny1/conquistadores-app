@@ -73,9 +73,26 @@ export default function CumpleanosProximos() {
     consejeros: true,
     directiva: true,
   });
+  const [errorCarga, setErrorCarga] = useState<string | null>(null);
+
+  const marcarListo = (clave: keyof typeof cargando) => {
+    setCargando((s) => ({ ...s, [clave]: false }));
+  };
+
+  const manejarErrorSnapshot = (clave: keyof typeof cargando, etiqueta: string) => (err: Error) => {
+    console.error(`Cumpleaños — error leyendo ${etiqueta}:`, err);
+    marcarListo(clave);
+    setErrorCarga(
+      (prev) =>
+        prev ??
+        `No se pudieron cargar todos los registros (${etiqueta}). Si acabas de actualizar firestore.rules, despliégalas en Firebase.`
+    );
+  };
 
   useEffect(() => {
-    const unsub = onSnapshot(collection(db, "RegistroConquis"), (snap) => {
+    const unsub = onSnapshot(
+      collection(db, "RegistroConquis"),
+      (snap) => {
       const conFecha: FilaCumple[] = [];
       const sinFecha: RegistradoSinFecha[] = [];
       snap.docs.forEach((docSnap) => {
@@ -93,13 +110,17 @@ export default function CumpleanosProximos() {
         );
       });
       setConquis({ conFecha, sinFecha });
-      setCargando((s) => ({ ...s, conquis: false }));
-    });
+      marcarListo("conquis");
+    },
+    manejarErrorSnapshot("conquis", "conquistadores")
+    );
     return () => unsub();
   }, []);
 
   useEffect(() => {
-    const unsub = onSnapshot(collection(db, "aspirantesGuiaMayor"), (snap) => {
+    const unsub = onSnapshot(
+      collection(db, "aspirantesGuiaMayor"),
+      (snap) => {
       const conFecha: FilaCumple[] = [];
       const sinFecha: RegistradoSinFecha[] = [];
       snap.docs.forEach((docSnap) => {
@@ -117,13 +138,17 @@ export default function CumpleanosProximos() {
         );
       });
       setAspirantes({ conFecha, sinFecha });
-      setCargando((s) => ({ ...s, aspirantes: false }));
-    });
+      marcarListo("aspirantes");
+    },
+    manejarErrorSnapshot("aspirantes", "aspirantes")
+    );
     return () => unsub();
   }, []);
 
   useEffect(() => {
-    const unsub = onSnapshot(collection(db, "consejeros"), (snap) => {
+    const unsub = onSnapshot(
+      collection(db, "consejeros"),
+      (snap) => {
       const conFecha: FilaCumple[] = [];
       const sinFecha: RegistradoSinFecha[] = [];
       snap.docs.forEach((docSnap) => {
@@ -162,13 +187,17 @@ export default function CumpleanosProximos() {
         }
       });
       setConsejeros({ conFecha, sinFecha });
-      setCargando((s) => ({ ...s, consejeros: false }));
-    });
+      marcarListo("consejeros");
+    },
+    manejarErrorSnapshot("consejeros", "consejeros")
+    );
     return () => unsub();
   }, []);
 
   useEffect(() => {
-    const unsub = onSnapshot(collection(db, "directivaClub"), (snap) => {
+    const unsub = onSnapshot(
+      collection(db, "directivaClub"),
+      (snap) => {
       const conFecha: FilaCumple[] = [];
       const sinFecha: RegistradoSinFecha[] = [];
       snap.docs.forEach((docSnap) => {
@@ -186,8 +215,10 @@ export default function CumpleanosProximos() {
         );
       });
       setDirectiva({ conFecha, sinFecha });
-      setCargando((s) => ({ ...s, directiva: false }));
-    });
+      marcarListo("directiva");
+    },
+    manejarErrorSnapshot("directiva", "directiva")
+    );
     return () => unsub();
   }, []);
 
@@ -261,6 +292,11 @@ export default function CumpleanosProximos() {
         </p>
       ) : (
         <>
+          {errorCarga && (
+            <p className="mb-4 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+              {errorCarga}
+            </p>
+          )}
           {lista.length === 0 ? (
             <p className="mb-4 rounded-xl bg-white/80 px-4 py-3 text-sm text-slate-600">
               No hay cumpleaños en los próximos {VENTANA_DIAS} días entre quienes tienen fecha de
