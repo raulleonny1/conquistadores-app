@@ -1,143 +1,77 @@
-rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-    // -----------------------------
-    // Helpers / Roles
-    // -----------------------------
-    function isAuth() {
-      return request.auth != null;
-    }
-
-    function role() {
-      return request.auth.token.role;
-    }
-
-    function isAdmin() {
-      return isAuth() && role() == "admin";
-    }
-
-    function isDirectiva() {
-      return isAuth() && role() == "directiva";
-    }
-
-    function isConsejero() {
-      return isAuth() && role() == "consejero";
-    }
-
-    function isMiembro() {
-      return isAuth() && role() == "miembro";
-    }
-
-    function isAspirante() {
-      return isAuth() && role() == "aspirante";
-    }
-
-    // Optional: allow users to read their own records based on a pin claim.
-    // WARNING: "pin" is low-entropy and should not be used as a security boundary
-    // unless you accept the risk. Prefer to use `uid` or a stable identifier.
-    function matchesPin(field) {
-      return isAuth() && request.auth.token.pin != null && request.auth.token.pin == field;
-    }
-
-    // -----------------------------
-    // Collections
-    // -----------------------------
-
-    match /unidades/{unitId} {
-      // Unidades are read in the UI to choose unidad/consejero.
-      allow read: if isAuth();
-      allow write: if isAdmin();
-    }
-
-    match /consejeros/{consejeroId} {
-      // La app usa PIN en cliente (sin Firebase Auth); lectura abierta como calificacionesConquis.
-      allow read: if true;
-      allow write: if true;
-    }
-
-    match /aspirantesGuiaMayor/{docId} {
-      allow read, write: if true;
-    }
-
-    match /directivaClub/{docId} {
-      allow read, write: if true;
-    }
-
-    match /RegistroConquis/{docId} {
-      // Admin / Directiva pueden leer todo si hay Auth; sin Auth, lectura abierta para dashboards con PIN.
-      allow read: if true
-        || isAdmin() || isDirectiva()
-        || (isConsejero() && request.auth.token.unidad != null && request.auth.token.unidad == resource.data.unidad)
-        || matchesPin(resource.data.pin);
-
-      // Escritura solo para admin (evita que cualquier usuario escriba libremente).
-      // Si deseas permitir que consejeros editen, añade un permiso adicional.
-      allow write: if isAdmin();
-    }
-
-    match /calificaciones/{docId} {
-      // Catálogo admin (sin pin) + notas por miembro (con pin).
-      function esCatalogo() {
-        return !('pin' in resource.data) || resource.data.pin == null || resource.data.pin == '';
-      }
-      function esCatalogoCreate() {
-        return !('pin' in request.resource.data) || request.resource.data.pin == null || request.resource.data.pin == '';
-      }
-
-      allow read: if esCatalogo()
-        || isAdmin() || isDirectiva()
-        || (isConsejero() && request.auth.token.consejeroId != null && request.auth.token.consejeroId == resource.data.consejeroId)
-        || matchesPin(resource.data.pin);
-
-      allow create: if esCatalogoCreate()
-        || isAdmin()
-        || (isConsejero() && request.auth.token.consejeroId != null && request.auth.token.consejeroId == request.resource.data.consejeroId);
-
-      allow update, delete: if esCatalogo()
-        || isAdmin()
-        || (isConsejero() && request.auth.token.consejeroId != null && request.auth.token.consejeroId == resource.data.consejeroId);
-    }
-
-    match /calificacionesSemanal/{docId} {
-      allow read: if isAdmin() || isDirectiva() || matchesPin(resource.data.pin);
-      allow write: if isAdmin() || isDirectiva() || isConsejero();
-    }
-
-    match /calificacionesConquis/{docId} {
-      allow read: if true;
-      allow write: if true;
-    }
-
-    match /eventos/{docId} {
-      allow read: if true;
-      allow write: if isAdmin() || isConsejero() || true;
-    }
-
-    // Reto destacado en dashboard de miembros (solo este documento es legible sin Auth).
-    match /config/{docId} {
-      allow read: if docId == "retoMiembroDashboard";
-      allow write: if isAdmin() || isConsejero();
-    }
-
-    // Retos por unidad: lectura pública para dashboards con PIN (misma política que config/retoMiembroDashboard).
-    match /retosEspeciales/{docId} {
-      allow read: if true;
-      allow write: if isAdmin() || isConsejero();
-    }
-
-    match /frasesSemana/{docId} {
-      allow read: if isAuth();
-      allow write: if isAdmin();
-    }
-
-    match /evaluacionesGuiaMayor/{docId} {
-      allow read: if isAdmin() || isDirectiva();
-      allow write: if isAdmin() || isDirectiva();
-    }
-
-    // Fallback: deny everything else explicitly.
-    match /{document=**} {
-      allow read, write: if false;
-    }
-  }
-}
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // La app valida PIN en el cliente (sin Firebase Auth). Lectura/escritura abiertas
+    // en colecciones operativas; el PIN no es seguridad fuerte — usar Auth en el futuro.
+
+    match /unidades/{unitId} {
+      allow read, write: if true;
+    }
+
+    match /consejeros/{consejeroId} {
+      allow read, write: if true;
+    }
+
+    match /aspirantesGuiaMayor/{docId} {
+      allow read, write: if true;
+    }
+
+    match /directivaClub/{docId} {
+      allow read, write: if true;
+    }
+
+    match /RegistroConquis/{docId} {
+      allow read, write: if true;
+    }
+
+    match /calificaciones/{docId} {
+      allow read, write: if true;
+    }
+
+    match /calificacionesSemanal/{docId} {
+      allow read, write: if true;
+    }
+
+    match /calificacionesConquis/{docId} {
+      allow read, write: if true;
+    }
+
+    match /eventos/{docId} {
+      allow read, write: if true;
+    }
+
+    match /config/{docId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    match /retosEspeciales/{docId} {
+      allow read, write: if true;
+    }
+
+    match /frasesSemana/{docId} {
+      allow read, write: if true;
+    }
+
+    match /especialidades/{docId} {
+      allow read, write: if true;
+    }
+
+    match /evaluacionesGuiaMayor/{docId} {
+      allow read, write: if true;
+    }
+
+    match /tarjetaGuiaMayor/{docId} {
+      allow read, write: if true;
+    }
+
+    match /actividadesTarjetaGuiaMayor/{docId} {
+      allow read, write: if true;
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
+

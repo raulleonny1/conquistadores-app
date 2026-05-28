@@ -8,6 +8,7 @@ import {
   pinCalificacionesConsejero,
 } from "@/src/lib/actividadesCalificacion";
 import { consejeroPuedeCalificar } from "@/src/lib/consejeroPermisos";
+import { storageSeguroSet } from "@/src/lib/storageSeguro";
 import { getCategoriasConPuntos, sumarPuntos } from "@/src/lib/categoriasPuntos";
 import RetoEspecialConsejeroPanel from "@/src/components/RetoEspecialConsejeroPanel";
 import ActividadesConsejeroCard from "@/src/components/ActividadesConsejeroCard";
@@ -47,7 +48,7 @@ export default function ConsejeroDashboard({ consejeroId }: { consejeroId: strin
 
   useEffect(() => {
     if (consejeroId) {
-      localStorage.setItem("consejeroId", consejeroId);
+      storageSeguroSet("consejeroId", consejeroId);
     }
   }, [consejeroId]);
 

@@ -1,5 +1,5 @@
 /* Service worker mínimo: instalación PWA y actualizaciones. Sin caché offline agresiva. */
-const SW_VERSION = "club-caleb-v2";
+const SW_VERSION = "club-caleb-v3-ios";
 const LOGO_NOTIFICATION = "/logo_completo.png?v=2";
 
 self.addEventListener("install", (event) => {

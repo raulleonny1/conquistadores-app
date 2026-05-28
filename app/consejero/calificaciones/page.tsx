@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { useConsejeroPuedeCalificar } from "@/src/hooks/useConsejeroPuedeCalificar";
 import ConsejeroSinPermisoCalificar from "@/src/components/consejero/ConsejeroSinPermisoCalificar";
+import { storageSeguroGet } from "@/src/lib/storageSeguro";
 
 const CATEGORIAS_PUNTOS = [
   { id: "puntualidad", nombre: "Puntualidad" },
@@ -52,7 +53,7 @@ function CalificacionesConsejeroPageInner() {
 
   useEffect(() => {
     const fromUrl = searchParams.get("consejeroId");
-    const stored = typeof window !== "undefined" ? localStorage.getItem("consejeroId") : null;
+    const stored = storageSeguroGet("consejeroId");
     setConsejeroId(fromUrl || stored);
   }, [searchParams]);
 

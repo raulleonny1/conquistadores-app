@@ -7,6 +7,7 @@ import { addDoc, collection, doc, getDoc, getDocs, setDoc, query, where } from "
 import { useSearchParams, usePathname } from "next/navigation";
 import { useConsejeroPuedeCalificar } from "@/src/hooks/useConsejeroPuedeCalificar";
 import ConsejeroSinPermisoCalificar from "@/src/components/consejero/ConsejeroSinPermisoCalificar";
+import { storageSeguroGet, storageSeguroSet } from "@/src/lib/storageSeguro";
 
 const CATEGORIAS_PUNTOS = [
   { id: "puntualidad", nombre: "Puntualidad" },
@@ -37,10 +38,10 @@ function CalificacionesGrupoPage() {
   const [consejeroIdState, setConsejeroIdState] = useState(consejeroId);
   useEffect(() => {
     if (consejeroId) {
-      localStorage.setItem("consejeroId", consejeroId);
+      storageSeguroSet("consejeroId", consejeroId);
       setConsejeroIdState(consejeroId);
     } else {
-      const storedId = localStorage.getItem("consejeroId");
+      const storedId = storageSeguroGet("consejeroId");
       if (storedId) setConsejeroIdState(storedId);
     }
   }, [consejeroId]);

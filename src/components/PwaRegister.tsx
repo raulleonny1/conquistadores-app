@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Share } from "lucide-react";
+import { esDispositivoIos } from "@/src/lib/navegacion";
 
 function esIosSinInstalar(): boolean {
   if (typeof window === "undefined") return false;
@@ -18,13 +19,20 @@ export default function PwaRegister() {
   const [mostrarAyudaIos, setMostrarAyudaIos] = useState(false);
 
   useEffect(() => {
-    if (!("serviceWorker" in navigator)) return;
+    const standalone =
+      window.matchMedia("(display-mode: standalone)").matches ||
+      ("standalone" in window.navigator &&
+        (window.navigator as Navigator & { standalone?: boolean }).standalone);
 
-    navigator.serviceWorker
-      .register("/sw.js", { scope: "/", updateViaCache: "none" })
-      .catch(() => {
-        /* SW opcional en dev sin HTTPS */
-      });
+    // En Safari iPhone sin instalar, el SW a veces deja la app en blanco o sin red; solo en PWA instalada.
+    const registrarSw = "serviceWorker" in navigator && (!esDispositivoIos() || standalone);
+    if (registrarSw) {
+      navigator.serviceWorker
+        .register("/sw.js", { scope: "/", updateViaCache: "none" })
+        .catch(() => {
+          /* SW opcional en dev sin HTTPS */
+        });
+    }
 
     setMostrarAyudaIos(esIosSinInstalar());
   }, []);
