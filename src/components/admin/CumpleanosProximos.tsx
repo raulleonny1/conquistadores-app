@@ -6,9 +6,13 @@ import { db, formatFechaDDMMYYYY } from "@/src/firebase";
 import { nombreCompletoAspirante } from "@/src/constants/aspirante";
 import {
   etiquetaDiasCumpleanos,
-  etiquetaTipoPersona,
   extraerFechaNacimiento,
+  extraerFechaNacimientoTitular,
+  extraerFechaNacimientoAsociado,
   filtrarCumpleanosProximos,
+  deduplicarRegistrosSinFecha,
+  quitarSinFechaSiYaTieneFecha,
+  contarPersonasUnicas,
   type CumpleanosPersona,
   type RegistradoSinFecha,
   type TipoPersonaClub,
@@ -31,14 +35,18 @@ function registrarPersona(
   nombre: string,
   tipo: TipoPersonaClub,
   detalle: string,
-  data: Record<string, unknown>
+  data: Record<string, unknown>,
+  fechaExplicita?: string
 ) {
   if (!nombre.trim()) return;
-  const fecha = extraerFechaNacimiento(data);
+  const fecha =
+    fechaExplicita !== undefined
+      ? fechaExplicita.trim()
+      : extraerFechaNacimiento(data);
   if (fecha) {
     conFecha.push({ id, nombre: nombre.trim(), tipo, detalle, fechaTexto: fecha });
   } else {
-    sinFecha.push({ id, nombre: nombre.trim(), tipo, detalle });
+    sinFecha.push({ id, nombre: nombre.trim(), tipo, tipos: [tipo], detalle });
   }
 }
 
@@ -52,9 +60,7 @@ function PersonaCard({
   return (
     <>
       <p className="font-bold text-slate-800">{p.nombre}</p>
-      <p className="text-xs text-slate-500">
-        {etiquetaTipoPersona(p.tipo)} · {p.detalle}
-      </p>
+      <p className="text-xs text-slate-500">{p.detalle}</p>
       <p className="mt-1 text-xs font-semibold text-pink-700">
         {fechaDisplay(p.fechaTexto)} · {etiquetaDiasCumpleanos(p.diasHasta)}
       </p>
@@ -167,7 +173,8 @@ export default function CumpleanosProximos() {
             nombreTitular,
             "consejero",
             detalleUnidades,
-            data
+            data,
+            extraerFechaNacimientoTitular(data)
           );
         }
 
@@ -180,9 +187,8 @@ export default function CumpleanosProximos() {
             nombreAsoc,
             "asociado",
             `Asociado de ${nombreTitular || "consejero"}`,
-            {
-              nacimiento: data.asociadoNacimiento ?? data.asociado_nacimiento ?? "",
-            }
+            data,
+            extraerFechaNacimientoAsociado(data)
           );
         }
       });
@@ -250,19 +256,21 @@ export default function CumpleanosProximos() {
   const hoy = useMemo(() => lista.filter((p) => p.diasHasta === 0), [lista]);
   const proximos = useMemo(() => lista.filter((p) => p.diasHasta > 0), [lista]);
 
-  const sinFechaPorTipo = useMemo(() => {
-    const grupos: Partial<Record<TipoPersonaClub, RegistradoSinFecha[]>> = {};
-    for (const p of todasSinFecha) {
-      if (!grupos[p.tipo]) grupos[p.tipo] = [];
-      grupos[p.tipo]!.push(p);
-    }
-    return grupos;
-  }, [todasSinFecha]);
+  const sinFechaUnicas = useMemo(
+    () =>
+      deduplicarRegistrosSinFecha(
+        quitarSinFechaSiYaTieneFecha(todasSinFecha, todasConFecha)
+      ),
+    [todasSinFecha, todasConFecha]
+  );
 
   const estaCargando =
     cargando.conquis || cargando.aspirantes || cargando.consejeros || cargando.directiva;
 
-  const totalRegistrados = todasConFecha.length + todasSinFecha.length;
+  const totalRegistrados = useMemo(
+    () => contarPersonasUnicas(todasConFecha, todasSinFecha),
+    [todasConFecha, todasSinFecha]
+  );
 
   const fechaDisplay = (raw: string) => {
     const fmt = formatFechaDDMMYYYY(raw);
@@ -341,9 +349,7 @@ export default function CumpleanosProximos() {
                       >
                         <div className="min-w-0">
                           <p className="font-semibold text-slate-800">{p.nombre}</p>
-                          <p className="text-xs text-slate-500">
-                            {etiquetaTipoPersona(p.tipo)} · {p.detalle}
-                          </p>
+                          <p className="text-xs text-slate-500">{p.detalle}</p>
                           <p className="text-xs text-slate-600">{fechaDisplay(p.fechaTexto)}</p>
                         </div>
                         <span className="shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-800">
@@ -357,41 +363,33 @@ export default function CumpleanosProximos() {
             </div>
           )}
 
-          {todasSinFecha.length > 0 && (
+          {sinFechaUnicas.length > 0 && (
             <details className="rounded-xl border border-slate-200 bg-white/90 p-4">
               <summary className="cursor-pointer text-sm font-bold text-slate-700">
-                Sin fecha de nacimiento ({todasSinFecha.length}) — clic en el nombre para abrir su
+                Sin fecha de nacimiento ({sinFechaUnicas.length}) — clic en el nombre para abrir su
                 registro y poner la fecha
               </summary>
-              <div className="mt-3 space-y-3 text-sm">
-                {(Object.keys(sinFechaPorTipo) as TipoPersonaClub[]).map((tipo) => {
-                  const items = sinFechaPorTipo[tipo];
-                  if (!items?.length) return null;
-                  return (
-                    <div key={tipo}>
-                      <p className="mb-1 text-xs font-bold uppercase text-slate-500">
-                        {etiquetaTipoPersona(tipo)} ({items.length})
-                      </p>
-                      <ul className="flex flex-wrap gap-2">
-                        {items.map((p) => (
-                          <li key={p.id}>
-                            <Link
-                              href={urlEditarPersona(p.tipo, p.id)}
-                              className="inline-flex items-center gap-1 rounded-lg border border-indigo-200 bg-white px-2.5 py-1.5 text-xs font-medium text-indigo-800 shadow-sm transition hover:border-indigo-400 hover:bg-indigo-50"
-                              title={`Editar registro y agregar fecha de nacimiento`}
-                            >
-                              <Pencil className="h-3 w-3 shrink-0" />
-                              <span>
-                                {p.nombre}
-                                {p.detalle ? ` · ${p.detalle}` : ""}
-                              </span>
-                            </Link>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  );
-                })}
+              <div className="mt-3 text-sm">
+                <ul className="flex flex-wrap gap-2">
+                  {sinFechaUnicas.map((p) => (
+                    <li key={p.id}>
+                      <Link
+                        href={urlEditarPersona(
+                          p.tipo,
+                          p.editRegistroId ?? p.id
+                        )}
+                        className="inline-flex items-center gap-1 rounded-lg border border-indigo-200 bg-white px-2.5 py-1.5 text-xs font-medium text-indigo-800 shadow-sm transition hover:border-indigo-400 hover:bg-indigo-50"
+                        title="Editar registro y agregar fecha de nacimiento"
+                      >
+                        <Pencil className="h-3 w-3 shrink-0" />
+                        <span>
+                          {p.nombre}
+                          {p.detalle ? ` · ${p.detalle}` : ""}
+                        </span>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
               </div>
             </details>
           )}
