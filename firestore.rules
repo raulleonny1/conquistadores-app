@@ -1,77 +1,161 @@
-rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-    // La app valida PIN en el cliente (sin Firebase Auth). Lectura/escritura abiertas
-    // en colecciones operativas; el PIN no es seguridad fuerte — usar Auth en el futuro.
-
-    match /unidades/{unitId} {
-      allow read, write: if true;
-    }
-
-    match /consejeros/{consejeroId} {
-      allow read, write: if true;
-    }
-
-    match /aspirantesGuiaMayor/{docId} {
-      allow read, write: if true;
-    }
-
-    match /directivaClub/{docId} {
-      allow read, write: if true;
-    }
-
-    match /RegistroConquis/{docId} {
-      allow read, write: if true;
-    }
-
-    match /calificaciones/{docId} {
-      allow read, write: if true;
-    }
-
-    match /calificacionesSemanal/{docId} {
-      allow read, write: if true;
-    }
-
-    match /calificacionesConquis/{docId} {
-      allow read, write: if true;
-    }
-
-    match /eventos/{docId} {
-      allow read, write: if true;
-    }
-
-    match /config/{docId} {
-      allow read: if true;
-      allow write: if true;
-    }
-
-    match /retosEspeciales/{docId} {
-      allow read, write: if true;
-    }
-
-    match /frasesSemana/{docId} {
-      allow read, write: if true;
-    }
-
-    match /especialidades/{docId} {
-      allow read, write: if true;
-    }
-
-    match /evaluacionesGuiaMayor/{docId} {
-      allow read, write: if true;
-    }
-
-    match /tarjetaGuiaMayor/{docId} {
-      allow read, write: if true;
-    }
-
-    match /actividadesTarjetaGuiaMayor/{docId} {
-      allow read, write: if true;
-    }
-
-    match /{document=**} {
-      allow read, write: if false;
-    }
-  }
-}
-
+rules_version = '2';
+
+service cloud.firestore {
+
+  match /databases/{database}/documents {
+
+    // La app valida PIN en el cliente (sin Firebase Auth). Lectura/escritura abiertas
+
+    // en colecciones operativas; el PIN no es seguridad fuerte — usar Auth en el futuro.
+
+
+
+    match /unidades/{unitId} {
+
+      allow read, write: if true;
+
+    }
+
+
+
+    match /consejeros/{consejeroId} {
+
+      allow read, write: if true;
+
+    }
+
+
+
+    match /aspirantesGuiaMayor/{docId} {
+
+      allow read, write: if true;
+
+    }
+
+
+
+    match /directivaClub/{docId} {
+
+      allow read, write: if true;
+
+    }
+
+
+
+    match /RegistroConquis/{docId} {
+
+      allow read, write: if true;
+
+    }
+
+
+
+    match /calificaciones/{docId} {
+
+      allow read, write: if true;
+
+    }
+
+
+
+    match /calificacionesSemanal/{docId} {
+
+      allow read, write: if true;
+
+    }
+
+
+
+    match /calificacionesConquis/{docId} {
+
+      allow read, write: if true;
+
+    }
+
+
+
+    match /eventos/{docId} {
+
+      allow read, write: if true;
+
+    }
+
+
+
+    match /config/{docId} {
+
+      allow read: if true;
+
+      allow write: if true;
+
+    }
+
+
+
+    match /retosEspeciales/{docId} {
+
+      allow read, write: if true;
+
+    }
+
+
+
+    match /frasesSemana/{docId} {
+
+      allow read, write: if true;
+
+    }
+
+
+
+    match /especialidades/{docId} {
+
+      allow read, write: if true;
+
+    }
+
+
+
+    match /evaluacionesGuiaMayor/{docId} {
+
+      allow read, write: if true;
+
+    }
+
+
+
+    match /tarjetaGuiaMayor/{docId} {
+
+      allow read, write: if true;
+
+    }
+
+
+
+    match /actividadesTarjetaGuiaMayor/{docId} {
+
+      allow read, write: if true;
+
+    }
+
+
+
+    match /fichasMedicas/{docId} {
+
+      allow read, write: if true;
+
+    }
+
+
+
+    match /{document=**} {
+
+      allow read, write: if false;
+
+    }
+
+  }
+
+}
+
+

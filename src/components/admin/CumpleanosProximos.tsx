@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { collection, onSnapshot } from "firebase/firestore";
 import { db, formatFechaDDMMYYYY } from "@/src/firebase";
 import { nombreCompletoAspirante } from "@/src/constants/aspirante";
@@ -13,10 +13,12 @@ import {
   deduplicarRegistrosSinFecha,
   quitarSinFechaSiYaTieneFecha,
   contarPersonasUnicas,
+  IndiceFechasNacimiento,
   type CumpleanosPersona,
   type RegistradoSinFecha,
   type TipoPersonaClub,
 } from "@/src/lib/cumpleanos";
+import { sincronizarFechasNacimientoClub } from "@/src/lib/sincronizarFechasNacimiento";
 import Link from "next/link";
 import { Cake, Loader2, Pencil } from "lucide-react";
 import { urlEditarPersona } from "@/src/lib/cumpleanos";
@@ -36,18 +38,69 @@ function registrarPersona(
   tipo: TipoPersonaClub,
   detalle: string,
   data: Record<string, unknown>,
-  fechaExplicita?: string
+  fechaExplicita?: string,
+  indice?: IndiceFechasNacimiento,
+  pin?: string
 ) {
   if (!nombre.trim()) return;
-  const fecha =
+  let fecha =
     fechaExplicita !== undefined
       ? fechaExplicita.trim()
       : extraerFechaNacimiento(data);
+  if (!fecha && indice) {
+    fecha = indice.buscar(nombre, pin) ?? "";
+  }
   if (fecha) {
     conFecha.push({ id, nombre: nombre.trim(), tipo, detalle, fechaTexto: fecha });
   } else {
     sinFecha.push({ id, nombre: nombre.trim(), tipo, tipos: [tipo], detalle });
   }
+}
+
+function construirIndiceDesdeDatos(
+  conquisDocs: { id: string; data: Record<string, unknown> }[],
+  aspirantesDocs: { id: string; data: Record<string, unknown> }[],
+  consejerosDocs: { id: string; data: Record<string, unknown> }[],
+  directivaDocs: { id: string; data: Record<string, unknown> }[],
+  fichasDocs: { id: string; data: Record<string, unknown> }[]
+): IndiceFechasNacimiento {
+  const indice = new IndiceFechasNacimiento();
+
+  for (const { id, data } of conquisDocs) {
+    const nombre = [data.nombre, data.apellido].filter(Boolean).join(" ").trim();
+    const fecha = extraerFechaNacimiento(data);
+    if (nombre && fecha) indice.agregar(nombre, fecha, "RegistroConquis", id);
+  }
+
+  for (const { id, data } of aspirantesDocs) {
+    const nombre = nombreCompletoAspirante(data);
+    const fecha = extraerFechaNacimiento(data);
+    if (nombre && fecha) indice.agregar(nombre, fecha, "aspirantesGuiaMayor", id);
+  }
+
+  for (const { id, data } of consejerosDocs) {
+    const titular = String(data.nombre ?? "").trim();
+    const asoc = String(data.consejeroAsociado ?? "").trim();
+    const fTit = extraerFechaNacimientoTitular(data);
+    const fAsoc = extraerFechaNacimientoAsociado(data);
+    if (titular && fTit) indice.agregar(titular, fTit, "consejeros", id);
+    if (asoc && fAsoc) indice.agregar(asoc, fAsoc, "consejeros", id);
+  }
+
+  for (const { id, data } of directivaDocs) {
+    const nombre = String(data.nombre ?? "").trim();
+    const fecha = extraerFechaNacimiento(data);
+    if (nombre && fecha) indice.agregar(nombre, fecha, "directivaClub", id);
+  }
+
+  for (const { id, data } of fichasDocs) {
+    const nombre = String(data.nombre ?? "").trim();
+    const fecha = extraerFechaNacimiento(data);
+    if (nombre && fecha) indice.agregar(nombre, fecha, "fichasMedicas", id);
+    if (fecha) indice.agregarPorPin(id, fecha);
+  }
+
+  return indice;
 }
 
 function PersonaCard({
@@ -69,25 +122,18 @@ function PersonaCard({
 }
 
 export default function CumpleanosProximos() {
-  const [conquis, setConquis] = useState<BloqueDatos>(bloqueVacio);
-  const [aspirantes, setAspirantes] = useState<BloqueDatos>(bloqueVacio);
-  const [consejeros, setConsejeros] = useState<BloqueDatos>(bloqueVacio);
-  const [directiva, setDirectiva] = useState<BloqueDatos>(bloqueVacio);
-  const [cargando, setCargando] = useState({
-    conquis: true,
-    aspirantes: true,
-    consejeros: true,
-    directiva: true,
-  });
+  type DocRow = { id: string; data: Record<string, unknown> };
+
+  const [rawConquis, setRawConquis] = useState<DocRow[] | null>(null);
+  const [rawAspirantes, setRawAspirantes] = useState<DocRow[] | null>(null);
+  const [rawConsejeros, setRawConsejeros] = useState<DocRow[] | null>(null);
+  const [rawDirectiva, setRawDirectiva] = useState<DocRow[] | null>(null);
+  const [rawFichas, setRawFichas] = useState<DocRow[] | null>(null);
   const [errorCarga, setErrorCarga] = useState<string | null>(null);
+  const syncHecho = useRef(false);
 
-  const marcarListo = (clave: keyof typeof cargando) => {
-    setCargando((s) => ({ ...s, [clave]: false }));
-  };
-
-  const manejarErrorSnapshot = (clave: keyof typeof cargando, etiqueta: string) => (err: Error) => {
+  const manejarErrorSnapshot = (etiqueta: string) => (err: Error) => {
     console.error(`Cumpleaños — error leyendo ${etiqueta}:`, err);
-    marcarListo(clave);
     setErrorCarga(
       (prev) =>
         prev ??
@@ -96,29 +142,20 @@ export default function CumpleanosProximos() {
   };
 
   useEffect(() => {
+    if (syncHecho.current) return;
+    syncHecho.current = true;
+    sincronizarFechasNacimientoClub().catch((err) => {
+      console.warn("Cumpleaños — sincronización de fechas:", err);
+    });
+  }, []);
+
+  useEffect(() => {
     const unsub = onSnapshot(
       collection(db, "RegistroConquis"),
       (snap) => {
-      const conFecha: FilaCumple[] = [];
-      const sinFecha: RegistradoSinFecha[] = [];
-      snap.docs.forEach((docSnap) => {
-        const data = docSnap.data() as Record<string, unknown>;
-        const nombre = [data.nombre, data.apellido].filter(Boolean).join(" ").trim();
-        const unidad = typeof data.unidad === "string" ? data.unidad : "";
-        registrarPersona(
-          conFecha,
-          sinFecha,
-          `c_${docSnap.id}`,
-          nombre,
-          "conquistador",
-          unidad ? `Unidad: ${unidad}` : "Club Caleb",
-          data
-        );
-      });
-      setConquis({ conFecha, sinFecha });
-      marcarListo("conquis");
-    },
-    manejarErrorSnapshot("conquis", "conquistadores")
+        setRawConquis(snap.docs.map((d) => ({ id: d.id, data: d.data() as Record<string, unknown> })));
+      },
+      manejarErrorSnapshot("conquistadores")
     );
     return () => unsub();
   }, []);
@@ -127,26 +164,9 @@ export default function CumpleanosProximos() {
     const unsub = onSnapshot(
       collection(db, "aspirantesGuiaMayor"),
       (snap) => {
-      const conFecha: FilaCumple[] = [];
-      const sinFecha: RegistradoSinFecha[] = [];
-      snap.docs.forEach((docSnap) => {
-        const data = docSnap.data() as Record<string, unknown>;
-        const nombre = nombreCompletoAspirante(data);
-        const asoc = typeof data.asociacion === "string" ? data.asociacion : "";
-        registrarPersona(
-          conFecha,
-          sinFecha,
-          `a_${docSnap.id}`,
-          nombre,
-          "aspirante",
-          asoc ? `Asociación: ${asoc}` : "Aspirante",
-          data
-        );
-      });
-      setAspirantes({ conFecha, sinFecha });
-      marcarListo("aspirantes");
-    },
-    manejarErrorSnapshot("aspirantes", "aspirantes")
+        setRawAspirantes(snap.docs.map((d) => ({ id: d.id, data: d.data() as Record<string, unknown> })));
+      },
+      manejarErrorSnapshot("aspirantes")
     );
     return () => unsub();
   }, []);
@@ -155,47 +175,9 @@ export default function CumpleanosProximos() {
     const unsub = onSnapshot(
       collection(db, "consejeros"),
       (snap) => {
-      const conFecha: FilaCumple[] = [];
-      const sinFecha: RegistradoSinFecha[] = [];
-      snap.docs.forEach((docSnap) => {
-        const data = docSnap.data() as Record<string, unknown>;
-        const unidades = Array.isArray(data.unidades)
-          ? (data.unidades as string[]).filter(Boolean).join(", ")
-          : "";
-        const detalleUnidades = unidades ? `Unidades: ${unidades}` : "Consejero";
-        const nombreTitular = String(data.nombre ?? "").trim();
-
-        if (nombreTitular) {
-          registrarPersona(
-            conFecha,
-            sinFecha,
-            `co_${docSnap.id}`,
-            nombreTitular,
-            "consejero",
-            detalleUnidades,
-            data,
-            extraerFechaNacimientoTitular(data)
-          );
-        }
-
-        const nombreAsoc = String(data.consejeroAsociado ?? "").trim();
-        if (nombreAsoc) {
-          registrarPersona(
-            conFecha,
-            sinFecha,
-            `as_${docSnap.id}`,
-            nombreAsoc,
-            "asociado",
-            `Asociado de ${nombreTitular || "consejero"}`,
-            data,
-            extraerFechaNacimientoAsociado(data)
-          );
-        }
-      });
-      setConsejeros({ conFecha, sinFecha });
-      marcarListo("consejeros");
-    },
-    manejarErrorSnapshot("consejeros", "consejeros")
+        setRawConsejeros(snap.docs.map((d) => ({ id: d.id, data: d.data() as Record<string, unknown> })));
+      },
+      manejarErrorSnapshot("consejeros")
     );
     return () => unsub();
   }, []);
@@ -204,29 +186,146 @@ export default function CumpleanosProximos() {
     const unsub = onSnapshot(
       collection(db, "directivaClub"),
       (snap) => {
-      const conFecha: FilaCumple[] = [];
-      const sinFecha: RegistradoSinFecha[] = [];
-      snap.docs.forEach((docSnap) => {
-        const data = docSnap.data() as Record<string, unknown>;
-        const nombre = String(data.nombre ?? "").trim();
-        const cargo = String(data.cargo ?? "").trim();
-        registrarPersona(
-          conFecha,
-          sinFecha,
-          `d_${docSnap.id}`,
-          nombre,
-          "directiva",
-          cargo || "Directiva",
-          data
-        );
-      });
-      setDirectiva({ conFecha, sinFecha });
-      marcarListo("directiva");
-    },
-    manejarErrorSnapshot("directiva", "directiva")
+        setRawDirectiva(snap.docs.map((d) => ({ id: d.id, data: d.data() as Record<string, unknown> })));
+      },
+      manejarErrorSnapshot("directiva")
     );
     return () => unsub();
   }, []);
+
+  useEffect(() => {
+    const unsub = onSnapshot(
+      collection(db, "fichasMedicas"),
+      (snap) => {
+        setRawFichas(snap.docs.map((d) => ({ id: d.id, data: d.data() as Record<string, unknown> })));
+      },
+      (err) => {
+        console.warn("Cumpleaños — fichasMedicas no disponibles:", err);
+        setRawFichas([]);
+      }
+    );
+    return () => unsub();
+  }, []);
+
+  const bloques = useMemo(() => {
+    if (
+      rawConquis === null ||
+      rawAspirantes === null ||
+      rawConsejeros === null ||
+      rawDirectiva === null ||
+      rawFichas === null
+    ) {
+      return null;
+    }
+
+    const indice = construirIndiceDesdeDatos(
+      rawConquis,
+      rawAspirantes,
+      rawConsejeros,
+      rawDirectiva,
+      rawFichas
+    );
+
+    const conquis: BloqueDatos = bloqueVacio();
+    for (const { id, data } of rawConquis) {
+      const nombre = [data.nombre, data.apellido].filter(Boolean).join(" ").trim();
+      const unidad = typeof data.unidad === "string" ? data.unidad : "";
+      registrarPersona(
+        conquis.conFecha,
+        conquis.sinFecha,
+        `c_${id}`,
+        nombre,
+        "conquistador",
+        unidad ? `Unidad: ${unidad}` : "Club Caleb",
+        data,
+        undefined,
+        indice
+      );
+    }
+
+    const aspirantes: BloqueDatos = bloqueVacio();
+    for (const { id, data } of rawAspirantes) {
+      const nombre = nombreCompletoAspirante(data);
+      const asoc = typeof data.asociacion === "string" ? data.asociacion : "";
+      registrarPersona(
+        aspirantes.conFecha,
+        aspirantes.sinFecha,
+        `a_${id}`,
+        nombre,
+        "aspirante",
+        asoc ? `Asociación: ${asoc}` : "Aspirante",
+        data,
+        undefined,
+        indice
+      );
+    }
+
+    const consejeros: BloqueDatos = bloqueVacio();
+    for (const { id, data } of rawConsejeros) {
+      const unidades = Array.isArray(data.unidades)
+        ? (data.unidades as string[]).filter(Boolean).join(", ")
+        : "";
+      const detalleUnidades = unidades ? `Unidades: ${unidades}` : "Consejero";
+      const nombreTitular = String(data.nombre ?? "").trim();
+
+      if (nombreTitular) {
+        const fechaTit = extraerFechaNacimientoTitular(data);
+        registrarPersona(
+          consejeros.conFecha,
+          consejeros.sinFecha,
+          `co_${id}`,
+          nombreTitular,
+          "consejero",
+          detalleUnidades,
+          data,
+          fechaTit || undefined,
+          indice,
+          String(data.pin ?? "")
+        );
+      }
+
+      const nombreAsoc = String(data.consejeroAsociado ?? "").trim();
+      if (nombreAsoc) {
+        const fechaAsoc = extraerFechaNacimientoAsociado(data);
+        registrarPersona(
+          consejeros.conFecha,
+          consejeros.sinFecha,
+          `as_${id}`,
+          nombreAsoc,
+          "asociado",
+          `Asociado de ${nombreTitular || "consejero"}`,
+          data,
+          fechaAsoc || undefined,
+          indice
+        );
+      }
+    }
+
+    const directiva: BloqueDatos = bloqueVacio();
+    for (const { id, data } of rawDirectiva) {
+      const nombre = String(data.nombre ?? "").trim();
+      const cargo = String(data.cargo ?? "").trim();
+      registrarPersona(
+        directiva.conFecha,
+        directiva.sinFecha,
+        `d_${id}`,
+        nombre,
+        "directiva",
+        cargo || "Directiva",
+        data,
+        undefined,
+        indice,
+        String(data.pin ?? "")
+      );
+    }
+
+    return { conquis, aspirantes, consejeros, directiva };
+  }, [rawConquis, rawAspirantes, rawConsejeros, rawDirectiva, rawFichas]);
+
+  const conquis = bloques?.conquis ?? bloqueVacio();
+  const aspirantes = bloques?.aspirantes ?? bloqueVacio();
+  const consejeros = bloques?.consejeros ?? bloqueVacio();
+  const directiva = bloques?.directiva ?? bloqueVacio();
 
   const todasConFecha = useMemo(
     () => [
@@ -264,8 +363,7 @@ export default function CumpleanosProximos() {
     [todasSinFecha, todasConFecha]
   );
 
-  const estaCargando =
-    cargando.conquis || cargando.aspirantes || cargando.consejeros || cargando.directiva;
+  const estaCargando = bloques === null;
 
   const totalRegistrados = useMemo(
     () => contarPersonasUnicas(todasConFecha, todasSinFecha),

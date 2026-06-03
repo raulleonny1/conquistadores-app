@@ -79,6 +79,65 @@ export function normalizarNombrePersona(nombre: string): string {
     .trim();
 }
 
+function tokensNombre(nombre: string): string[] {
+  return normalizarNombrePersona(nombre).split(" ").filter(Boolean);
+}
+
+/**
+ * Misma persona con nombre corto vs completo (p. ej. "Caleb" / "Caleb Gómez", "Omar" / "Omar Pinilio").
+ */
+export function nombresCoinciden(a: string, b: string): boolean {
+  const na = normalizarNombrePersona(a);
+  const nb = normalizarNombrePersona(b);
+  if (!na || !nb) return false;
+  if (na === nb) return true;
+  if (na.includes(nb) || nb.includes(na)) return true;
+
+  const ta = tokensNombre(a);
+  const tb = tokensNombre(b);
+  if (!ta[0] || ta[0] !== tb[0]) return false;
+
+  if (ta.length === 1 || tb.length === 1) return true;
+  return ta[ta.length - 1] === tb[tb.length - 1];
+}
+
+export type EntradaFechaNacimiento = {
+  nombre: string;
+  fecha: string;
+  coleccion: string;
+  docId: string;
+};
+
+/** Índice en memoria para buscar fecha por nombre en cualquier registro del club. */
+export class IndiceFechasNacimiento {
+  private entradas: EntradaFechaNacimiento[] = [];
+  private porPin = new Map<string, string>();
+
+  agregar(nombre: string, fecha: string, coleccion: string, docId: string): void {
+    const f = normalizarFechaTexto(fecha);
+    if (!nombre.trim() || !f || !parseFechaNacimiento(f)) return;
+    this.entradas.push({ nombre: nombre.trim(), fecha: f, coleccion, docId });
+  }
+
+  agregarPorPin(pin: string, fecha: string): void {
+    const p = String(pin ?? "").trim();
+    const f = normalizarFechaTexto(fecha);
+    if (!p || !f || !parseFechaNacimiento(f)) return;
+    this.porPin.set(p, f);
+  }
+
+  buscar(nombre: string, pin?: string): string | null {
+    const p = String(pin ?? "").trim();
+    if (p && this.porPin.has(p)) return this.porPin.get(p)!;
+
+    if (!nombre.trim()) return null;
+    const coincidencias = this.entradas.filter((e) => nombresCoinciden(nombre, e.nombre));
+    if (coincidencias.length === 0) return null;
+    coincidencias.sort((a, b) => b.fecha.localeCompare(a.fecha));
+    return coincidencias[0].fecha;
+  }
+}
+
 const PRIORIDAD_TIPO: Record<TipoPersonaClub, number> = {
   directiva: 1,
   consejero: 2,
@@ -329,10 +388,22 @@ export function quitarSinFechaSiYaTieneFecha(
   sinFecha: RegistradoSinFecha[],
   conFecha: Omit<CumpleanosPersona, "diasHasta" | "editRegistroId">[]
 ): RegistradoSinFecha[] {
-  const nombresConFecha = new Set(
-    conFecha.map((p) => normalizarNombrePersona(p.nombre)).filter(Boolean)
-  );
-  return sinFecha.filter((p) => !nombresConFecha.has(normalizarNombrePersona(p.nombre)));
+  return sinFecha.filter((p) => {
+    const nombre = p.nombre;
+    return !conFecha.some((c) => nombresCoinciden(nombre, c.nombre));
+  });
+}
+
+/** Resuelve fecha local del documento o, si falta, en el índice global del club. */
+export function resolverFechaNacimiento(
+  data: Record<string, unknown>,
+  nombre: string,
+  indice?: IndiceFechasNacimiento,
+  campos: readonly string[] = CAMPOS_FECHA_NACIMIENTO
+): string {
+  const local = extraerDesdeCampos(data, campos);
+  if (local) return local;
+  return indice?.buscar(nombre) ?? "";
 }
 
 /** Quita el prefijo interno (c_, a_, co_, …) y devuelve el id de Firestore. */
