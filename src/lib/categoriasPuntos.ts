@@ -67,6 +67,35 @@ export function sumarPuntos(
   return getCategoriasConPuntos(puntos, etiquetasActividades).reduce((acc, c) => acc + c.valor, 0);
 }
 
+/** Clave de documento en calificacionesConquis (siempre el PIN de acceso). */
+export function clavePinCalificaciones(
+  data: { pin?: unknown } | null | undefined,
+  docId: string
+): string {
+  return String(data?.pin ?? docId).trim();
+}
+
+/**
+ * Índice pin → total de puntos desde la colección calificacionesConquis.
+ * Si hay varios documentos con el mismo PIN, se usa el total más alto (evita doble conteo).
+ */
+export function indexarTotalesPorPin(
+  docs: { id: string; data: () => Record<string, unknown> }[]
+): Record<string, number> {
+  const map: Record<string, number> = {};
+  for (const d of docs) {
+    const data = d.data();
+    const pinKey = clavePinCalificaciones(data, d.id);
+    if (!pinKey) continue;
+    const total = sumarPuntos(
+      data.puntos as Record<string, unknown> | undefined,
+      data.etiquetasActividades as Record<string, string> | undefined
+    );
+    map[pinKey] = Math.max(map[pinKey] ?? 0, total);
+  }
+  return map;
+}
+
 /** Columnas del historial semanal: solo categorías que aparecen con puntos en algún registro. */
 export function getCategoriasEnHistorial(
   historial: { puntos?: Record<string, unknown> }[]

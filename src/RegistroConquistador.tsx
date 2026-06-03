@@ -5,6 +5,7 @@ import { collection, addDoc, onSnapshot, doc, deleteDoc, updateDoc } from 'fireb
 import { logInfo, logError } from "@/src/lib/logger";
 import { handleError } from "@/src/lib/errorHandler";
 import { toast } from "react-hot-toast";
+import { generarPinUnicoClub } from "@/src/lib/pinUnico";
 
 export default function RegistroConquistador() {
   // ...existing code...
@@ -88,15 +89,11 @@ export default function RegistroConquistador() {
   }, []);
 
   // Generar PIN de 4 dígitos
-  function generarPin() {
-    return Math.floor(1000 + Math.random() * 9000).toString();
-  }
-
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     // ...existing code...
     try {
-      const pin = generarPin();
+      const pin = await generarPinUnicoClub();
       await addDoc(collection(db, 'RegistroConquis'), { ...form, pin });
       toast.success('Registro guardado en Firebase. PIN: ' + pin);
       logInfo('Registro guardado en Firebase. PIN: ' + pin);

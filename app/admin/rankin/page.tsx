@@ -6,6 +6,11 @@ import { db } from "@/src/firebase";
 import { collection, doc, getDoc, getDocs, query, where } from "firebase/firestore";
 import { ArrowLeft, Medal, Search, Trophy, UserRound } from "lucide-react";
 import { expandirConsejerosYAsociados } from "@/src/lib/actividadesCalificacion";
+import {
+  getCategoriasConPuntos,
+  indexarTotalesPorPin,
+  sumarPuntos,
+} from "@/src/lib/categoriasPuntos";
 
 type Participante = {
   id: string;
@@ -89,7 +94,7 @@ export default function RankinPage() {
           return {
             id: d.id,
             nombre: fullName || "Sin nombre",
-            pin: data.pin || d.id,
+            pin: String(data.pin ?? d.id).trim(),
             tipo: "conquistador",
           };
         });
@@ -99,7 +104,7 @@ export default function RankinPage() {
           return {
             id: d.id,
             nombre: data.nombre || "Sin nombre",
-            pin: data.pin || d.id,
+            pin: String(data.pin ?? d.id).trim(),
             tipo: "aspirante",
           };
         });
@@ -118,15 +123,12 @@ export default function RankinPage() {
           .sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
 
         const totalesSnapshot = await getDocs(collection(db, "calificacionesConquis"));
-        const totalesMap: TotalesPorPin = {};
-        totalesSnapshot.docs.forEach((d) => {
-          const data = d.data() as Partial<{ puntos: Record<string, unknown> }>;
-          const puntos = data.puntos || {};
-          totalesMap[d.id] = Object.values(puntos).reduce<number>(
-            (acc, value) => acc + toNumber(value),
-            0
-          );
-        });
+        const totalesMap: TotalesPorPin = indexarTotalesPorPin(
+          totalesSnapshot.docs.map((d) => ({
+            id: d.id,
+            data: () => d.data() as Record<string, unknown>,
+          }))
+        );
 
         setParticipantes(merged);
         setTotalesPorPin(totalesMap);
@@ -152,19 +154,20 @@ export default function RankinPage() {
           getDocs(query(collection(db, "calificacionesSemanal"), where("pin", "==", selectedPin))),
         ]);
 
-        const puntosMap = (totalesSnap.exists() ? (totalesSnap.data().puntos as Record<string, unknown>) : {}) || {};
+        const dataTotales = totalesSnap.exists() ? totalesSnap.data() : null;
+        const puntosMap =
+          (dataTotales?.puntos as Record<string, unknown> | undefined) || {};
+        const etiquetas =
+          (dataTotales?.etiquetasActividades as Record<string, string> | undefined) ||
+          {};
 
-        const categorias = CATEGORIAS_PUNTOS.map((cat) => ({
-          categoria: cat.nombre,
-          puntos: toNumber(puntosMap[cat.id]),
-        })).filter((c) => c.puntos > 0);
+        const categorias = getCategoriasConPuntos(puntosMap, etiquetas).map((c) => ({
+          categoria: c.nombre,
+          puntos: c.valor,
+        }));
 
-        const computedTotal = Object.values(puntosMap).reduce<number>(
-          (acc, value) => acc + toNumber(value),
-          0
-        );
         setResumenCategorias(categorias);
-        setTotalGeneral(computedTotal);
+        setTotalGeneral(sumarPuntos(puntosMap, etiquetas));
 
         const eventos: RegistroSemanal[] = historialSnap.docs
           .map((d) => {

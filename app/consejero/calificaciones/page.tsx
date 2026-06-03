@@ -10,6 +10,7 @@ import {
 import { useConsejeroPuedeCalificar } from "@/src/hooks/useConsejeroPuedeCalificar";
 import ConsejeroSinPermisoCalificar from "@/src/components/consejero/ConsejeroSinPermisoCalificar";
 import { storageSeguroGet } from "@/src/lib/storageSeguro";
+import { sumarPuntos, toNumberPuntos } from "@/src/lib/categoriasPuntos";
 
 const CATEGORIAS_PUNTOS = [
   { id: "puntualidad", nombre: "Puntualidad" },
@@ -96,11 +97,7 @@ function CalificacionesConsejeroPageInner() {
     fetchCalificaciones();
   }, [pin, puedeCalificar]);
 
-  const total = Object.values(puntos).reduce((acc: number, val) => {
-    if (typeof val === "number") return acc + val;
-    if (typeof val === "string") return acc + (parseInt(val) || 0);
-    return acc;
-  }, 0);
+  const total = sumarPuntos(puntos);
 
   if (loadingPermiso || (puedeCalificar && loading)) {
     return <div className="text-center mt-10 text-lg text-indigo-700">Cargando datos...</div>;
@@ -153,13 +150,20 @@ function CalificacionesConsejeroPageInner() {
             setInputFechas(prev => ({ ...prev, [catId]: value }));
           };
           const handleAgregar = async (catId: string) => {
+            if (!puedeCalificar) {
+              alert("No tienes permiso para calificar.");
+              return;
+            }
             const inputFecha = inputFechas[catId] || "";
             const inputValor = inputValores[catId] || "";
             if (!inputFecha) return alert("Selecciona una fecha");
             const valorNumerico = parseInt(inputValor, 10) || 0;
             if (valorNumerico <= 0) return alert("Ingresa puntos mayores a 0");
             const ref = doc(db, "calificacionesConquis", pin);
-            const puntosActualizados = { ...puntos, [catId]: toNumber(valor) + valorNumerico };
+            const puntosActualizados = {
+              ...puntos,
+              [catId]: toNumberPuntos(puntos[catId]) + valorNumerico,
+            };
             await setDoc(ref, {
               pin,
               nombre,

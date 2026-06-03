@@ -4,6 +4,7 @@ import { db } from "../../../src/firebase";
 import { formatFechaDDMMYYYY } from "@/src/utils/formatoFecha";
 import { collection, addDoc, onSnapshot, deleteDoc, doc, updateDoc } from "firebase/firestore";
 import { ArrowLeft } from "lucide-react";
+import { generarPinUnicoClub, validarPinDisponible } from "@/src/lib/pinUnico";
 
 const cargos = [
   "Director/a",
@@ -46,8 +47,6 @@ export default function DirectivaPage() {
   };
 
   // Generar PIN aleatorio
-  const generarPin = () => Math.floor(1000 + Math.random() * 9000).toString();
-
   // Cargar directiva en tiempo real
   useEffect(() => {
     const unsub = onSnapshot(collection(db, "directivaClub"), snap => {
@@ -60,14 +59,34 @@ export default function DirectivaPage() {
     setLoading(true);
     try {
       if (editId) {
+        const pinActual = directiva.find((d) => d.id === editId)?.pin;
+        if (form.cargo === "Director/a") {
+          const val = await validarPinDisponible("1902", [
+            { coleccion: "directivaClub", docId: editId },
+          ]);
+          if (!val.ok && pinActual !== "1902") {
+            alert(val.mensaje);
+            setLoading(false);
+            return;
+          }
+        }
         await updateDoc(doc(db, "directivaClub", editId), {
-          ...form
+          ...form,
+          ...(form.cargo === "Director/a" ? { pin: "1902" } : {}),
         });
         alert("Directiva actualizada correctamente.");
         setEditId(null);
       } else {
-        // Si el cargo es Director/a, usar PIN fijo 1902
-        const pin = form.cargo === "Director/a" ? "1902" : generarPin();
+        const pin =
+          form.cargo === "Director/a" ? "1902" : await generarPinUnicoClub();
+        if (form.cargo === "Director/a") {
+          const val = await validarPinDisponible("1902");
+          if (!val.ok) {
+            alert(val.mensaje);
+            setLoading(false);
+            return;
+          }
+        }
         await addDoc(collection(db, "directivaClub"), {
           ...form,
           pin,

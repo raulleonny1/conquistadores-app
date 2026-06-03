@@ -21,6 +21,7 @@ import { buildWhatsappUrl, mensajePinAspirante } from "@/src/utils/whatsapp";
 import FichaMedicaUpload from "@/src/components/forms/FichaMedicaUpload";
 import { ArrowLeft, MessageCircle } from "lucide-react";
 import { toast } from "react-hot-toast";
+import { generarPinUnicoClub } from "@/src/lib/pinUnico";
 
 type AspiranteDoc = {
   id: string;
@@ -65,7 +66,6 @@ export default function AspirantePage() {
   const [aspirantes, setAspirantes] = useState<AspiranteDoc[]>([]);
   const editarDesdeUrlAplicado = useRef(false);
 
-  const generarPin = () => Math.floor(1000 + Math.random() * 9000).toString();
 
   useEffect(() => {
     const unsub = onSnapshot(collection(db, "aspirantesGuiaMayor"), (snap) => {
@@ -132,7 +132,7 @@ export default function AspirantePage() {
 
     setLoading(true);
     try {
-      const docId = editId ?? generarPin();
+      const docId = editId ?? (await generarPinUnicoClub());
 
       const telefono = form.telefono.trim();
 

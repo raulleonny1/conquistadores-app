@@ -23,7 +23,7 @@ import {
   esCatalogoAdminCalificaciones,
   type CatalogoCalificacion,
 } from "@/src/lib/actividadesCalificacion";
-import { toNumberPuntos } from "@/src/lib/categoriasPuntos";
+import { indexarTotalesPorPin, toNumberPuntos } from "@/src/lib/categoriasPuntos";
 import { nombreGrupoCoincide } from "@/src/lib/unidades";
 
 type Modo = "individual" | "grupo";
@@ -111,17 +111,14 @@ export default function RegistroActividadesAspirantesPage() {
     });
 
     const unsubTotales = onSnapshot(collection(db, "calificacionesConquis"), (snap) => {
-      const map: Record<string, number> = {};
-      snap.docs.forEach((d) => {
-        const data = d.data() as { pin?: string; puntos?: Record<string, unknown> };
-        const pinKey = (data.pin || d.id).trim();
-        const puntos = data.puntos || {};
-        map[pinKey] = Object.values(puntos).reduce<number>(
-          (acc, v) => acc + toNumberPuntos(v),
-          0
-        );
-      });
-      setTotalesPin(map);
+      setTotalesPin(
+        indexarTotalesPorPin(
+          snap.docs.map((d) => ({
+            id: d.id,
+            data: () => d.data() as Record<string, unknown>,
+          }))
+        )
+      );
     });
 
     return () => {

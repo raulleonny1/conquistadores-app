@@ -19,11 +19,13 @@ import {
 } from "lucide-react";
 import {
   aplicarCalificacionCatalogo,
+  dedupeConquistadoresRegistro,
   esCatalogoAdminCalificaciones,
+  filtrarConquistadoresBusqueda,
   type CatalogoCalificacion,
   type ConquistadorRegistro,
 } from "@/src/lib/actividadesCalificacion";
-import { toNumberPuntos } from "@/src/lib/categoriasPuntos";
+import { indexarTotalesPorPin, toNumberPuntos } from "@/src/lib/categoriasPuntos";
 import { nombreGrupoCoincide } from "@/src/lib/unidades";
 
 type Modo = "individual" | "grupo";
@@ -56,6 +58,7 @@ export default function RegistroActividadesConquistadoresPage() {
   const [busqueda, setBusqueda] = useState("");
   const [conquistadores, setConquistadores] = useState<ConquistadorRegistro[]>([]);
   const [catalogo, setCatalogo] = useState<CatalogoCalificacion[]>([]);
+  /** Id del documento en RegistroConquis (no confundir con PIN de acceso). */
   const [pinSeleccionado, setPinSeleccionado] = useState("");
   const [unidadGrupo, setUnidadGrupo] = useState("");
   const [seleccionadosGrupo, setSeleccionadosGrupo] = useState<Record<string, boolean>>({});
@@ -84,7 +87,7 @@ export default function RegistroActividadesConquistadoresPage() {
             unidad?: string;
           };
           const nombre = [data.nombre, data.apellido].filter(Boolean).join(" ").trim();
-          const pin = (data.pin || d.id).trim();
+          const pin = String(data.pin ?? d.id).trim();
           return {
             id: d.id,
             pin,
@@ -92,9 +95,12 @@ export default function RegistroActividadesConquistadoresPage() {
             unidad: (data.unidad || "Sin unidad").trim(),
           };
         })
-        .filter((c) => Boolean(c.pin))
-        .sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
-      setConquistadores(lista);
+        .filter((c) => Boolean(c.pin));
+      setConquistadores(
+        dedupeConquistadoresRegistro(lista).sort((a, b) =>
+          a.nombre.localeCompare(b.nombre, "es")
+        )
+      );
     });
 
     const unsubCatalogo = onSnapshot(collection(db, "calificaciones"), (snap) => {
@@ -112,17 +118,14 @@ export default function RegistroActividadesConquistadoresPage() {
     });
 
     const unsubTotales = onSnapshot(collection(db, "calificacionesConquis"), (snap) => {
-      const map: Record<string, number> = {};
-      snap.docs.forEach((d) => {
-        const data = d.data() as { pin?: string; puntos?: Record<string, unknown> };
-        const pinKey = (data.pin || d.id).trim();
-        const puntos = data.puntos || {};
-        map[pinKey] = Object.values(puntos).reduce<number>(
-          (acc, v) => acc + toNumberPuntos(v),
-          0
-        );
-      });
-      setTotalesPin(map);
+      setTotalesPin(
+        indexarTotalesPorPin(
+          snap.docs.map((d) => ({
+            id: d.id,
+            data: () => d.data() as Record<string, unknown>,
+          }))
+        )
+      );
     });
 
     return () => {
@@ -133,28 +136,26 @@ export default function RegistroActividadesConquistadoresPage() {
     };
   }, []);
 
+  const conquistadoresFiltrados = useMemo(
+    () => filtrarConquistadoresBusqueda(conquistadores, busqueda),
+    [conquistadores, busqueda]
+  );
+
   useEffect(() => {
-    if (conquistadores.length > 0 && !pinSeleccionado) {
-      setPinSeleccionado(conquistadores[0].pin);
+    if (modo !== "individual" || conquistadores.length === 0) return;
+    const listaVisible = busqueda.trim() ? conquistadoresFiltrados : conquistadores;
+    if (listaVisible.length === 0) return;
+    const enLista = listaVisible.some((c) => c.id === pinSeleccionado);
+    if (!pinSeleccionado || !enLista) {
+      setPinSeleccionado(listaVisible[0].id);
     }
-  }, [conquistadores, pinSeleccionado]);
+  }, [modo, conquistadores, pinSeleccionado, busqueda, conquistadoresFiltrados]);
 
   useEffect(() => {
     if (catalogo.length > 0 && !catalogoGrupoId) {
       setCatalogoGrupoId(catalogo[0].id);
     }
   }, [catalogo, catalogoGrupoId]);
-
-  const conquistadoresFiltrados = useMemo(() => {
-    const t = busqueda.trim().toLowerCase();
-    if (!t) return conquistadores;
-    return conquistadores.filter(
-      (c) =>
-        c.nombre.toLowerCase().includes(t) ||
-        c.pin.includes(t) ||
-        c.unidad.toLowerCase().includes(t)
-    );
-  }, [conquistadores, busqueda]);
 
   const unidades = useMemo(() => {
     const set = new Set<string>();
@@ -166,7 +167,7 @@ export default function RegistroActividadesConquistadoresPage() {
   }, [conquistadores, unidadesOficiales]);
 
   const seleccionado = useMemo(
-    () => conquistadores.find((c) => c.pin === pinSeleccionado),
+    () => conquistadores.find((c) => c.id === pinSeleccionado || c.pin === pinSeleccionado),
     [conquistadores, pinSeleccionado]
   );
 
@@ -378,7 +379,11 @@ export default function RegistroActividadesConquistadoresPage() {
                   className="w-full rounded-xl border border-slate-200 py-2 pl-9 pr-3 text-sm"
                 />
               </div>
-              <p className="mt-2 text-xs text-slate-500">{conquistadores.length} registrados</p>
+              <p className="mt-2 text-xs text-slate-500">
+                {busqueda.trim()
+                  ? `${listaSidebar.length} de ${conquistadores.length} registrados`
+                  : `${conquistadores.length} registrados`}
+              </p>
             </div>
             <ul className="max-h-[28rem] overflow-y-auto p-2">
               {modo === "grupo" && unidadGrupo && (
@@ -396,15 +401,15 @@ export default function RegistroActividadesConquistadoresPage() {
                 listaSidebar.map((c) => {
                   const activo =
                     modo === "individual"
-                      ? c.pin === pinSeleccionado
+                      ? c.id === pinSeleccionado
                       : Boolean(seleccionadosGrupo[c.pin]);
                   return (
-                    <li key={c.pin}>
+                    <li key={c.id}>
                       <button
                         type="button"
                         onClick={() => {
                           if (modo === "individual") {
-                            setPinSeleccionado(c.pin);
+                            setPinSeleccionado(c.id);
                           } else {
                             setSeleccionadosGrupo((prev) => ({
                               ...prev,

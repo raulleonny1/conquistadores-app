@@ -5,6 +5,7 @@ import { getDocs, doc, updateDoc, deleteDoc, addDoc, collection, onSnapshot } fr
 import { db } from "@/src/firebase";
 import { especialidadesBase } from "@/src/data/especialidades";
 import { handleError } from "@/src/lib/errorHandler";
+import { generarPinUnicoClub, validarPinDisponible } from "@/src/lib/pinUnico";
 import { toast } from "react-hot-toast";
 import Link from "next/link";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -240,15 +241,22 @@ export default function RegistroConquisPageInner({ unidades: initialUnidades, co
   const categorias = form.especialidadArea ? Array.from(new Set(especialidadesBase.filter(e => e.area === form.especialidadArea).map(e => e.categoria))) : [];
   const especialidades = form.especialidadArea && form.especialidadCategoria ? especialidadesBase.filter(e => e.area === form.especialidadArea && e.categoria === form.especialidadCategoria).map(e => e.especialidad) : [];
 
-  function generarPin() {
-    return Math.floor(1000 + Math.random() * 9000).toString();
-  }
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
     try {
       if (editMode && editId) {
-        // Editar
+        const pinEdit = String(form.pin).trim();
+        if (pinEdit) {
+          const validacion = await validarPinDisponible(pinEdit, [
+            { coleccion: "RegistroConquis", docId: editId },
+          ]);
+          if (!validacion.ok) {
+            toast.error(validacion.mensaje);
+            setSaving(false);
+            return;
+          }
+        }
         const rest = { ...form };
         await updateDoc(doc(db, 'RegistroConquis', editId), rest);
         setEditId(null);
@@ -256,7 +264,7 @@ export default function RegistroConquisPageInner({ unidades: initialUnidades, co
         toast.success("Conquistador actualizado");
       } else {
         // Registrar
-        const pin = generarPin();
+        const pin = await generarPinUnicoClub();
         await addDoc(collection(db, "RegistroConquis"), {
           ...form,
           pin,

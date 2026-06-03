@@ -26,6 +26,7 @@ import {
 import { useRouter } from 'next/navigation';
 
 import { collection, getDocs, updateDoc, doc } from 'firebase/firestore';
+import { cargarPinsOcupadosClub, generarPinsUnicosEnLote } from '@/src/lib/pinUnico';
 import { db } from '../../src/firebase';
 import CumpleanosProximos from '@/src/components/admin/CumpleanosProximos';
 
@@ -203,9 +204,12 @@ const AdminPage = () => {
   const handleResetPins = async () => {
     setLoadingPins(true);
     const snapshot = await getDocs(collection(db, "consejeros"));
+    const ocupados = await cargarPinsOcupadosClub();
+    const pines = await generarPinsUnicosEnLote(snapshot.docs.length, ocupados);
     const updates: {nombre: string, nuevoPin: string}[] = [];
-    for (const docSnap of snapshot.docs) {
-      const nuevoPin = Math.floor(1000 + Math.random() * 9000).toString();
+    for (let i = 0; i < snapshot.docs.length; i++) {
+      const docSnap = snapshot.docs[i];
+      const nuevoPin = pines[i];
       await updateDoc(doc(db, "consejeros", docSnap.id), { pin: nuevoPin });
       updates.push({ nombre: docSnap.data().nombre || docSnap.id, nuevoPin });
     }

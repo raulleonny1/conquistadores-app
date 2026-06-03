@@ -5,26 +5,11 @@ import { toast } from 'react-hot-toast';
 import { db } from '../../../src/firebase';
 import { collection, addDoc, doc, getDocs, updateDoc } from 'firebase/firestore';
 import { handleError } from '@/src/lib/errorHandler';
-
-function crearPinEnSet(pinsOcupados: Set<string>): string {
-  for (let intento = 0; intento < 80; intento++) {
-    const pin = String(Math.floor(1000 + Math.random() * 9000));
-    if (!pinsOcupados.has(pin)) return pin;
-  }
-  let pin = String(Date.now()).slice(-4);
-  while (pinsOcupados.has(pin)) pin = String(Math.floor(1000 + Math.random() * 9000));
-  return pin;
-}
-
-async function generarPinConsejeroUnico(): Promise<string> {
-  const snap = await getDocs(collection(db, 'consejeros'));
-  const pinsOcupados = new Set(
-    snap.docs.map((d) => String(d.data().pin ?? '').trim()).filter(Boolean)
-  );
-  const pin = crearPinEnSet(pinsOcupados);
-  pinsOcupados.add(pin);
-  return pin;
-}
+import {
+  cargarPinsOcupadosClub,
+  crearPinEnSet,
+  generarPinUnicoClub,
+} from '@/src/lib/pinUnico';
 
 type ConsejeroPageClientProps = {
   initialUnidadesRegistradas?: string[];
@@ -85,7 +70,7 @@ export default function ConsejeroPage({ initialUnidadesRegistradas }: ConsejeroP
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     try {
-      const pin = await generarPinConsejeroUnico();
+      const pin = await generarPinUnicoClub();
       await addDoc(collection(db, 'consejeros'), {
         nombre: form.nombre.trim(),
         nacimiento: form.nacimiento.trim(),
@@ -219,9 +204,7 @@ function ConsejerosList({
   useEffect(() => {
     const fetchConsejeros = async () => {
       const querySnapshot = await getDocs(collection(db, 'consejeros'));
-      const pinsOcupados = new Set(
-        querySnapshot.docs.map((d) => String(d.data().pin ?? '').trim()).filter(Boolean)
-      );
+      const pinsOcupados = await cargarPinsOcupadosClub();
       const lista: Consejero[] = [];
       let pinsAsignados = 0;
 
@@ -233,6 +216,13 @@ function ConsejerosList({
           pinsOcupados.add(pin);
           await updateDoc(doc(db, 'consejeros', docSnap.id), { pin });
           pinsAsignados++;
+        } else if (pinsOcupados.has(pin)) {
+          pin = crearPinEnSet(pinsOcupados);
+          pinsOcupados.add(pin);
+          await updateDoc(doc(db, 'consejeros', docSnap.id), { pin });
+          pinsAsignados++;
+        } else {
+          pinsOcupados.add(pin);
         }
         lista.push({ id: docSnap.id, ...data, pin });
       }
@@ -241,7 +231,7 @@ function ConsejerosList({
       setConsejeros(lista);
       if (pinsAsignados > 0) {
         toast.success(
-          `PIN asignado automáticamente a ${pinsAsignados} consejero(s) que no tenían uno.`
+          `PIN único asignado o corregido en ${pinsAsignados} consejero(s) (sin duplicados en el club).`
         );
       }
     };

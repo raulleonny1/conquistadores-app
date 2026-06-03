@@ -35,23 +35,39 @@ const EvaluarGuiaMayorPage = () => {
       "especialidades",
     ];
 
-    const sumarPuntosAspirante = async (pinAspirante: string, delta: number) => {
-      if (!pinAspirante || delta === 0) return;
-      const ref = doc(db, "calificacionesConquis", pinAspirante);
+    const sumarPuntosAspirante = async (aspiranteDocId: string, delta: number) => {
+      if (!aspiranteDocId || delta === 0) return;
+
+      let pinKey = aspiranteDocId.trim();
+      let nombreActual = "";
+      const aspiranteSnap = await getDoc(doc(db, "aspirantesGuiaMayor", aspiranteDocId));
+      if (aspiranteSnap.exists()) {
+        const ad = aspiranteSnap.data();
+        pinKey = String(ad.pin ?? aspiranteDocId).trim();
+        nombreActual = [ad.nombre, ad.apellido].filter(Boolean).join(" ").trim() || String(ad.nombre ?? "");
+      } else {
+        const qAsp = query(
+          collection(db, "aspirantesGuiaMayor"),
+          where("pin", "==", aspiranteDocId)
+        );
+        const qSnap = await getDocs(qAsp);
+        if (!qSnap.empty) {
+          const ad = qSnap.docs[0].data();
+          pinKey = String(ad.pin ?? qSnap.docs[0].id).trim();
+          nombreActual = [ad.nombre, ad.apellido].filter(Boolean).join(" ").trim() || String(ad.nombre ?? "");
+        }
+      }
+
+      const ref = doc(db, "calificacionesConquis", pinKey);
       const snap = await getDoc(ref);
       let puntosActuales: Record<string, number | string> = {};
-      let nombreActual = "";
 
       if (snap.exists()) {
         const data = snap.data();
         puntosActuales = data.puntos || {};
-        nombreActual = data.nombre || "";
+        if (!nombreActual) nombreActual = data.nombre || "";
       } else {
         puntosActuales = CATEGORIAS_BASE.reduce((acc, key) => ({ ...acc, [key]: 0 }), {});
-        const aspiranteSnap = await getDoc(doc(db, "aspirantesGuiaMayor", pinAspirante));
-        if (aspiranteSnap.exists()) {
-          nombreActual = aspiranteSnap.data().nombre || "";
-        }
       }
 
       const tareasActual = typeof puntosActuales.tareas === "number"
@@ -60,7 +76,7 @@ const EvaluarGuiaMayorPage = () => {
       const tareasNuevo = Math.max(0, tareasActual + delta);
 
       await setDoc(ref, {
-        pin: pinAspirante,
+        pin: pinKey,
         nombre: nombreActual,
         puntos: {
           ...puntosActuales,
@@ -69,7 +85,7 @@ const EvaluarGuiaMayorPage = () => {
       }, { merge: true });
 
       await addDoc(collection(db, "calificacionesSemanal"), {
-        pin: pinAspirante,
+        pin: pinKey,
         fecha: new Date().toLocaleDateString(),
         origen: "evaluacion_guia_mayor",
         evaluador,
