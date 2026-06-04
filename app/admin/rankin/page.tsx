@@ -4,13 +4,17 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { db } from "@/src/firebase";
 import { collection, doc, getDoc, getDocs, query, where } from "firebase/firestore";
-import { ArrowLeft, Medal, Search, Trophy, UserRound } from "lucide-react";
+import { ArrowLeft, Medal, Search, Trophy, UserRound, Users } from "lucide-react";
 import { expandirConsejerosYAsociados } from "@/src/lib/actividadesCalificacion";
 import {
   getCategoriasConPuntos,
   indexarTotalesPorPin,
   sumarPuntos,
 } from "@/src/lib/categoriasPuntos";
+import {
+  calcularRankingUnidades,
+  type ConquistadorUnidad,
+} from "@/src/lib/rankingUnidades";
 
 type Participante = {
   id: string;
@@ -71,7 +75,11 @@ export default function RankinPage() {
   const [tipoFiltro, setTipoFiltro] = useState<
     "todos" | "conquistador" | "aspirante" | "consejero"
   >("todos");
+  const [vistaRanking, setVistaRanking] = useState<"personas" | "unidades">("personas");
   const [participantes, setParticipantes] = useState<Participante[]>([]);
+  const [conquisUnidad, setConquisUnidad] = useState<ConquistadorUnidad[]>([]);
+  const [catalogoUnidades, setCatalogoUnidades] = useState<string[]>([]);
+  const [selectedUnidad, setSelectedUnidad] = useState<string>("");
   const [totalesPorPin, setTotalesPorPin] = useState<TotalesPorPin>({});
   const [selectedPin, setSelectedPin] = useState<string>("");
   const [resumenCategorias, setResumenCategorias] = useState<CategoriaResumen[]>([]);
@@ -82,11 +90,32 @@ export default function RankinPage() {
     const loadParticipantes = async () => {
       setLoading(true);
       try {
-        const [conquisSnap, aspirantesSnap, consejerosSnap] = await Promise.all([
+        const [conquisSnap, aspirantesSnap, consejerosSnap, unidadesSnap] =
+          await Promise.all([
           getDocs(collection(db, "RegistroConquis")),
           getDocs(collection(db, "aspirantesGuiaMayor")),
           getDocs(collection(db, "consejeros")),
+          getDocs(collection(db, "unidades")),
         ]);
+
+        const unidadesOficiales = unidadesSnap.docs
+          .map((d) => String((d.data() as { nombre?: string }).nombre ?? "").trim())
+          .filter(Boolean);
+
+        const conquisUnidadLista: ConquistadorUnidad[] = conquisSnap.docs.map((d) => {
+          const data = d.data() as Partial<{
+            nombre: string;
+            apellido: string;
+            pin: string;
+            unidad: string;
+          }>;
+          const fullName = [data.nombre || "", data.apellido || ""].join(" ").trim();
+          return {
+            pin: String(data.pin ?? d.id).trim(),
+            nombre: fullName || "Sin nombre",
+            unidad: (data.unidad || "Sin unidad").trim() || "Sin unidad",
+          };
+        });
 
         const conquis: Participante[] = conquisSnap.docs.map((d) => {
           const data = d.data() as Partial<{ nombre: string; apellido: string; pin: string }>;
@@ -131,9 +160,19 @@ export default function RankinPage() {
         );
 
         setParticipantes(merged);
+        setConquisUnidad(conquisUnidadLista.filter((c) => Boolean(c.pin)));
+        setCatalogoUnidades(unidadesOficiales);
         setTotalesPorPin(totalesMap);
         if (merged.length > 0) {
           setSelectedPin((prev) => prev || merged[0].pin);
+        }
+        const rankingUnidades = calcularRankingUnidades(
+          conquisUnidadLista,
+          totalesMap,
+          unidadesOficiales
+        );
+        if (rankingUnidades.length > 0) {
+          setSelectedUnidad((prev) => prev || rankingUnidades[0].unidad);
         }
       } finally {
         setLoading(false);
@@ -195,6 +234,22 @@ export default function RankinPage() {
     loadDetalle();
   }, [selectedPin]);
 
+  const rankingUnidades = useMemo(
+    () => calcularRankingUnidades(conquisUnidad, totalesPorPin, catalogoUnidades),
+    [conquisUnidad, totalesPorPin, catalogoUnidades]
+  );
+
+  const rankingUnidadesFiltrado = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    if (!term) return rankingUnidades;
+    return rankingUnidades.filter((u) => u.unidad.toLowerCase().includes(term));
+  }, [rankingUnidades, search]);
+
+  const unidadSeleccionada = useMemo(
+    () => rankingUnidades.find((u) => u.unidad === selectedUnidad),
+    [rankingUnidades, selectedUnidad]
+  );
+
   const filteredParticipantes = useMemo(() => {
     const term = search.trim().toLowerCase();
     const filteredByType =
@@ -227,10 +282,37 @@ export default function RankinPage() {
           <div>
             <h1 className="text-2xl font-black text-slate-800">Ranking General</h1>
             <p className="text-sm text-slate-500">
-              Puntos totales y detalle por evento para conquistadores, aspirantes y consejeros.
+              Puntos totales por persona o sumados por unidad de conquistadores.
             </p>
           </div>
-          <button
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex rounded-xl border border-slate-200 bg-slate-50 p-1">
+              <button
+                type="button"
+                onClick={() => setVistaRanking("personas")}
+                className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold ${
+                  vistaRanking === "personas"
+                    ? "bg-indigo-600 text-white"
+                    : "text-slate-600 hover:bg-white"
+                }`}
+              >
+                <UserRound className="h-3.5 w-3.5" />
+                Por persona
+              </button>
+              <button
+                type="button"
+                onClick={() => setVistaRanking("unidades")}
+                className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold ${
+                  vistaRanking === "unidades"
+                    ? "bg-cyan-600 text-white"
+                    : "text-slate-600 hover:bg-white"
+                }`}
+              >
+                <Users className="h-3.5 w-3.5" />
+                Por unidad
+              </button>
+            </div>
+            <button
             type="button"
             onClick={() => router.push("/admin")}
             className="inline-flex items-center gap-2 rounded-lg bg-slate-200 px-4 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-300"
@@ -238,10 +320,13 @@ export default function RankinPage() {
             <ArrowLeft size={16} />
             Volver al menu
           </button>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
           <aside className="lg:col-span-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            {vistaRanking === "personas" ? (
+              <>
             <div className="mb-4 flex gap-2">
               <button
                 type="button"
@@ -342,10 +427,155 @@ export default function RankinPage() {
                 })}
               </ul>
             )}
+              </>
+            ) : (
+              <>
+                <p className="mb-3 text-xs text-slate-500">
+                  Total de calificaciones de todos los conquistadores de cada unidad.
+                </p>
+                <div className="relative mb-4">
+                  <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+                  <input
+                    type="search"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    placeholder="Buscar unidad..."
+                    className="w-full rounded-lg border border-slate-200 bg-slate-50 py-2 pl-9 pr-3 text-sm focus:border-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-200"
+                  />
+                </div>
+                {loading ? (
+                  <p className="py-8 text-center text-sm text-slate-500">Cargando unidades...</p>
+                ) : rankingUnidadesFiltrado.length === 0 ? (
+                  <p className="py-8 text-center text-sm text-slate-500">
+                    No hay conquistadores con unidad registrada.
+                  </p>
+                ) : (
+                  <ul className="space-y-2">
+                    {rankingUnidadesFiltrado.map((u, idx) => {
+                      const active = u.unidad === selectedUnidad;
+                      return (
+                        <li key={u.unidad}>
+                          <button
+                            type="button"
+                            onClick={() => setSelectedUnidad(u.unidad)}
+                            className={`w-full rounded-xl border px-3 py-3 text-left transition ${
+                              active
+                                ? "border-cyan-300 bg-cyan-50"
+                                : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50"
+                            }`}
+                          >
+                            <div className="flex items-start justify-between gap-2">
+                              <div>
+                                <p className="font-semibold text-slate-800">
+                                  #{idx + 1} {u.unidad}
+                                </p>
+                                <p className="mt-1 text-xs text-slate-500">
+                                  {u.cantidadMiembros} conquistador
+                                  {u.cantidadMiembros !== 1 ? "es" : ""}
+                                </p>
+                              </div>
+                              <span className="rounded-full bg-amber-100 px-2 py-1 text-xs font-bold text-amber-800">
+                                {u.totalPuntos}
+                              </span>
+                            </div>
+                          </button>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+              </>
+            )}
           </aside>
 
           <section className="lg:col-span-8 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-            {!selectedParticipante ? (
+            {vistaRanking === "unidades" ? (
+              !unidadSeleccionada ? (
+                <div className="flex min-h-72 items-center justify-center text-slate-500">
+                  Selecciona una unidad para ver el detalle.
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <div className="rounded-xl border border-cyan-200 bg-cyan-50 p-4">
+                      <p className="text-xs font-bold uppercase tracking-widest text-cyan-700">
+                        Total de la unidad
+                      </p>
+                      <div className="mt-2 flex items-center gap-2 text-3xl font-black text-cyan-900">
+                        <Trophy className="h-7 w-7" />
+                        {unidadSeleccionada.totalPuntos}
+                      </div>
+                      <p className="text-sm text-cyan-700">puntos sumados</p>
+                    </div>
+                    <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                      <p className="text-xs font-bold uppercase tracking-widest text-slate-500">
+                        Unidad
+                      </p>
+                      <div className="mt-2 flex items-center gap-2 text-lg font-bold text-slate-800">
+                        <Users className="h-5 w-5 text-cyan-600" />
+                        {unidadSeleccionada.unidad}
+                      </div>
+                      <p className="mt-1 text-xs text-slate-500">
+                        {unidadSeleccionada.cantidadMiembros} miembros en el registro
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="rounded-xl border border-slate-200">
+                    <div className="border-b border-slate-200 px-4 py-3">
+                      <h2 className="text-sm font-bold uppercase tracking-wider text-slate-600">
+                        Puntos por conquistador
+                      </h2>
+                    </div>
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full text-sm">
+                        <thead className="bg-slate-100 text-xs uppercase tracking-wider text-slate-600">
+                          <tr>
+                            <th className="px-4 py-3 text-left">#</th>
+                            <th className="px-4 py-3 text-left">Nombre</th>
+                            <th className="px-4 py-3 text-right">Puntos</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {unidadSeleccionada.miembros.map((m, i) => (
+                            <tr key={m.pin} className="border-t border-slate-200">
+                              <td className="px-4 py-3 text-slate-500">{i + 1}</td>
+                              <td className="px-4 py-3 font-medium text-slate-800">{m.nombre}</td>
+                              <td className="px-4 py-3 text-right font-bold text-indigo-700">
+                                {m.puntos}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                        <tfoot className="border-t-2 border-slate-300 bg-slate-50">
+                          <tr>
+                            <td colSpan={2} className="px-4 py-3 text-right font-bold text-slate-700">
+                              Total unidad
+                            </td>
+                            <td className="px-4 py-3 text-right font-black text-cyan-800">
+                              {unidadSeleccionada.totalPuntos}
+                            </td>
+                          </tr>
+                        </tfoot>
+                      </table>
+                    </div>
+                  </div>
+
+                  <p className="text-xs text-slate-500">
+                    Para calificar a toda la unidad de una vez: Admin → Registros →{" "}
+                    <button
+                      type="button"
+                      className="font-semibold text-cyan-700 underline"
+                      onClick={() => router.push("/admin/registros/actividades-conquistadores")}
+                    >
+                      Actividades conquistadores
+                    </button>{" "}
+                    → modo «Por grupo (unidad)». Los consejeros pueden hacerlo desde su panel →
+                    calificaciones por unidad.
+                  </p>
+                </div>
+              )
+            ) : !selectedParticipante ? (
               <div className="flex min-h-72 items-center justify-center text-slate-500">
                 Selecciona una persona para ver su detalle.
               </div>
