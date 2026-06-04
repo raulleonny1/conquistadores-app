@@ -3,12 +3,14 @@ import { canonicalizarUnidad, normalizarUnidad } from "@/src/lib/unidades";
 export type MiembroUnidadRanking = {
   pin: string;
   nombre: string;
-  puntos: number;
+  /** Puntos personales (calificación individual), independientes de la unidad. */
+  puntosPersonales: number;
 };
 
 export type UnidadRanking = {
   unidad: string;
-  totalPuntos: number;
+  /** Total de calificaciones hechas «por unidad» (un solo registro en Firebase). */
+  totalPuntosUnidad: number;
   cantidadMiembros: number;
   miembros: MiembroUnidadRanking[];
 };
@@ -31,11 +33,12 @@ export function dedupeConquisPorPin(lista: ConquistadorUnidad[]): ConquistadorUn
 }
 
 /**
- * Suma puntos de calificacionesConquis por unidad (solo conquistadores registrados).
+ * Ranking por unidad: total de puntos del documento de unidad + desglose personal por miembro.
  */
 export function calcularRankingUnidades(
   conquis: ConquistadorUnidad[],
-  totalesPorPin: Record<string, number>,
+  totalesPersonalesPorPin: Record<string, number>,
+  totalesUnidadPorClaveNorm: Record<string, number>,
   catalogoUnidades: string[] = []
 ): UnidadRanking[] {
   const porUnidad = new Map<
@@ -49,13 +52,12 @@ export function calcularRankingUnidades(
       ? canonicalizarUnidad(rawUnidad, catalogoUnidades)
       : rawUnidad;
     const key = normalizarUnidad(nombreUnidad);
-    const puntos = totalesPorPin[c.pin] ?? 0;
 
     const prev = porUnidad.get(key);
     const miembro: MiembroUnidadRanking = {
       pin: c.pin,
       nombre: c.nombre.trim() || "Sin nombre",
-      puntos,
+      puntosPersonales: totalesPersonalesPorPin[c.pin] ?? 0,
     };
 
     if (!prev) {
@@ -67,13 +69,15 @@ export function calcularRankingUnidades(
 
   const resultado: UnidadRanking[] = [];
 
-  for (const { nombreMostrar, miembros } of porUnidad.values()) {
+  for (const [key, { nombreMostrar, miembros }] of porUnidad.entries()) {
     miembros.sort(
-      (a, b) => b.puntos - a.puntos || a.nombre.localeCompare(b.nombre, "es")
+      (a, b) =>
+        b.puntosPersonales - a.puntosPersonales ||
+        a.nombre.localeCompare(b.nombre, "es")
     );
     resultado.push({
       unidad: nombreMostrar,
-      totalPuntos: miembros.reduce((acc, m) => acc + m.puntos, 0),
+      totalPuntosUnidad: totalesUnidadPorClaveNorm[key] ?? 0,
       cantidadMiembros: miembros.length,
       miembros,
     });
@@ -81,7 +85,7 @@ export function calcularRankingUnidades(
 
   return resultado.sort(
     (a, b) =>
-      b.totalPuntos - a.totalPuntos ||
+      b.totalPuntosUnidad - a.totalPuntosUnidad ||
       a.unidad.localeCompare(b.unidad, "es")
   );
 }

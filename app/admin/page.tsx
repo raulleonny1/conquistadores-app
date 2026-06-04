@@ -25,9 +25,6 @@ import {
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
-import { collection, getDocs, updateDoc, doc } from 'firebase/firestore';
-import { cargarPinsOcupadosClub, generarPinsUnicosEnLote } from '@/src/lib/pinUnico';
-import { db } from '../../src/firebase';
 import CumpleanosProximos from '@/src/components/admin/CumpleanosProximos';
 
 type MenuItem = {
@@ -126,8 +123,6 @@ const AdminPage = () => {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<string | null>(null);
   const [showConfig, setShowConfig] = useState(false);
-  const [resetPins, setResetPins] = useState<{nombre: string, nuevoPin: string}[]>([]);
-  const [loadingPins, setLoadingPins] = useState(false);
 
   const [menuItems, setMenuItems] = useState([
     {
@@ -201,22 +196,6 @@ const AdminPage = () => {
           };
 
           // Renderiza el contenido según el tab activo
-  const handleResetPins = async () => {
-    setLoadingPins(true);
-    const snapshot = await getDocs(collection(db, "consejeros"));
-    const ocupados = await cargarPinsOcupadosClub();
-    const pines = await generarPinsUnicosEnLote(snapshot.docs.length, ocupados);
-    const updates: {nombre: string, nuevoPin: string}[] = [];
-    for (let i = 0; i < snapshot.docs.length; i++) {
-      const docSnap = snapshot.docs[i];
-      const nuevoPin = pines[i];
-      await updateDoc(doc(db, "consejeros", docSnap.id), { pin: nuevoPin });
-      updates.push({ nombre: docSnap.data().nombre || docSnap.id, nuevoPin });
-    }
-    setResetPins(updates);
-    setLoadingPins(false);
-  };
-
   const renderTabContent = () => {
     if (activeTab === 'unidades') {
       return (
@@ -244,24 +223,17 @@ const AdminPage = () => {
       return (
         <div className="max-w-lg mx-auto bg-white border-l-4 border-yellow-500 rounded-xl shadow p-6 flex flex-col items-start mb-4">
           <h2 className="text-xl font-bold text-yellow-700 mb-2">Configuración</h2>
-          <p className="text-yellow-800 mb-4">Ajustes y opciones generales del sistema.</p>
-          <div className="bg-white border-l-4 border-pink-500 rounded-xl shadow p-6 flex flex-col items-start mb-4 w-full">
-            <h3 className="text-lg font-bold text-pink-700 mb-2">Resetear PIN de Consejeros</h3>
-            <p className="mb-2 text-pink-800">Genera nuevos PINs aleatorios para todos los consejeros. Los nuevos PINs se mostrarán abajo.</p>
-            <button onClick={handleResetPins} className="bg-pink-600 text-white px-4 py-2 rounded font-bold shadow hover:bg-pink-800 transition mb-2" disabled={loadingPins}>
-              {loadingPins ? 'Reseteando...' : 'Resetear PINs'}
-            </button>
-            {resetPins.length > 0 && (
-              <div className="w-full mt-2">
-                <h4 className="font-semibold text-pink-700 mb-1">Nuevos PINs:</h4>
-                <ul className="text-sm">
-                  {resetPins.map((c, i) => (
-                    <li key={i} className="mb-1"><span className="font-bold">{c.nombre}:</span> <span className="font-mono">{c.nuevoPin}</span></li>
-                  ))}
-                </ul>
-              </div>
-            )}
-          </div>
+          <p className="text-yellow-800 mb-4">
+            El cambio de PIN (con migración de puntos e historial) solo se hace en la pantalla
+            dedicada de configuración.
+          </p>
+          <button
+            type="button"
+            onClick={() => router.push('/admin/configuracion')}
+            className="bg-indigo-600 text-white px-4 py-2 rounded font-bold shadow hover:bg-indigo-800 transition"
+          >
+            Ir a Configuración → Resetear PIN
+          </button>
         </div>
       );
     }

@@ -1,6 +1,6 @@
 import { db } from "@/src/firebase";
 import { addDoc, collection, doc, getDoc, setDoc } from "firebase/firestore";
-import { CLAVE_RESTA_GENERAL, sumarPuntos, toNumberPuntos } from "@/src/lib/categoriasPuntos";
+import { CLAVE_RESTA_GENERAL, sumarPuntos, toNumberPuntos, claveDocCalificacionesUnidad } from "@/src/lib/categoriasPuntos";
 import { textoMotivoCompleto } from "@/src/lib/motivosRestaPuntos";
 
 export type TipoMovimientoPuntos = "suma" | "resta";
@@ -39,6 +39,10 @@ export async function registrarMovimientoPuntos(params: {
   catalogoId?: string;
   catalogoNombre?: string;
   etiquetaActividad?: string;
+  /** personal = conquistador/aspirante; unidad = puntos del grupo unidad (un solo doc). */
+  alcance?: "personal" | "unidad";
+  unidadNombre?: string;
+  miembrosEnUnidad?: number;
 }): Promise<ResultadoMovimientoPuntos> {
   const pinKey = String(params.pin).trim();
   const catKey = String(params.categoriaId).trim();
@@ -118,6 +122,13 @@ export async function registrarMovimientoPuntos(params: {
       puntos: puntosActualizados,
       etiquetasActividades: patchEtiquetas,
       fechaUltima: params.fecha,
+      ...(params.alcance === "unidad"
+        ? {
+            tipo: "unidad",
+            alcance: "unidad",
+            unidad: params.unidadNombre ?? params.nombre,
+          }
+        : {}),
     },
     { merge: true }
   );
@@ -130,7 +141,15 @@ export async function registrarMovimientoPuntos(params: {
     categoriaId: catKey,
     puntos: { [catKey]: cantidad },
     totalEvento: cantidad,
+    alcance: params.alcance ?? "personal",
   };
+
+  if (params.alcance === "unidad") {
+    historial.unidad = params.unidadNombre ?? params.nombre;
+    if (params.miembrosEnUnidad != null) {
+      historial.miembrosEnUnidad = params.miembrosEnUnidad;
+    }
+  }
 
   if (params.aplicadoPor) historial.aplicadoPor = params.aplicadoPor;
   if (params.catalogoId) historial.catalogoId = params.catalogoId;
@@ -350,5 +369,79 @@ export async function aplicarCalificacionCatalogo(params: {
     catalogoId: catalogo.id,
     catalogoNombre: catalogo.nombre,
     etiquetaActividad: catalogo.nombre,
+    alcance: "personal",
+  });
+}
+
+/** Calificación de catálogo para toda la unidad: un solo total, no se reparte por miembro. */
+export async function aplicarCalificacionCatalogoUnidad(params: {
+  unidad: string;
+  catalogo: CatalogoCalificacion;
+  fecha: string;
+  origen: "admin_grupo" | "consejero_grupal";
+  catalogoUnidades?: string[];
+  miembrosEnUnidad?: number;
+  aplicadoPor?: string;
+}): Promise<ResultadoMovimientoPuntos> {
+  const nombreUnidad = params.unidad.trim();
+  if (!nombreUnidad) return { ok: false, mensaje: "Unidad inválida." };
+
+  const docKey = claveDocCalificacionesUnidad(
+    nombreUnidad,
+    params.catalogoUnidades ?? []
+  );
+  const catKey = clavePuntosCatalogo(params.catalogo.id);
+
+  return registrarMovimientoPuntos({
+    pin: docKey,
+    nombre: nombreUnidad,
+    categoriaId: catKey,
+    cantidad: params.catalogo.puntos,
+    fecha: params.fecha,
+    tipo: "suma",
+    origen: params.origen,
+    aplicadoPor: params.aplicadoPor,
+    catalogoId: params.catalogo.id,
+    catalogoNombre: params.catalogo.nombre,
+    etiquetaActividad: params.catalogo.nombre,
+    alcance: "unidad",
+    unidadNombre: nombreUnidad,
+    miembrosEnUnidad: params.miembrosEnUnidad,
+  });
+}
+
+/** Consejero: puntos por categoría oficial a la unidad (no a cada checkbox). */
+export async function aplicarCalificacionCategoriaUnidad(params: {
+  unidad: string;
+  categoriaId: string;
+  categoriaNombre: string;
+  cantidad: number;
+  fecha: string;
+  origen: "consejero_grupal";
+  catalogoUnidades?: string[];
+  miembrosEnUnidad?: number;
+  aplicadoPor?: string;
+}): Promise<ResultadoMovimientoPuntos> {
+  const nombreUnidad = params.unidad.trim();
+  if (!nombreUnidad) return { ok: false, mensaje: "Unidad inválida." };
+
+  const docKey = claveDocCalificacionesUnidad(
+    nombreUnidad,
+    params.catalogoUnidades ?? []
+  );
+
+  return registrarMovimientoPuntos({
+    pin: docKey,
+    nombre: nombreUnidad,
+    categoriaId: params.categoriaId,
+    cantidad: params.cantidad,
+    fecha: params.fecha,
+    tipo: "suma",
+    origen: params.origen,
+    aplicadoPor: params.aplicadoPor,
+    etiquetaActividad: params.categoriaNombre,
+    alcance: "unidad",
+    unidadNombre: nombreUnidad,
+    miembrosEnUnidad: params.miembrosEnUnidad,
   });
 }

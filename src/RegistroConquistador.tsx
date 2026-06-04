@@ -139,7 +139,7 @@ export default function RegistroConquistador() {
     setEditForm({});
   };
   const guardarEdicion = async () => {
-    const { id, ...rest } = editForm;
+    const { id, pin: _pinIgnorado, ...rest } = editForm;
 
     try {
       await updateDoc(doc(db, 'RegistroConquis', id), rest);
@@ -213,7 +213,7 @@ export default function RegistroConquistador() {
                     <td className="p-2"><input className="border rounded p-1 text-xs sm:text-sm" value={editForm.clase || ''} onChange={e => setEditForm({ ...editForm, clase: e.target.value })} /></td>
                     <td className="p-2"><input className="border rounded p-1 text-xs sm:text-sm" value={editForm.unidad || ''} onChange={e => setEditForm({ ...editForm, unidad: e.target.value })} /></td>
                     <td className="p-2"><input className="border rounded p-1 text-xs sm:text-sm" value={editForm.consejero || ''} onChange={e => setEditForm({ ...editForm, consejero: e.target.value })} /></td>
-                    <td className="p-2"><input className="border rounded p-1 text-xs sm:text-sm" value={editForm.pin || ''} onChange={e => setEditForm({ ...editForm, pin: e.target.value })} /></td>
+                    <td className="p-2 font-mono font-bold text-blue-700">{editForm.pin || "—"}</td>
                     <td className="p-2 flex gap-1">
                       <button className="bg-green-600 text-white px-2 py-1 rounded text-xs sm:text-sm" onClick={guardarEdicion}>Guardar</button>
                       <button className="bg-gray-400 text-white px-2 py-1 rounded text-xs sm:text-sm" onClick={cancelarEdicion}>Cancelar</button>

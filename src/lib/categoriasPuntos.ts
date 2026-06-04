@@ -1,4 +1,6 @@
 /** Categorías oficiales de puntos (calificacionesConquis) — misma lista en admin, consejero y dashboards. */
+import { canonicalizarUnidad, normalizarUnidad } from "@/src/lib/unidades";
+
 export const CATEGORIAS_PUNTOS = [
   { id: "puntualidad", nombre: "Puntualidad" },
   { id: "asistencia", nombre: "Asistencia" },
@@ -78,15 +80,28 @@ export function sumarPuntos(
 
 /** Clave de documento en calificacionesConquis (siempre el PIN de acceso). */
 export function clavePinCalificaciones(
-  data: { pin?: unknown } | null | undefined,
+  data: { pin?: unknown; tipo?: unknown } | null | undefined,
   docId: string
 ): string {
+  if (esDocumentoCalificacionesUnidad(docId, data as Record<string, unknown> | undefined)) {
+    return "";
+  }
   return String(data?.pin ?? docId).trim();
 }
 
+/** Documentos de puntos de unidad (no son personas). */
+export function esDocumentoCalificacionesUnidad(
+  docId: string,
+  data?: Record<string, unknown> | null
+): boolean {
+  if (docId.startsWith("unidad_")) return true;
+  if (data?.tipo === "unidad" || data?.alcance === "unidad") return true;
+  return false;
+}
+
 /**
- * Índice pin → total de puntos desde la colección calificacionesConquis.
- * Si hay varios documentos con el mismo PIN, se usa el total más alto (evita doble conteo).
+ * Índice pin → total de puntos desde calificacionesConquis (solo personas).
+ * Excluye documentos de unidad.
  */
 export function indexarTotalesPorPin(
   docs: { id: string; data: () => Record<string, unknown> }[]
@@ -94,6 +109,7 @@ export function indexarTotalesPorPin(
   const map: Record<string, number> = {};
   for (const d of docs) {
     const data = d.data();
+    if (esDocumentoCalificacionesUnidad(d.id, data)) continue;
     const pinKey = clavePinCalificaciones(data, d.id);
     if (!pinKey) continue;
     const total = sumarPuntos(
@@ -103,6 +119,45 @@ export function indexarTotalesPorPin(
     map[pinKey] = Math.max(map[pinKey] ?? 0, total);
   }
   return map;
+}
+
+/**
+ * Índice nombre de unidad → total de calificaciones de unidad (modo grupo).
+ * Clave normalizada con normalizarUnidad del nombre canónico.
+ */
+export function indexarTotalesPorUnidad(
+  docs: { id: string; data: () => Record<string, unknown> }[],
+  catalogoUnidades: string[] = []
+): Record<string, number> {
+  const map: Record<string, number> = {};
+  for (const d of docs) {
+    const data = d.data();
+    if (!esDocumentoCalificacionesUnidad(d.id, data)) continue;
+    const raw = String(data.unidad ?? data.nombre ?? "").trim();
+    if (!raw) continue;
+    const nombre = catalogoUnidades.length
+      ? canonicalizarUnidad(raw, catalogoUnidades)
+      : raw;
+    const key = normalizarUnidad(nombre);
+    const total = sumarPuntos(
+      data.puntos as Record<string, unknown> | undefined,
+      data.etiquetasActividades as Record<string, string> | undefined
+    );
+    map[key] = Math.max(map[key] ?? 0, total);
+  }
+  return map;
+}
+
+/** Nombre canónico → clave de documento en calificacionesConquis. */
+export function claveDocCalificacionesUnidad(
+  unidad: string,
+  catalogoUnidades: string[] = []
+): string {
+  const nombre = catalogoUnidades.length
+    ? canonicalizarUnidad(unidad.trim(), catalogoUnidades)
+    : unidad.trim();
+  const slug = normalizarUnidad(nombre).replace(/\s+/g, "_");
+  return `unidad_${slug}`;
 }
 
 /** Columnas del historial semanal: solo categorías que aparecen con puntos en algún registro. */

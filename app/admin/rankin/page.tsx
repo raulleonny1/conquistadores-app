@@ -9,6 +9,7 @@ import { expandirConsejerosYAsociados } from "@/src/lib/actividadesCalificacion"
 import {
   getCategoriasConPuntos,
   indexarTotalesPorPin,
+  indexarTotalesPorUnidad,
   sumarPuntos,
 } from "@/src/lib/categoriasPuntos";
 import {
@@ -81,6 +82,9 @@ export default function RankinPage() {
   const [catalogoUnidades, setCatalogoUnidades] = useState<string[]>([]);
   const [selectedUnidad, setSelectedUnidad] = useState<string>("");
   const [totalesPorPin, setTotalesPorPin] = useState<TotalesPorPin>({});
+  const [totalesPorUnidadClave, setTotalesPorUnidadClave] = useState<Record<string, number>>(
+    {}
+  );
   const [selectedPin, setSelectedPin] = useState<string>("");
   const [resumenCategorias, setResumenCategorias] = useState<CategoriaResumen[]>([]);
   const [historial, setHistorial] = useState<RegistroSemanal[]>([]);
@@ -152,23 +156,25 @@ export default function RankinPage() {
           .sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
 
         const totalesSnapshot = await getDocs(collection(db, "calificacionesConquis"));
-        const totalesMap: TotalesPorPin = indexarTotalesPorPin(
-          totalesSnapshot.docs.map((d) => ({
-            id: d.id,
-            data: () => d.data() as Record<string, unknown>,
-          }))
-        );
+        const docsCalif = totalesSnapshot.docs.map((d) => ({
+          id: d.id,
+          data: () => d.data() as Record<string, unknown>,
+        }));
+        const totalesMap: TotalesPorPin = indexarTotalesPorPin(docsCalif);
+        const totalesUnidadMap = indexarTotalesPorUnidad(docsCalif, unidadesOficiales);
 
         setParticipantes(merged);
         setConquisUnidad(conquisUnidadLista.filter((c) => Boolean(c.pin)));
         setCatalogoUnidades(unidadesOficiales);
         setTotalesPorPin(totalesMap);
+        setTotalesPorUnidadClave(totalesUnidadMap);
         if (merged.length > 0) {
           setSelectedPin((prev) => prev || merged[0].pin);
         }
         const rankingUnidades = calcularRankingUnidades(
           conquisUnidadLista,
           totalesMap,
+          totalesUnidadMap,
           unidadesOficiales
         );
         if (rankingUnidades.length > 0) {
@@ -235,8 +241,14 @@ export default function RankinPage() {
   }, [selectedPin]);
 
   const rankingUnidades = useMemo(
-    () => calcularRankingUnidades(conquisUnidad, totalesPorPin, catalogoUnidades),
-    [conquisUnidad, totalesPorPin, catalogoUnidades]
+    () =>
+      calcularRankingUnidades(
+        conquisUnidad,
+        totalesPorPin,
+        totalesPorUnidadClave,
+        catalogoUnidades
+      ),
+    [conquisUnidad, totalesPorPin, totalesPorUnidadClave, catalogoUnidades]
   );
 
   const rankingUnidadesFiltrado = useMemo(() => {
@@ -282,7 +294,7 @@ export default function RankinPage() {
           <div>
             <h1 className="text-2xl font-black text-slate-800">Ranking General</h1>
             <p className="text-sm text-slate-500">
-              Puntos totales por persona o sumados por unidad de conquistadores.
+              Por persona: calificaciones individuales. Por unidad: total del grupo (no se reparten entre miembros).
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -431,7 +443,7 @@ export default function RankinPage() {
             ) : (
               <>
                 <p className="mb-3 text-xs text-slate-500">
-                  Total de calificaciones de todos los conquistadores de cada unidad.
+                  Puntos otorgados en modo «por unidad» (un registro por unidad en Firebase).
                 </p>
                 <div className="relative mb-4">
                   <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
@@ -475,7 +487,7 @@ export default function RankinPage() {
                                 </p>
                               </div>
                               <span className="rounded-full bg-amber-100 px-2 py-1 text-xs font-bold text-amber-800">
-                                {u.totalPuntos}
+                                {u.totalPuntosUnidad}
                               </span>
                             </div>
                           </button>
@@ -499,13 +511,15 @@ export default function RankinPage() {
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <div className="rounded-xl border border-cyan-200 bg-cyan-50 p-4">
                       <p className="text-xs font-bold uppercase tracking-widest text-cyan-700">
-                        Total de la unidad
+                        Puntos de la unidad
                       </p>
                       <div className="mt-2 flex items-center gap-2 text-3xl font-black text-cyan-900">
                         <Trophy className="h-7 w-7" />
-                        {unidadSeleccionada.totalPuntos}
+                        {unidadSeleccionada.totalPuntosUnidad}
                       </div>
-                      <p className="text-sm text-cyan-700">puntos sumados</p>
+                      <p className="text-sm text-cyan-700">
+                        calificaciones en modo grupo (no se dividen entre miembros)
+                      </p>
                     </div>
                     <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
                       <p className="text-xs font-bold uppercase tracking-widest text-slate-500">
@@ -524,7 +538,7 @@ export default function RankinPage() {
                   <div className="rounded-xl border border-slate-200">
                     <div className="border-b border-slate-200 px-4 py-3">
                       <h2 className="text-sm font-bold uppercase tracking-wider text-slate-600">
-                        Puntos por conquistador
+                        Puntos personales por miembro
                       </h2>
                     </div>
                     <div className="overflow-x-auto">
@@ -533,7 +547,7 @@ export default function RankinPage() {
                           <tr>
                             <th className="px-4 py-3 text-left">#</th>
                             <th className="px-4 py-3 text-left">Nombre</th>
-                            <th className="px-4 py-3 text-right">Puntos</th>
+                            <th className="px-4 py-3 text-right">Pts personales</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -542,7 +556,7 @@ export default function RankinPage() {
                               <td className="px-4 py-3 text-slate-500">{i + 1}</td>
                               <td className="px-4 py-3 font-medium text-slate-800">{m.nombre}</td>
                               <td className="px-4 py-3 text-right font-bold text-indigo-700">
-                                {m.puntos}
+                                {m.puntosPersonales}
                               </td>
                             </tr>
                           ))}
@@ -550,10 +564,10 @@ export default function RankinPage() {
                         <tfoot className="border-t-2 border-slate-300 bg-slate-50">
                           <tr>
                             <td colSpan={2} className="px-4 py-3 text-right font-bold text-slate-700">
-                              Total unidad
+                              Total unidad (modo grupo)
                             </td>
                             <td className="px-4 py-3 text-right font-black text-cyan-800">
-                              {unidadSeleccionada.totalPuntos}
+                              {unidadSeleccionada.totalPuntosUnidad}
                             </td>
                           </tr>
                         </tfoot>

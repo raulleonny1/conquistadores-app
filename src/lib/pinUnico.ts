@@ -200,53 +200,108 @@ export async function migrarCalificacionesAlNuevoPin(
       { pin: nuevo, nombre, puntos: {}, etiquetasActividades: {} },
       { merge: true }
     );
-    return;
-  }
+  } else {
+    const dataViejo = snapViejo.data();
+    const puntosViejos = (dataViejo.puntos as Record<string, unknown>) || {};
+    const etiquetasViejas =
+      (dataViejo.etiquetasActividades as Record<string, string>) || {};
+    const nombreFinal = nombre || String(dataViejo.nombre ?? "");
 
-  const dataViejo = snapViejo.data();
-  const puntosViejos = (dataViejo.puntos as Record<string, unknown>) || {};
-  const etiquetasViejas =
-    (dataViejo.etiquetasActividades as Record<string, string>) || {};
-  const nombreFinal = nombre || String(dataViejo.nombre ?? "");
-
-  if (snapNuevo.exists()) {
-    const dataNuevo = snapNuevo.data();
-    const puntosNuevos = (dataNuevo.puntos as Record<string, unknown>) || {};
-    const etiquetasNuevas =
-      (dataNuevo.etiquetasActividades as Record<string, string>) || {};
-    const puntosFusionados = { ...puntosNuevos };
-    for (const [k, v] of Object.entries(puntosViejos)) {
-      puntosFusionados[k] = toNumberPuntos(puntosFusionados[k]) + toNumberPuntos(v);
-    }
-    await setDoc(
-      refNuevo,
-      {
+    if (snapNuevo.exists()) {
+      const dataNuevo = snapNuevo.data();
+      const puntosNuevos = (dataNuevo.puntos as Record<string, unknown>) || {};
+      const etiquetasNuevas =
+        (dataNuevo.etiquetasActividades as Record<string, string>) || {};
+      const puntosFusionados = { ...puntosNuevos };
+      for (const [k, v] of Object.entries(puntosViejos)) {
+        puntosFusionados[k] = toNumberPuntos(puntosFusionados[k]) + toNumberPuntos(v);
+      }
+      await setDoc(
+        refNuevo,
+        {
+          pin: nuevo,
+          nombre: nombreFinal,
+          puntos: puntosFusionados,
+          etiquetasActividades: { ...etiquetasViejas, ...etiquetasNuevas },
+        },
+        { merge: true }
+      );
+    } else {
+      await setDoc(refNuevo, {
+        ...dataViejo,
         pin: nuevo,
         nombre: nombreFinal,
-        puntos: puntosFusionados,
-        etiquetasActividades: { ...etiquetasViejas, ...etiquetasNuevas },
-      },
-      { merge: true }
-    );
-  } else {
-    await setDoc(refNuevo, {
-      ...dataViejo,
-      pin: nuevo,
-      nombre: nombreFinal,
-    });
-  }
+      });
+    }
 
-  if (viejo !== nuevo) {
     try {
       await deleteDoc(refViejo);
     } catch {
-      /* si falla el borrado, el doc nuevo ya tiene los puntos */
+      /* el doc nuevo ya tiene los puntos */
     }
+  }
+
+  await migrarHistorialSemanalAlNuevoPin(viejo, nuevo);
+  await migrarFichaMedicaAlNuevoPin(viejo, nuevo);
+}
+
+/** Historial semanal: actualiza el campo pin en cada evento del PIN anterior. */
+async function migrarHistorialSemanalAlNuevoPin(
+  pinAnterior: string,
+  pinNuevo: string
+): Promise<void> {
+  const snap = await getDocs(
+    query(collection(db, "calificacionesSemanal"), where("pin", "==", pinAnterior))
+  );
+  if (snap.empty) return;
+
+  await Promise.all(
+    snap.docs.map((d) =>
+      updateDoc(doc(db, "calificacionesSemanal", d.id), { pin: pinNuevo })
+    )
+  );
+}
+
+/** Ficha médica guardada bajo el PIN de acceso. */
+async function migrarFichaMedicaAlNuevoPin(
+  pinAnterior: string,
+  pinNuevo: string
+): Promise<void> {
+  const refViejo = doc(db, "fichasMedicas", pinAnterior);
+  const refNuevo = doc(db, "fichasMedicas", pinNuevo);
+  const snapViejo = await getDoc(refViejo);
+  if (!snapViejo.exists()) return;
+
+  const snapNuevo = await getDoc(refNuevo);
+  if (snapNuevo.exists()) {
+    await setDoc(refNuevo, { ...snapViejo.data(), ...snapNuevo.data() }, { merge: true });
+  } else {
+    await setDoc(refNuevo, snapViejo.data());
+  }
+
+  try {
+    await deleteDoc(refViejo);
+  } catch {
+    /* ficha ya copiada */
   }
 }
 
 /**
- * Asigna un PIN único a una persona, actualiza Firebase y migra sus puntos.
+ * Único punto de cambio de PIN con migración de datos (puntos, historial, ficha médica).
+ * Usar desde Admin → Configuración; no cambiar el PIN con updateDoc en otros formularios.
+ */
+export async function cambiarPinConMigracion(opts: {
+  coleccion: ColeccionPin;
+  docId: string;
+  nombre: string;
+  pinFijo?: string;
+}): Promise<{ pinAnterior: string; pinNuevo: string }> {
+  return resetearPinPersona(opts);
+}
+
+/**
+ * Asigna un PIN único a una persona, actualiza Firebase y migra puntos + historial.
+ * @see cambiarPinConMigracion — usar siempre este flujo para cambiar PIN.
  */
 export async function resetearPinPersona(opts: {
   coleccion: ColeccionPin;

@@ -5,7 +5,7 @@ import { getDocs, doc, updateDoc, deleteDoc, addDoc, collection, onSnapshot } fr
 import { db } from "@/src/firebase";
 import { especialidadesBase } from "@/src/data/especialidades";
 import { handleError } from "@/src/lib/errorHandler";
-import { generarPinUnicoClub, validarPinDisponible } from "@/src/lib/pinUnico";
+import { generarPinUnicoClub } from "@/src/lib/pinUnico";
 import { toast } from "react-hot-toast";
 import Link from "next/link";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -246,19 +246,8 @@ export default function RegistroConquisPageInner({ unidades: initialUnidades, co
     setSaving(true);
     try {
       if (editMode && editId) {
-        const pinEdit = String(form.pin).trim();
-        if (pinEdit) {
-          const validacion = await validarPinDisponible(pinEdit, [
-            { coleccion: "RegistroConquis", docId: editId },
-          ]);
-          if (!validacion.ok) {
-            toast.error(validacion.mensaje);
-            setSaving(false);
-            return;
-          }
-        }
-        const rest = { ...form };
-        await updateDoc(doc(db, 'RegistroConquis', editId), rest);
+        const { pin: _pinIgnorado, ...rest } = form;
+        await updateDoc(doc(db, "RegistroConquis", editId), rest);
         setEditId(null);
         setEditMode(false);
         toast.success("Conquistador actualizado");
@@ -538,6 +527,16 @@ export default function RegistroConquisPageInner({ unidades: initialUnidades, co
         </div>
 
         <div className="md:col-span-2 flex flex-col gap-3 md:flex-row md:flex-wrap md:justify-end md:items-center">
+          {editMode && form.pin && (
+            <p className="w-full rounded-lg border border-indigo-100 bg-indigo-50 px-3 py-2 text-xs text-indigo-900">
+              PIN de acceso:{" "}
+              <code className="font-mono font-bold">{form.pin}</code> — para cambiarlo usa{" "}
+              <Link href="/admin/configuracion" className="font-bold underline">
+                Admin → Configuración → Resetear PIN
+              </Link>{" "}
+              (los puntos se migran solos).
+            </p>
+          )}
           {editMode && form.pin && form.whatsapp && whatsappUrlFromRegistro(form) && (
             <a
               href={whatsappUrlFromRegistro(form)}

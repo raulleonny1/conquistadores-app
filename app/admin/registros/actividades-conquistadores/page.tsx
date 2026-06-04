@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import {
   aplicarCalificacionCatalogo,
+  aplicarCalificacionCatalogoUnidad,
   dedupeConquistadoresRegistro,
   esCatalogoAdminCalificaciones,
   filtrarConquistadoresBusqueda,
@@ -31,12 +32,21 @@ import QuitarPuntosPanel from "@/src/components/calificaciones/QuitarPuntosPanel
 
 type Modo = "individual" | "grupo";
 
-type PendienteItem = {
-  id: string;
-  pin: string;
-  nombreConquistador: string;
-  catalogo: CatalogoCalificacion;
-};
+type PendienteItem =
+  | {
+      tipo: "individual";
+      id: string;
+      pin: string;
+      nombreConquistador: string;
+      catalogo: CatalogoCalificacion;
+    }
+  | {
+      tipo: "unidad";
+      id: string;
+      unidad: string;
+      catalogo: CatalogoCalificacion;
+      cantidadMiembros: number;
+    };
 
 function fechaHoyInput(): string {
   return new Date().toISOString().slice(0, 10);
@@ -218,6 +228,7 @@ export default function RegistroActividadesConquistadoresPage() {
     setPendientes((prev) => [
       ...prev,
       {
+        tipo: "individual",
         id: `${seleccionado.pin}_${item.id}_${Date.now()}`,
         pin: seleccionado.pin,
         nombreConquistador: seleccionado.nombre,
@@ -240,17 +251,19 @@ export default function RegistroActividadesConquistadoresPage() {
       toast.error("Marca al menos un conquistador o usa «Toda la unidad».");
       return;
     }
-    const nuevos: PendienteItem[] = pins.map((pin) => {
-      const m = conquistadores.find((c) => c.pin === pin)!;
-      return {
-        id: `${pin}_${cat.id}_${Date.now()}_${Math.random()}`,
-        pin: m.pin,
-        nombreConquistador: m.nombre,
+    const nuevos: PendienteItem[] = [
+      {
+        tipo: "unidad",
+        id: `unidad_${unidadGrupo}_${cat.id}_${Date.now()}`,
+        unidad: unidadGrupo,
         catalogo: cat,
-      };
-    });
+        cantidadMiembros: pins.length,
+      },
+    ];
     setPendientes((prev) => [...prev, ...nuevos]);
-    toast.success(`${nuevos.length} registro(s) en la lista. Pulsa Guardar para subir a Firebase.`);
+    toast.success(
+      `Unidad «${unidadGrupo}»: +${cat.puntos} pts al total de la unidad (${pins.length} miembros referidos). Pulsa Guardar.`
+    );
   };
 
   const agregarTodaLaUnidad = () => {
@@ -281,16 +294,31 @@ export default function RegistroActividadesConquistadoresPage() {
     let ok = 0;
     try {
       for (const p of pendientes) {
-        const res = await aplicarCalificacionCatalogo({
-          pin: p.pin,
-          nombre: p.nombreConquistador,
-          catalogo: p.catalogo,
-          fecha: fechaFmt,
-          origen: modo === "individual" ? "admin_individual" : "admin_grupo",
-        });
-        if (!res.ok) {
-          toast.error(`${p.nombreConquistador}: ${res.mensaje}`);
-          break;
+        if (p.tipo === "unidad") {
+          const res = await aplicarCalificacionCatalogoUnidad({
+            unidad: p.unidad,
+            catalogo: p.catalogo,
+            fecha: fechaFmt,
+            origen: "admin_grupo",
+            catalogoUnidades: unidadesOficiales,
+            miembrosEnUnidad: p.cantidadMiembros,
+          });
+          if (!res.ok) {
+            toast.error(`${p.unidad}: ${res.mensaje}`);
+            break;
+          }
+        } else {
+          const res = await aplicarCalificacionCatalogo({
+            pin: p.pin,
+            nombre: p.nombreConquistador,
+            catalogo: p.catalogo,
+            fecha: fechaFmt,
+            origen: "admin_individual",
+          });
+          if (!res.ok) {
+            toast.error(`${p.nombreConquistador}: ${res.mensaje}`);
+            break;
+          }
         }
         ok++;
       }
@@ -514,8 +542,19 @@ export default function RegistroActividadesConquistadoresPage() {
                       className="flex items-center justify-between gap-2 rounded-lg border border-amber-100 bg-white px-3 py-2 text-sm"
                     >
                       <span className="min-w-0 flex-1 truncate text-slate-800">
-                        <span className="font-semibold">{p.nombreConquistador.split(" ")[0]}</span>
-                        {" · "}
+                        {p.tipo === "unidad" ? (
+                          <>
+                            <span className="font-semibold text-cyan-800">Unidad {p.unidad}</span>
+                            {" · "}
+                          </>
+                        ) : (
+                          <>
+                            <span className="font-semibold">
+                              {p.nombreConquistador.split(" ")[0]}
+                            </span>
+                            {" · "}
+                          </>
+                        )}
                         {p.catalogo.nombre}{" "}
                         <span className="font-bold text-indigo-600">+{p.catalogo.puntos} pts</span>
                       </span>
@@ -531,7 +570,8 @@ export default function RegistroActividadesConquistadoresPage() {
                   ))}
                 </ul>
                 <p className="mt-2 text-xs text-amber-800">
-                  Al guardar, los puntos aparecen en el ranking y en el dashboard de cada conquistador.
+                  Individual: suma al PIN del conquistador. Unidad: un solo total de la unidad (no se
+                  reparte entre miembros).
                 </p>
               </div>
             )}
@@ -645,9 +685,10 @@ export default function RegistroActividadesConquistadoresPage() {
                   </button>
                 </div>
 
-                <p className="mb-4 text-sm text-slate-600">
-                  Elige la unidad y la calificación del catálogo. Los miembros de la unidad se
-                  marcan solos; puedes desmarcar alguno si hace falta.
+                <p className="mb-4 rounded-xl border border-cyan-200 bg-cyan-50 px-4 py-3 text-sm text-cyan-900">
+                  Los puntos van al <strong>total de la unidad</strong> (un registro en Firebase), no
+                  a cada conquistador marcado. Marca miembros solo como referencia de quién
+                  participó.
                 </p>
 
                 <div className="flex flex-wrap gap-2">

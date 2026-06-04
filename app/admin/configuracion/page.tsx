@@ -44,7 +44,7 @@ const GRUPOS: GrupoPin[] = [
   {
     id: "RegistroConquis",
     titulo: "Conquistadores",
-    subtitulo: "Resetea el PIN de acceso de cada miembro. Los puntos se migran al PIN nuevo.",
+    subtitulo: "Resetea el PIN de acceso. Migra puntos, historial y ficha médica al PIN nuevo.",
     icon: Users,
     colorClass: "bg-emerald-600",
   },

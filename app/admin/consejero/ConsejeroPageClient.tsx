@@ -9,6 +9,7 @@ import {
   cargarPinsOcupadosClub,
   crearPinEnSet,
   generarPinUnicoClub,
+  migrarCalificacionesAlNuevoPin,
 } from '@/src/lib/pinUnico';
 
 type ConsejeroPageClientProps = {
@@ -217,9 +218,15 @@ function ConsejerosList({
           await updateDoc(doc(db, 'consejeros', docSnap.id), { pin });
           pinsAsignados++;
         } else if (pinsOcupados.has(pin)) {
+          const pinAnterior = pin;
           pin = crearPinEnSet(pinsOcupados);
           pinsOcupados.add(pin);
           await updateDoc(doc(db, 'consejeros', docSnap.id), { pin });
+          await migrarCalificacionesAlNuevoPin(
+            pinAnterior,
+            pin,
+            String(data.nombre ?? '')
+          );
           pinsAsignados++;
         } else {
           pinsOcupados.add(pin);
