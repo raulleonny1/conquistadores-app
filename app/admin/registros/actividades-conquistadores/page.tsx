@@ -27,6 +27,7 @@ import {
 } from "@/src/lib/actividadesCalificacion";
 import { indexarTotalesPorPin, toNumberPuntos } from "@/src/lib/categoriasPuntos";
 import { nombreGrupoCoincide } from "@/src/lib/unidades";
+import QuitarPuntosPanel from "@/src/components/calificaciones/QuitarPuntosPanel";
 
 type Modo = "individual" | "grupo";
 
@@ -280,13 +281,17 @@ export default function RegistroActividadesConquistadoresPage() {
     let ok = 0;
     try {
       for (const p of pendientes) {
-        await aplicarCalificacionCatalogo({
+        const res = await aplicarCalificacionCatalogo({
           pin: p.pin,
           nombre: p.nombreConquistador,
           catalogo: p.catalogo,
           fecha: fechaFmt,
           origen: modo === "individual" ? "admin_individual" : "admin_grupo",
         });
+        if (!res.ok) {
+          toast.error(`${p.nombreConquistador}: ${res.mensaje}`);
+          break;
+        }
         ok++;
       }
       toast.success(
@@ -575,6 +580,16 @@ export default function RegistroActividadesConquistadoresPage() {
                     </div>
                   ))}
                 </div>
+
+                {seleccionado && (
+                  <QuitarPuntosPanel
+                    className="mt-8"
+                    pin={seleccionado.pin}
+                    nombre={seleccionado.nombre}
+                    origen="admin_resta_individual"
+                    aplicadoPor="admin"
+                  />
+                )}
               </>
             ) : (
               <>

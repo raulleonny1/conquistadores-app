@@ -1,30 +1,23 @@
 "use client";
 import React, { useEffect, useState, Suspense } from "react";
 import { db } from "../../../src/firebase";
-import { addDoc, collection, doc, getDoc, query, setDoc, where, getDocs } from "firebase/firestore";
+import { collection, doc, getDoc, query, setDoc, where, getDocs } from "firebase/firestore";
 import { useSearchParams } from "next/navigation";
-import {
-  Star,
-  Award,
-} from "lucide-react";
+import { Star, Award } from "lucide-react";
+import { toast } from "react-hot-toast";
 import { useConsejeroPuedeCalificar } from "@/src/hooks/useConsejeroPuedeCalificar";
 import ConsejeroSinPermisoCalificar from "@/src/components/consejero/ConsejeroSinPermisoCalificar";
 import { storageSeguroGet } from "@/src/lib/storageSeguro";
-import { sumarPuntos, toNumberPuntos } from "@/src/lib/categoriasPuntos";
+import {
+  CATEGORIAS_PUNTOS,
+  sumarPuntos,
+  toNumberPuntos,
+} from "@/src/lib/categoriasPuntos";
+import { registrarMovimientoPuntos } from "@/src/lib/actividadesCalificacion";
+import QuitarPuntosPanel from "@/src/components/calificaciones/QuitarPuntosPanel";
+import HistorialSemanal from "@/app/conquistadores/calificaciones/HistorialSemanal";
 
-const CATEGORIAS_PUNTOS = [
-  { id: "puntualidad", nombre: "Puntualidad" },
-  { id: "asistencia", nombre: "Asistencia" },
-  { id: "disciplina", nombre: "Disciplina" },
-  { id: "reclutador", nombre: "Reclutador" },
-  { id: "materiales", nombre: "Materiales" },
-  { id: "fidelidad", nombre: "Fidelidad Eclesiástica" },
-  { id: "misionero", nombre: "Misionero" },
-  { id: "colaborador", nombre: "Colaborador" },
-  { id: "orden_cerrado", nombre: "Orden Cerrado" },
-  { id: "tareas", nombre: "Completar Tareas" },
-  { id: "especialidades", nombre: "Especialidades" }
-];
+const CATEGORIAS = CATEGORIAS_PUNTOS;
 
 export default function CalificacionesConsejeroPage() {
   return (
@@ -46,12 +39,6 @@ function CalificacionesConsejeroPageInner() {
   const [inputValores, setInputValores] = React.useState<{ [key: string]: string }>({});
   const [inputFechas, setInputFechas] = React.useState<{ [key: string]: string }>({});
 
-  const toNumber = (value: unknown) => {
-    if (typeof value === "number") return value;
-    if (typeof value === "string") return parseInt(value, 10) || 0;
-    return 0;
-  };
-
   useEffect(() => {
     const fromUrl = searchParams.get("consejeroId");
     const stored = storageSeguroGet("consejeroId");
@@ -71,7 +58,7 @@ function CalificacionesConsejeroPageInner() {
         setPuntos(data.puntos || {});
         setNombre(data.nombre || "");
       } else {
-        const initialPuntos = CATEGORIAS_PUNTOS.reduce((acc, cat) => ({ ...acc, [cat.id]: 0 }), {});
+        const initialPuntos = CATEGORIAS.reduce((acc, cat) => ({ ...acc, [cat.id]: 0 }), {});
         let nombreDetectado = "";
         const [miembroSnap, aspiranteSnap] = await Promise.all([
           getDocs(query(collection(db, "RegistroConquis"), where("pin", "==", pin))),
@@ -141,8 +128,8 @@ function CalificacionesConsejeroPageInner() {
 
       {/* Tabla de Calificaciones con fecha */}
       <div className="grid md:grid-cols-2 gap-4">
-        {CATEGORIAS_PUNTOS.map(cat => {
-          const valor = puntos[cat.id] || 0;
+        {CATEGORIAS.map(cat => {
+          const valor = toNumberPuntos(puntos[cat.id]);
           const handleInputValor = (catId: string, value: string) => {
             setInputValores(prev => ({ ...prev, [catId]: value }));
           };
@@ -151,36 +138,40 @@ function CalificacionesConsejeroPageInner() {
           };
           const handleAgregar = async (catId: string) => {
             if (!puedeCalificar) {
-              alert("No tienes permiso para calificar.");
+              toast.error("No tienes permiso para calificar.");
               return;
             }
             const inputFecha = inputFechas[catId] || "";
             const inputValor = inputValores[catId] || "";
-            if (!inputFecha) return alert("Selecciona una fecha");
+            if (!inputFecha) {
+              toast.error("Selecciona una fecha");
+              return;
+            }
             const valorNumerico = parseInt(inputValor, 10) || 0;
-            if (valorNumerico <= 0) return alert("Ingresa puntos mayores a 0");
-            const ref = doc(db, "calificacionesConquis", pin);
-            const puntosActualizados = {
-              ...puntos,
-              [catId]: toNumberPuntos(puntos[catId]) + valorNumerico,
-            };
-            await setDoc(ref, {
+            if (valorNumerico <= 0) {
+              toast.error("Ingresa puntos mayores a 0");
+              return;
+            }
+            const res = await registrarMovimientoPuntos({
               pin,
               nombre,
-              puntos: puntosActualizados,
-              fechaUltima: inputFecha,
-            }, { merge: true });
-
-            await addDoc(collection(db, "calificacionesSemanal"), {
-              pin,
+              categoriaId: catId,
+              cantidad: valorNumerico,
               fecha: inputFecha,
+              tipo: "suma",
               origen: "consejero_individual",
-              puntos: { [catId]: valorNumerico },
-              totalEvento: valorNumerico,
+              aplicadoPor: consejeroId || undefined,
             });
-
-            setPuntos(puntosActualizados);
+            if (!res.ok) {
+              toast.error(res.mensaje);
+              return;
+            }
+            setPuntos((prev: Record<string, unknown>) => ({
+              ...prev,
+              [catId]: res.nuevoValorCategoria,
+            }));
             setInputValores(prev => ({ ...prev, [catId]: "" }));
+            toast.success("Puntos agregados");
           };
           return (
             <div key={cat.id} className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100">
@@ -211,7 +202,21 @@ function CalificacionesConsejeroPageInner() {
           );
         })}
       </div>
-      {/* Eliminado RegistroSemanal, solo lógica de calificaciones */}
+
+      <QuitarPuntosPanel
+        className="mt-8"
+        pin={pin}
+        nombre={nombre}
+        origen="consejero_resta_individual"
+        aplicadoPor={consejeroId || undefined}
+        onRestado={() => {
+          getDoc(doc(db, "calificacionesConquis", pin)).then((snap) => {
+            if (snap.exists()) setPuntos(snap.data().puntos || {});
+          });
+        }}
+      />
+
+      <HistorialSemanal pin={pin} />
     </div>
   );
 }

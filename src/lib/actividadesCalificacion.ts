@@ -1,6 +1,174 @@
 import { db } from "@/src/firebase";
 import { addDoc, collection, doc, getDoc, setDoc } from "firebase/firestore";
-import { toNumberPuntos } from "@/src/lib/categoriasPuntos";
+import { CLAVE_RESTA_GENERAL, sumarPuntos, toNumberPuntos } from "@/src/lib/categoriasPuntos";
+import { textoMotivoCompleto } from "@/src/lib/motivosRestaPuntos";
+
+export type TipoMovimientoPuntos = "suma" | "resta";
+
+export type OrigenMovimientoPuntos =
+  | "admin_individual"
+  | "admin_grupo"
+  | "admin_aspirante_individual"
+  | "admin_aspirante_grupo"
+  | "admin_consejero_individual"
+  | "admin_consejero_grupo"
+  | "admin_resta_individual"
+  | "admin_resta_grupo"
+  | "admin_resta_aspirante"
+  | "admin_resta_consejero"
+  | "consejero_individual"
+  | "consejero_grupal"
+  | "consejero_resta_individual"
+  | "consejero_resta_grupal";
+
+export type ResultadoMovimientoPuntos =
+  | { ok: true; nuevoValorCategoria: number; totalPuntos: number }
+  | { ok: false; mensaje: string };
+
+export async function registrarMovimientoPuntos(params: {
+  pin: string;
+  nombre: string;
+  categoriaId: string;
+  cantidad: number;
+  fecha: string;
+  tipo: TipoMovimientoPuntos;
+  origen: OrigenMovimientoPuntos;
+  aplicadoPor?: string;
+  motivo?: string;
+  motivoDetalle?: string;
+  catalogoId?: string;
+  catalogoNombre?: string;
+  etiquetaActividad?: string;
+}): Promise<ResultadoMovimientoPuntos> {
+  const pinKey = String(params.pin).trim();
+  const catKey = String(params.categoriaId).trim();
+  const cantidad = Math.floor(Math.abs(params.cantidad));
+
+  if (!pinKey || !catKey) {
+    return { ok: false, mensaje: "PIN o categoría inválidos." };
+  }
+  if (!Number.isFinite(cantidad) || cantidad <= 0) {
+    return { ok: false, mensaje: "La cantidad debe ser mayor a 0." };
+  }
+  if (!params.fecha?.trim()) {
+    return { ok: false, mensaje: "Selecciona una fecha." };
+  }
+
+  if (params.tipo === "resta") {
+    if (!params.motivo?.trim()) {
+      return { ok: false, mensaje: "Indica el motivo de la resta." };
+    }
+    if (params.motivo === "otro" && !params.motivoDetalle?.trim()) {
+      return { ok: false, mensaje: "Especifica el motivo en el campo de detalle." };
+    }
+  }
+
+  const ref = doc(db, "calificacionesConquis", pinKey);
+  const snap = await getDoc(ref);
+  const puntosActuales: Record<string, unknown> = snap.exists()
+    ? (snap.data().puntos as Record<string, unknown>) || {}
+    : {};
+  const etiquetasPrevias: Record<string, string> = snap.exists()
+    ? ((snap.data().etiquetasActividades as Record<string, string>) || {})
+    : {};
+
+  const esRestaGeneral =
+    params.tipo === "resta" && catKey === CLAVE_RESTA_GENERAL;
+
+  let nuevoValor: number;
+
+  if (esRestaGeneral) {
+    const totalActual = sumarPuntos(puntosActuales, etiquetasPrevias);
+    if (cantidad > totalActual) {
+      return {
+        ok: false,
+        mensaje: `El total actual es ${totalActual} pts. No puedes quitar ${cantidad}.`,
+      };
+    }
+    const valorPrevio = toNumberPuntos(puntosActuales[CLAVE_RESTA_GENERAL]);
+    nuevoValor = valorPrevio + cantidad;
+  } else {
+    const valorPrevio = toNumberPuntos(puntosActuales[catKey]);
+
+    if (params.tipo === "resta" && valorPrevio < cantidad) {
+      return {
+        ok: false,
+        mensaje: `Solo hay ${valorPrevio} pts en esta categoría. No puedes quitar ${cantidad}.`,
+      };
+    }
+
+    nuevoValor =
+      params.tipo === "suma"
+        ? valorPrevio + cantidad
+        : Math.max(0, valorPrevio - cantidad);
+  }
+
+  const puntosActualizados = { ...puntosActuales, [catKey]: nuevoValor };
+
+  const patchEtiquetas = { ...etiquetasPrevias };
+  if (params.tipo === "suma" && params.etiquetaActividad) {
+    patchEtiquetas[catKey] = params.etiquetaActividad;
+  }
+
+  await setDoc(
+    ref,
+    {
+      pin: pinKey,
+      nombre: params.nombre,
+      puntos: puntosActualizados,
+      etiquetasActividades: patchEtiquetas,
+      fechaUltima: params.fecha,
+    },
+    { merge: true }
+  );
+
+  const historial: Record<string, unknown> = {
+    pin: pinKey,
+    fecha: params.fecha,
+    tipo: params.tipo,
+    origen: params.origen,
+    categoriaId: catKey,
+    puntos: { [catKey]: cantidad },
+    totalEvento: cantidad,
+  };
+
+  if (params.aplicadoPor) historial.aplicadoPor = params.aplicadoPor;
+  if (params.catalogoId) historial.catalogoId = params.catalogoId;
+  if (params.catalogoNombre) historial.catalogoNombre = params.catalogoNombre;
+  if (params.tipo === "resta") {
+    historial.motivo = params.motivo;
+    historial.motivoTexto = textoMotivoCompleto(
+      params.motivo!,
+      params.motivoDetalle
+    );
+    if (params.motivoDetalle?.trim()) {
+      historial.motivoDetalle = params.motivoDetalle.trim();
+    }
+  }
+
+  await addDoc(collection(db, "calificacionesSemanal"), historial);
+
+  const totalPuntos = sumarPuntos(puntosActualizados, patchEtiquetas);
+
+  return { ok: true, nuevoValorCategoria: nuevoValor, totalPuntos };
+}
+
+export async function aplicarRestaPuntos(params: {
+  pin: string;
+  nombre: string;
+  cantidad: number;
+  fecha: string;
+  motivo: string;
+  motivoDetalle?: string;
+  origen: OrigenMovimientoPuntos;
+  aplicadoPor?: string;
+}): Promise<ResultadoMovimientoPuntos> {
+  return registrarMovimientoPuntos({
+    ...params,
+    categoriaId: CLAVE_RESTA_GENERAL,
+    tipo: "resta",
+  });
+}
 
 export type CatalogoCalificacion = {
   id: string;
@@ -160,54 +328,27 @@ export async function aplicarCalificacionCatalogo(params: {
     | "admin_aspirante_grupo"
     | "admin_consejero_individual"
     | "admin_consejero_grupo";
-}): Promise<void> {
-  const { pin, nombre, catalogo, fecha, origen } = params;
+  aplicadoPor?: string;
+}): Promise<ResultadoMovimientoPuntos> {
+  const { pin, nombre, catalogo, fecha, origen, aplicadoPor } = params;
   const pinKey = String(pin).trim();
-  if (!pinKey) return;
+  if (!pinKey) return { ok: false, mensaje: "PIN inválido." };
 
   const puntosAgregar = catalogo.puntos;
-  if (puntosAgregar <= 0) return;
+  if (puntosAgregar <= 0) return { ok: false, mensaje: "La actividad no tiene puntos." };
 
   const catKey = clavePuntosCatalogo(catalogo.id);
-  const ref = doc(db, "calificacionesConquis", pinKey);
-  const snap = await getDoc(ref);
-
-  const puntosActuales: Record<string, unknown> = snap.exists()
-    ? (snap.data().puntos as Record<string, unknown>) || {}
-    : {};
-
-  const valorPrevio = toNumberPuntos(puntosActuales[catKey]);
-  const puntosActualizados = {
-    ...puntosActuales,
-    [catKey]: valorPrevio + puntosAgregar,
-  };
-
-  const etiquetasPrevias: Record<string, string> = snap.exists()
-    ? ((snap.data().etiquetasActividades as Record<string, string>) || {})
-    : {};
-
-  await setDoc(
-    ref,
-    {
-      pin: pinKey,
-      nombre,
-      puntos: puntosActualizados,
-      etiquetasActividades: {
-        ...etiquetasPrevias,
-        [catKey]: catalogo.nombre,
-      },
-      fechaUltima: fecha,
-    },
-    { merge: true }
-  );
-
-  await addDoc(collection(db, "calificacionesSemanal"), {
+  return registrarMovimientoPuntos({
     pin: pinKey,
+    nombre,
+    categoriaId: catKey,
+    cantidad: puntosAgregar,
     fecha,
+    tipo: "suma",
     origen,
+    aplicadoPor,
     catalogoId: catalogo.id,
     catalogoNombre: catalogo.nombre,
-    puntos: { [catKey]: puntosAgregar },
-    totalEvento: puntosAgregar,
+    etiquetaActividad: catalogo.nombre,
   });
 }

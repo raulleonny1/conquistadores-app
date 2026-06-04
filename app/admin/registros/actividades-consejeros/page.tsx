@@ -26,6 +26,7 @@ import {
 } from "@/src/lib/actividadesCalificacion";
 import { indexarTotalesPorPin, toNumberPuntos } from "@/src/lib/categoriasPuntos";
 import { consejeroAsesoraUnidad } from "@/src/lib/unidades";
+import QuitarPuntosPanel from "@/src/components/calificaciones/QuitarPuntosPanel";
 
 type Modo = "individual" | "grupo";
 
@@ -220,7 +221,7 @@ export default function RegistroActividadesConsejerosPage() {
     let ok = 0;
     try {
       for (const p of pendientes) {
-        await aplicarCalificacionCatalogo({
+        const res = await aplicarCalificacionCatalogo({
           pin: p.pin,
           nombre: p.nombreConsejero,
           catalogo: p.catalogo,
@@ -228,6 +229,10 @@ export default function RegistroActividadesConsejerosPage() {
           origen:
             modo === "individual" ? "admin_consejero_individual" : "admin_consejero_grupo",
         });
+        if (!res.ok) {
+          toast.error(`${p.nombreConsejero}: ${res.mensaje}`);
+          break;
+        }
         ok++;
       }
       toast.success(
@@ -547,6 +552,16 @@ export default function RegistroActividadesConsejerosPage() {
                     </div>
                   ))}
                 </div>
+
+                {seleccionado && (
+                  <QuitarPuntosPanel
+                    className="mt-8"
+                    pin={seleccionado.pin}
+                    nombre={seleccionado.nombre}
+                    origen="admin_resta_consejero"
+                    aplicadoPor="admin"
+                  />
+                )}
               </>
             ) : (
               <>

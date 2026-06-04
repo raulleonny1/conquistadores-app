@@ -15,6 +15,9 @@ export const CATEGORIAS_PUNTOS = [
 
 export type CategoriaPuntosId = (typeof CATEGORIAS_PUNTOS)[number]["id"];
 
+/** Acumula puntos quitados del total (no toca categorías ni actividades). */
+export const CLAVE_RESTA_GENERAL = "ajuste_resta";
+
 const IDS_OFICIALES = new Set<string>(CATEGORIAS_PUNTOS.map((c) => c.id));
 
 export function toNumberPuntos(value: unknown): number {
@@ -24,6 +27,7 @@ export function toNumberPuntos(value: unknown): number {
 }
 
 export function nombreCategoria(id: string): string {
+  if (id === CLAVE_RESTA_GENERAL) return "Resta de puntos";
   const found = CATEGORIAS_PUNTOS.find((c) => c.id === id);
   if (found) return found.nombre;
   return id.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase());
@@ -49,7 +53,7 @@ export function getCategoriasConPuntos(
   }
 
   for (const key of Object.keys(puntos)) {
-    if (IDS_OFICIALES.has(key)) continue;
+    if (IDS_OFICIALES.has(key) || key === CLAVE_RESTA_GENERAL) continue;
     const valor = toNumberPuntos(puntos[key]);
     if (valor > 0) {
       resultado.push({ id: key, nombre: nombreMostrar(key), valor });
@@ -59,12 +63,17 @@ export function getCategoriasConPuntos(
   return resultado;
 }
 
-/** Total solo de categorías con puntos registrados (> 0). */
+/** Total de puntos del miembro (categorías y actividades menos restas generales). */
 export function sumarPuntos(
   puntos: Record<string, unknown> | undefined | null,
   etiquetasActividades?: Record<string, string> | null
 ): number {
-  return getCategoriasConPuntos(puntos, etiquetasActividades).reduce((acc, c) => acc + c.valor, 0);
+  const bruto = getCategoriasConPuntos(puntos, etiquetasActividades).reduce(
+    (acc, c) => acc + c.valor,
+    0
+  );
+  const resta = toNumberPuntos(puntos?.[CLAVE_RESTA_GENERAL]);
+  return Math.max(0, bruto - resta);
 }
 
 /** Clave de documento en calificacionesConquis (siempre el PIN de acceso). */
@@ -107,5 +116,9 @@ export function getCategoriasEnHistorial(
       if (toNumberPuntos(reg.puntos[key]) > 0) conValor.add(key);
     }
   }
-  return CATEGORIAS_PUNTOS.filter((c) => conValor.has(c.id));
+  const cols = CATEGORIAS_PUNTOS.filter((c) => conValor.has(c.id));
+  if (conValor.has(CLAVE_RESTA_GENERAL)) {
+    return [...cols, { id: CLAVE_RESTA_GENERAL, nombre: "Resta" }];
+  }
+  return cols;
 }
