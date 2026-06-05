@@ -1,6 +1,6 @@
-# Manual de Usuario — Sistema Club Caleb GYE
+# Manual de Usuario — ConquisApp
 
-Bienvenido al sistema de gestión del Club Caleb GYE. Este manual te guiará paso a paso en el uso de todas las funciones principales, para que puedas aprovechar al máximo la plataforma.
+Bienvenido a **ConquisApp**, la plataforma multi-club para Conquistadores, Aventureros y Jóvenes Adventistas. Este manual describe las funciones principales de tu club.
 
 ---
 
@@ -78,4 +78,4 @@ Bienvenido al sistema de gestión del Club Caleb GYE. Este manual te guiará pas
 
 ---
 
-¡Gracias por usar el sistema Club Caleb GYE!
+¡Gracias por usar ConquisApp!

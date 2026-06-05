@@ -32,6 +32,7 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+!.env.example
 
 # Firebase Admin SDK (proyecto conquistadoresapp-78f92 — no compartir con otras apps)
 serviceAccountKey.json
