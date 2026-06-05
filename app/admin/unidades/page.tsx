@@ -12,6 +12,8 @@ import {
   doc,
 } from "firebase/firestore";
 import { logInfo } from "@/src/lib/logger";
+import { consolidarUnidadesClub } from "@/src/lib/consolidarUnidades";
+import { toast } from "react-hot-toast";
 
 const unidadesRef = collection(db, "unidades");
 
@@ -21,8 +23,8 @@ export default function UnidadesPage() {
   const [form, setForm] = useState({ nombre: "", banderin: "" });
   const [unidades, setUnidades] = useState<any[]>([]);
   const [editId, setEditId] = useState<string | null>(null);
+  const [consolidando, setConsolidando] = useState(false);
 
-  // Cargar unidades
   const cargarUnidades = async () => {
     const snapshot = await getDocs(unidadesRef);
 
@@ -38,7 +40,6 @@ export default function UnidadesPage() {
     cargarUnidades();
   }, []);
 
-  // Cambiar inputs
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setForm({
       ...form,
@@ -46,17 +47,19 @@ export default function UnidadesPage() {
     });
   };
 
-  // Guardar o actualizar
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
+    const nombre = form.nombre.trim();
+    if (!nombre) return;
+
     if (editId) {
-      await updateDoc(doc(db, "unidades", editId), form);
-      logInfo('Unidad actualizada: ' + editId);
+      await updateDoc(doc(db, "unidades", editId), { ...form, nombre });
+      logInfo("Unidad actualizada: " + editId);
       setEditId(null);
     } else {
-      const docRef = await addDoc(unidadesRef, form);
-      logInfo('Unidad registrada: ' + docRef.id);
+      const docRef = await addDoc(unidadesRef, { ...form, nombre });
+      logInfo("Unidad registrada: " + docRef.id);
     }
 
     setForm({ nombre: "", banderin: "" });
@@ -64,7 +67,6 @@ export default function UnidadesPage() {
     cargarUnidades();
   };
 
-  // Editar unidad
   const handleEdit = (unidad: any) => {
     setForm({
       nombre: unidad.nombre,
@@ -74,22 +76,45 @@ export default function UnidadesPage() {
     setEditId(unidad.id);
   };
 
-  // Eliminar unidad
   const handleDelete = async (id: string) => {
     const confirmar = confirm("¿Eliminar esta unidad?");
     if (!confirmar) return;
 
     await deleteDoc(doc(db, "unidades", id));
-  await deleteDoc(doc(db, "unidades", id));
-  logInfo('Unidad eliminada: ' + id);
+    logInfo("Unidad eliminada: " + id);
 
     setUnidades(unidades.filter((u) => u.id !== id));
   };
 
+  const handleConsolidar = async () => {
+    const ok = confirm(
+      "¿Unificar duplicados como «Unidad de Gacelas» → «Gacelas» y «Unidad de Tigres» → «Tigres»?\n\n" +
+        "Moverá integrantes, fusionará puntos de unidad y limpiará el catálogo. No borra puntos personales."
+    );
+    if (!ok) return;
+
+    setConsolidando(true);
+    try {
+      const res = await consolidarUnidadesClub();
+      toast.success(
+        `Listo: ${res.conquistadoresActualizados} conquistador(es), ` +
+          `${res.catalogoEliminados} duplicado(s) en catálogo, ` +
+          `${res.docsPuntosUnidadFusionados} doc(s) de puntos unificados.`
+      );
+      if (res.detalle.length) {
+        console.info("[consolidarUnidades]", res.detalle.join("\n"));
+      }
+      await cargarUnidades();
+    } catch (err) {
+      console.error(err);
+      toast.error("Error al consolidar unidades. Revisa la consola.");
+    } finally {
+      setConsolidando(false);
+    }
+  };
+
   return (
     <div className="min-h-screen flex flex-col items-center bg-slate-50 py-12">
-      
-      {/* Botón regresar */}
       <div className="w-full max-w-2xl flex justify-end mb-4">
         <button
           onClick={() => router.push("/admin/registros")}
@@ -99,19 +124,34 @@ export default function UnidadesPage() {
         </button>
       </div>
 
-      {/* Formulario */}
+      <div className="bg-cyan-50 border border-cyan-200 rounded-2xl shadow-sm p-6 w-full max-w-2xl mb-6">
+        <h3 className="text-lg font-bold text-cyan-900 mb-2">Nombres duplicados</h3>
+        <p className="text-sm text-cyan-800 mb-4">
+          Si en el ranking aparecen «Unidad de Gacelas» y «Gacelas» por separado, usa este botón
+          una vez. Mueve integrantes al nombre corto, fusiona puntos de unidad y elimina entradas
+          duplicadas del catálogo. Usa nombres simples al registrar (ej. «Gacelas», «Tigres»).
+        </p>
+        <button
+          type="button"
+          disabled={consolidando}
+          onClick={handleConsolidar}
+          className="bg-cyan-700 text-white px-5 py-2 rounded-lg font-bold hover:bg-cyan-800 disabled:opacity-50"
+        >
+          {consolidando ? "Consolidando…" : "Unificar «Unidad de X» → «X»"}
+        </button>
+      </div>
+
       <div className="bg-white rounded-2xl shadow-xl p-8 w-full max-w-md mb-8">
         <h2 className="text-3xl font-bold text-purple-700 mb-6 text-center">
           {editId ? "Editar Unidad" : "Registrar Unidad"}
         </h2>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-
           <input
             name="nombre"
             value={form.nombre}
             onChange={handleChange}
-            placeholder="Nombre de la unidad"
+            placeholder="Nombre (ej. Gacelas, Tigres)"
             className="w-full p-2 rounded border"
             required
           />
@@ -130,40 +170,31 @@ export default function UnidadesPage() {
           >
             {editId ? "Actualizar" : "Guardar"}
           </button>
-
         </form>
       </div>
 
-      {/* Lista de unidades */}
       <div className="bg-white rounded-2xl shadow-xl p-8 w-full max-w-2xl">
         <h3 className="text-2xl font-bold text-purple-700 mb-4 text-center">
           Unidades Registradas
         </h3>
 
         {unidades.length === 0 ? (
-          <p className="text-center text-gray-500">
-            No hay unidades registradas
-          </p>
+          <p className="text-center text-gray-500">No hay unidades registradas</p>
         ) : (
           <ul className="divide-y divide-gray-200">
-
             {unidades.map((unidad) => (
               <li
                 key={unidad.id}
                 className="py-4 flex flex-col md:flex-row md:items-center md:justify-between"
               >
-
                 <div>
-                  <p className="font-semibold text-purple-800">
-                    {unidad.nombre}
-                  </p>
+                  <p className="font-semibold text-purple-800">{unidad.nombre}</p>
                   <p className="text-gray-600 text-sm">
                     Banderín: {unidad.banderin || "No definido"}
                   </p>
                 </div>
 
                 <div className="flex gap-2 mt-2 md:mt-0">
-
                   <button
                     onClick={() => handleEdit(unidad)}
                     className="bg-yellow-400 text-white px-3 py-1 rounded-full font-semibold shadow hover:bg-yellow-600 transition"
@@ -177,12 +208,9 @@ export default function UnidadesPage() {
                   >
                     Eliminar
                   </button>
-
                 </div>
-
               </li>
             ))}
-
           </ul>
         )}
       </div>

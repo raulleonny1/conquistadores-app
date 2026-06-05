@@ -11,18 +11,22 @@ import {
   indexarTotalesPorPin,
   indexarTotalesPorUnidad,
   sumarPuntos,
+  toNumberPuntos,
 } from "@/src/lib/categoriasPuntos";
+import {
+  construirEntradasRanking,
+  etiquetaTipoParticipante,
+  totalPuntosEntrada,
+  type ParticipanteRankingRaw,
+} from "@/src/lib/rankingPersonas";
 import {
   calcularRankingUnidades,
   type ConquistadorUnidad,
 } from "@/src/lib/rankingUnidades";
+import { canonicalizarUnidad } from "@/src/lib/unidades";
+import { nombreCompletoAspirante } from "@/src/constants/aspirante";
 
-type Participante = {
-  id: string;
-  nombre: string;
-  pin: string;
-  tipo: "conquistador" | "aspirante" | "consejero" | "asociado";
-};
+type Participante = ParticipanteRankingRaw;
 
 type TotalesPorPin = Record<string, number>;
 
@@ -85,7 +89,7 @@ export default function RankinPage() {
   const [totalesPorUnidadClave, setTotalesPorUnidadClave] = useState<Record<string, number>>(
     {}
   );
-  const [selectedPin, setSelectedPin] = useState<string>("");
+  const [selectedRankingKey, setSelectedRankingKey] = useState<string>("");
   const [resumenCategorias, setResumenCategorias] = useState<CategoriaResumen[]>([]);
   const [historial, setHistorial] = useState<RegistroSemanal[]>([]);
   const [totalGeneral, setTotalGeneral] = useState(0);
@@ -114,10 +118,14 @@ export default function RankinPage() {
             unidad: string;
           }>;
           const fullName = [data.nombre || "", data.apellido || ""].join(" ").trim();
+          const rawUnidad = (data.unidad || "Sin unidad").trim() || "Sin unidad";
           return {
             pin: String(data.pin ?? d.id).trim(),
             nombre: fullName || "Sin nombre",
-            unidad: (data.unidad || "Sin unidad").trim() || "Sin unidad",
+            unidad:
+              rawUnidad === "Sin unidad"
+                ? rawUnidad
+                : canonicalizarUnidad(rawUnidad, unidadesOficiales),
           };
         });
 
@@ -133,10 +141,10 @@ export default function RankinPage() {
         });
 
         const aspirantes: Participante[] = aspirantesSnap.docs.map((d) => {
-          const data = d.data() as Partial<{ nombre: string; pin: string }>;
+          const data = d.data() as Partial<{ nombre: string; apellido: string; pin: string }>;
           return {
             id: d.id,
-            nombre: data.nombre || "Sin nombre",
+            nombre: nombreCompletoAspirante(data) || data.nombre || "Sin nombre",
             pin: String(data.pin ?? d.id).trim(),
             tipo: "aspirante",
           };
@@ -168,9 +176,6 @@ export default function RankinPage() {
         setCatalogoUnidades(unidadesOficiales);
         setTotalesPorPin(totalesMap);
         setTotalesPorUnidadClave(totalesUnidadMap);
-        if (merged.length > 0) {
-          setSelectedPin((prev) => prev || merged[0].pin);
-        }
         const rankingUnidades = calcularRankingUnidades(
           conquisUnidadLista,
           totalesMap,
@@ -188,23 +193,74 @@ export default function RankinPage() {
     loadParticipantes();
   }, []);
 
+  const entradasRanking = useMemo(
+    () => construirEntradasRanking(participantes, tipoFiltro),
+    [participantes, tipoFiltro]
+  );
+
+  const entradasFiltradas = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    const list = term
+      ? entradasRanking.filter((e) => e.nombre.toLowerCase().includes(term))
+      : entradasRanking;
+
+    return [...list].sort(
+      (a, b) =>
+        totalPuntosEntrada(b, totalesPorPin) - totalPuntosEntrada(a, totalesPorPin) ||
+        a.nombre.localeCompare(b.nombre, "es")
+    );
+  }, [entradasRanking, search, totalesPorPin]);
+
+  const entradaSeleccionada = useMemo(() => {
+    if (entradasFiltradas.length === 0) return null;
+    return (
+      entradasFiltradas.find((e) => e.key === selectedRankingKey) ?? entradasFiltradas[0]
+    );
+  }, [entradasFiltradas, selectedRankingKey]);
+
   useEffect(() => {
-    if (!selectedPin) return;
+    if (entradasFiltradas.length === 0) return;
+    if (!entradasFiltradas.some((e) => e.key === selectedRankingKey)) {
+      setSelectedRankingKey(entradasFiltradas[0].key);
+    }
+  }, [entradasFiltradas, selectedRankingKey]);
+
+  useEffect(() => {
+    if (!entradaSeleccionada || entradaSeleccionada.pins.length === 0) return;
 
     const loadDetalle = async () => {
       setLoadingDetail(true);
       try {
-        const [totalesSnap, historialSnap] = await Promise.all([
-          getDoc(doc(db, "calificacionesConquis", selectedPin)),
-          getDocs(query(collection(db, "calificacionesSemanal"), where("pin", "==", selectedPin))),
+        const [totalesSnaps, historialSnaps] = await Promise.all([
+          Promise.all(
+            entradaSeleccionada.pins.map((pin) =>
+              getDoc(doc(db, "calificacionesConquis", pin))
+            )
+          ),
+          Promise.all(
+            entradaSeleccionada.pins.map((pin) =>
+              getDocs(
+                query(collection(db, "calificacionesSemanal"), where("pin", "==", pin))
+              )
+            )
+          ),
         ]);
 
-        const dataTotales = totalesSnap.exists() ? totalesSnap.data() : null;
-        const puntosMap =
-          (dataTotales?.puntos as Record<string, unknown> | undefined) || {};
-        const etiquetas =
-          (dataTotales?.etiquetasActividades as Record<string, string> | undefined) ||
-          {};
+        const puntosMap: Record<string, unknown> = {};
+        const etiquetas: Record<string, string> = {};
+
+        for (const snap of totalesSnaps) {
+          if (!snap.exists()) continue;
+          const data = snap.data();
+          const pts = (data.puntos as Record<string, unknown>) || {};
+          for (const [k, v] of Object.entries(pts)) {
+            puntosMap[k] = toNumberPuntos(puntosMap[k]) + toNumberPuntos(v);
+          }
+          Object.assign(
+            etiquetas,
+            (data.etiquetasActividades as Record<string, string>) || {}
+          );
+        }
 
         const categorias = getCategoriasConPuntos(puntosMap, etiquetas).map((c) => ({
           categoria: c.nombre,
@@ -214,23 +270,27 @@ export default function RankinPage() {
         setResumenCategorias(categorias);
         setTotalGeneral(sumarPuntos(puntosMap, etiquetas));
 
-        const eventos: RegistroSemanal[] = historialSnap.docs
-          .map((d) => {
-            const data = d.data() as Partial<{ fecha: string; puntos: Record<string, number | string> }>;
-            const puntos = data.puntos || {};
-            const totalEvento = Object.values(puntos).reduce<number>(
+        const eventos: RegistroSemanal[] = [];
+        for (const snap of historialSnaps) {
+          for (const d of snap.docs) {
+            const data = d.data() as Partial<{
+              fecha: string;
+              puntos: Record<string, number | string>;
+            }>;
+            const pts = data.puntos || {};
+            const totalEvento = Object.values(pts).reduce<number>(
               (acc, value) => acc + toNumber(value),
               0
             );
-            return {
+            eventos.push({
               id: d.id,
               fecha: data.fecha || "",
-              puntos,
+              puntos: pts,
               totalEvento,
-            };
-          })
-          .sort((a, b) => parseDate(b.fecha) - parseDate(a.fecha));
-
+            });
+          }
+        }
+        eventos.sort((a, b) => parseDate(b.fecha) - parseDate(a.fecha));
         setHistorial(eventos);
       } finally {
         setLoadingDetail(false);
@@ -238,7 +298,7 @@ export default function RankinPage() {
     };
 
     loadDetalle();
-  }, [selectedPin]);
+  }, [entradaSeleccionada]);
 
   const rankingUnidades = useMemo(
     () =>
@@ -262,30 +322,7 @@ export default function RankinPage() {
     [rankingUnidades, selectedUnidad]
   );
 
-  const filteredParticipantes = useMemo(() => {
-    const term = search.trim().toLowerCase();
-    const filteredByType =
-      tipoFiltro === "todos"
-        ? participantes
-        : tipoFiltro === "consejero"
-          ? participantes.filter((p) => p.tipo === "consejero" || p.tipo === "asociado")
-          : participantes.filter((p) => p.tipo === tipoFiltro);
-    const filteredBySearch = term
-      ? filteredByType.filter((p) => p.nombre.toLowerCase().includes(term))
-      : filteredByType;
-
-    return [...filteredBySearch].sort((a, b) => {
-      const totalA = totalesPorPin[a.pin] ?? 0;
-      const totalB = totalesPorPin[b.pin] ?? 0;
-      if (totalA !== totalB) return totalB - totalA;
-      return a.nombre.localeCompare(b.nombre, "es");
-    });
-  }, [participantes, search, tipoFiltro, totalesPorPin]);
-
-  const selectedParticipante = useMemo(
-    () => participantes.find((p) => p.pin === selectedPin),
-    [participantes, selectedPin]
-  );
+  const filteredParticipantes = entradasFiltradas;
 
   return (
     <div className="min-h-screen bg-slate-50 px-4 py-8 text-slate-900">
@@ -401,15 +438,15 @@ export default function RankinPage() {
               <p className="py-8 text-center text-sm text-slate-500">No se encontraron participantes.</p>
             ) : (
               <ul className="space-y-2">
-                {filteredParticipantes.map((p) => {
-                  const active = p.pin === selectedPin;
-                  const total = totalesPorPin[p.pin] ?? 0;
-                  const rank = filteredParticipantes.findIndex((item) => item.pin === p.pin) + 1;
+                {filteredParticipantes.map((entrada, idx) => {
+                  const active = entrada.key === (entradaSeleccionada?.key ?? "");
+                  const total = totalPuntosEntrada(entrada, totalesPorPin);
+                  const rank = idx + 1;
                   return (
-                    <li key={`${p.tipo}-${p.id}`}>
+                    <li key={entrada.key}>
                       <button
                         type="button"
-                        onClick={() => setSelectedPin(p.pin)}
+                        onClick={() => setSelectedRankingKey(entrada.key)}
                         className={`w-full rounded-xl border px-3 py-3 text-left transition ${
                           active
                             ? "border-indigo-300 bg-indigo-50"
@@ -417,19 +454,22 @@ export default function RankinPage() {
                         }`}
                       >
                         <div className="flex items-start justify-between gap-2">
-                          <div>
-                            <p className="font-semibold text-slate-800">#{rank} {p.nombre}</p>
-                            <p className="mt-1 text-xs uppercase tracking-wide text-slate-500">
-                              {p.tipo === "conquistador"
-                                ? "Conquistador"
-                                : p.tipo === "aspirante"
-                                  ? "Aspirante"
-                                  : p.tipo === "asociado"
-                                    ? "Consejero asociado"
-                                    : "Consejero"}
+                          <div className="min-w-0 flex-1">
+                            <p className="font-semibold text-slate-800">
+                              #{rank} {entrada.nombre}
                             </p>
+                            <div className="mt-1 flex flex-wrap gap-1">
+                              {entrada.etiquetasTipos.map((etiq) => (
+                                <span
+                                  key={etiq}
+                                  className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-600"
+                                >
+                                  {etiq}
+                                </span>
+                              ))}
+                            </div>
                           </div>
-                          <span className="rounded-full bg-amber-100 px-2 py-1 text-xs font-bold text-amber-800">
+                          <span className="shrink-0 rounded-full bg-amber-100 px-2 py-1 text-xs font-bold text-amber-800">
                             {total}
                           </span>
                         </div>
@@ -589,7 +629,7 @@ export default function RankinPage() {
                   </p>
                 </div>
               )
-            ) : !selectedParticipante ? (
+            ) : !entradaSeleccionada ? (
               <div className="flex min-h-72 items-center justify-center text-slate-500">
                 Selecciona una persona para ver su detalle.
               </div>
@@ -604,19 +644,82 @@ export default function RankinPage() {
                       <Trophy className="h-7 w-7" />
                       {totalGeneral}
                     </div>
-                    <p className="text-sm text-amber-700">puntos</p>
+                    <p className="text-sm text-amber-700">
+                      {entradaSeleccionada.pins.length > 1
+                        ? "suma para ranking (cada cargo tiene su PIN aparte)"
+                        : "puntos"}
+                    </p>
                   </div>
                   <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
                     <p className="text-xs font-bold uppercase tracking-widest text-slate-500">Participante</p>
                     <div className="mt-2 flex items-center gap-2 text-lg font-bold text-slate-800">
                       <UserRound className="h-5 w-5 text-indigo-600" />
-                      {selectedParticipante.nombre}
+                      {entradaSeleccionada.nombre}
                     </div>
-                    <p className="mt-1 text-xs uppercase tracking-wider text-slate-500">
-                      {selectedParticipante.tipo === "conquistador" ? "Conquistador" : "Aspirante a guía mayor"}
-                    </p>
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {entradaSeleccionada.etiquetasTipos.map((etiq) => (
+                        <span
+                          key={etiq}
+                          className="rounded-full bg-indigo-100 px-2.5 py-0.5 text-xs font-semibold text-indigo-800"
+                        >
+                          {etiq}
+                        </span>
+                      ))}
+                    </div>
+                    {entradaSeleccionada.pins.length > 1 && (
+                      <p className="mt-2 text-xs text-slate-500">
+                        Vista unificada solo en ranking. Login y dashboards usan un PIN por cargo.
+                      </p>
+                    )}
                   </div>
                 </div>
+
+                {entradaSeleccionada.entradas.length > 1 && (
+                  <div className="rounded-xl border border-indigo-200 bg-indigo-50/40">
+                    <div className="border-b border-indigo-100 px-4 py-3">
+                      <h2 className="text-sm font-bold uppercase tracking-wider text-indigo-900">
+                        Puntos por cargo (PINs separados)
+                      </h2>
+                      <p className="mt-1 text-xs text-indigo-800">
+                        Cada fila es un registro distinto en Firebase. No se fusionan PINs.
+                      </p>
+                    </div>
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full text-sm">
+                        <thead className="bg-indigo-100/60 text-xs uppercase tracking-wider text-indigo-900">
+                          <tr>
+                            <th className="px-4 py-2 text-left">Cargo</th>
+                            <th className="px-4 py-2 text-left">PIN</th>
+                            <th className="px-4 py-2 text-right">Puntos</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {entradaSeleccionada.entradas.map((e) => (
+                            <tr key={`${e.tipo}-${e.pin}`} className="border-t border-indigo-100">
+                              <td className="px-4 py-2 font-medium text-slate-800">
+                                {etiquetaTipoParticipante(e.tipo)}
+                              </td>
+                              <td className="px-4 py-2 font-mono text-slate-600">{e.pin}</td>
+                              <td className="px-4 py-2 text-right font-bold text-indigo-800">
+                                {totalesPorPin[e.pin] ?? 0}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                        <tfoot className="border-t-2 border-indigo-200 bg-indigo-100/40">
+                          <tr>
+                            <td colSpan={2} className="px-4 py-2 text-right font-bold text-indigo-900">
+                              Total en ranking «Todos»
+                            </td>
+                            <td className="px-4 py-2 text-right font-black text-indigo-900">
+                              {totalPuntosEntrada(entradaSeleccionada, totalesPorPin)}
+                            </td>
+                          </tr>
+                        </tfoot>
+                      </table>
+                    </div>
+                  </div>
+                )}
 
                 <div className="rounded-xl border border-slate-200">
                   <div className="border-b border-slate-200 px-4 py-3">

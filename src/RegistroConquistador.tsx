@@ -6,6 +6,7 @@ import { logInfo, logError } from "@/src/lib/logger";
 import { handleError } from "@/src/lib/errorHandler";
 import { toast } from "react-hot-toast";
 import { generarPinUnicoClub } from "@/src/lib/pinUnico";
+import { canonicalizarUnidad } from "@/src/lib/unidades";
 
 export default function RegistroConquistador() {
   // ...existing code...
@@ -142,7 +143,13 @@ export default function RegistroConquistador() {
     const { id, pin: _pinIgnorado, ...rest } = editForm;
 
     try {
-      await updateDoc(doc(db, 'RegistroConquis', id), rest);
+      const payload = {
+        ...rest,
+        unidad: rest.unidad
+          ? canonicalizarUnidad(String(rest.unidad), unidadesRegistradas)
+          : rest.unidad,
+      };
+      await updateDoc(doc(db, 'RegistroConquis', id), payload);
       toast.success('Miembro actualizado');
       logInfo('Miembro actualizado: ' + id);
       setEditandoId(null);
@@ -211,7 +218,20 @@ export default function RegistroConquistador() {
                     <td className="p-2"><input className="border rounded p-1 text-xs sm:text-sm" value={editForm.apellido || ''} onChange={e => setEditForm({ ...editForm, apellido: e.target.value })} /></td>
                     <td className="p-2"><input className="border rounded p-1 text-xs sm:text-sm" value={editForm.edad || ''} onChange={e => setEditForm({ ...editForm, edad: e.target.value })} /></td>
                     <td className="p-2"><input className="border rounded p-1 text-xs sm:text-sm" value={editForm.clase || ''} onChange={e => setEditForm({ ...editForm, clase: e.target.value })} /></td>
-                    <td className="p-2"><input className="border rounded p-1 text-xs sm:text-sm" value={editForm.unidad || ''} onChange={e => setEditForm({ ...editForm, unidad: e.target.value })} /></td>
+                    <td className="p-2">
+                      <select
+                        className="border rounded p-1 text-xs sm:text-sm w-full"
+                        value={editForm.unidad || ""}
+                        onChange={(e) => setEditForm({ ...editForm, unidad: e.target.value })}
+                      >
+                        <option value="">Sin unidad</option>
+                        {unidadesRegistradas.map((u) => (
+                          <option key={u} value={u}>
+                            {u}
+                          </option>
+                        ))}
+                      </select>
+                    </td>
                     <td className="p-2"><input className="border rounded p-1 text-xs sm:text-sm" value={editForm.consejero || ''} onChange={e => setEditForm({ ...editForm, consejero: e.target.value })} /></td>
                     <td className="p-2 font-mono font-bold text-blue-700">{editForm.pin || "—"}</td>
                     <td className="p-2 flex gap-1">

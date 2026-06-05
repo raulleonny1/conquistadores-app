@@ -247,7 +247,13 @@ export default function RegistroConquisPageInner({ unidades: initialUnidades, co
     try {
       if (editMode && editId) {
         const { pin: _pinIgnorado, ...rest } = form;
-        await updateDoc(doc(db, "RegistroConquis", editId), rest);
+        const payload = {
+          ...rest,
+          unidad: rest.unidad
+            ? canonicalizarUnidad(rest.unidad, catalogoUnidades)
+            : rest.unidad,
+        };
+        await updateDoc(doc(db, "RegistroConquis", editId), payload);
         setEditId(null);
         setEditMode(false);
         toast.success("Conquistador actualizado");
@@ -257,6 +263,9 @@ export default function RegistroConquisPageInner({ unidades: initialUnidades, co
         await addDoc(collection(db, "RegistroConquis"), {
           ...form,
           pin,
+          unidad: form.unidad
+            ? canonicalizarUnidad(form.unidad, catalogoUnidades)
+            : form.unidad,
           especialidades: form.especialidades,
         });
         toast.success("Conquistador registrado");

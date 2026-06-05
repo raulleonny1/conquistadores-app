@@ -6,10 +6,7 @@ import { db } from '../../../src/firebase';
 import { collection, addDoc, doc, getDocs, updateDoc } from 'firebase/firestore';
 import { handleError } from '@/src/lib/errorHandler';
 import {
-  cargarPinsOcupadosClub,
-  crearPinEnSet,
   generarPinUnicoClub,
-  migrarCalificacionesAlNuevoPin,
 } from '@/src/lib/pinUnico';
 
 type ConsejeroPageClientProps = {
@@ -192,6 +189,8 @@ function ConsejerosList({
   editarAsociadoDesdeUrl?: boolean;
 }) {
   const [consejeros, setConsejeros] = useState<Consejero[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [editId, setEditId] = useState<string | null>(null);
   const editarDesdeUrlAplicado = React.useRef(false);
   const [editForm, setEditForm] = useState<{
@@ -204,42 +203,28 @@ function ConsejerosList({
 
   useEffect(() => {
     const fetchConsejeros = async () => {
-      const querySnapshot = await getDocs(collection(db, 'consejeros'));
-      const pinsOcupados = await cargarPinsOcupadosClub();
-      const lista: Consejero[] = [];
-      let pinsAsignados = 0;
+      setLoading(true);
+      setLoadError(null);
+      try {
+        const querySnapshot = await getDocs(collection(db, 'consejeros'));
+        const lista: Consejero[] = querySnapshot.docs.map((docSnap) => {
+          const data = docSnap.data() as Omit<Consejero, 'id'>;
+          return {
+            id: docSnap.id,
+            ...data,
+            pin: String(data.pin ?? '').trim(),
+            unidades: Array.isArray(data.unidades) ? data.unidades : [],
+          };
+        });
 
-      for (const docSnap of querySnapshot.docs) {
-        const data = docSnap.data() as Omit<Consejero, 'id'>;
-        let pin = String(data.pin ?? '').trim();
-        if (!pin) {
-          pin = crearPinEnSet(pinsOcupados);
-          pinsOcupados.add(pin);
-          await updateDoc(doc(db, 'consejeros', docSnap.id), { pin });
-          pinsAsignados++;
-        } else if (pinsOcupados.has(pin)) {
-          const pinAnterior = pin;
-          pin = crearPinEnSet(pinsOcupados);
-          pinsOcupados.add(pin);
-          await updateDoc(doc(db, 'consejeros', docSnap.id), { pin });
-          await migrarCalificacionesAlNuevoPin(
-            pinAnterior,
-            pin,
-            String(data.nombre ?? '')
-          );
-          pinsAsignados++;
-        } else {
-          pinsOcupados.add(pin);
-        }
-        lista.push({ id: docSnap.id, ...data, pin });
-      }
-
-      lista.sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
-      setConsejeros(lista);
-      if (pinsAsignados > 0) {
-        toast.success(
-          `PIN único asignado o corregido en ${pinsAsignados} consejero(s) (sin duplicados en el club).`
-        );
+        lista.sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
+        setConsejeros(lista);
+      } catch (error) {
+        handleError(error, 'Error al cargar consejeros');
+        setLoadError('No se pudieron cargar los consejeros. Recarga la página.');
+        setConsejeros([]);
+      } finally {
+        setLoading(false);
       }
     };
     fetchConsejeros();
@@ -350,7 +335,21 @@ function ConsejerosList({
     }
   };
 
-  if (consejeros.length === 0) return <div className="text-gray-500">No hay consejeros registrados.</div>;
+  if (loading) {
+    return <div className="text-green-700 py-4">Cargando consejeros…</div>;
+  }
+
+  if (loadError) {
+    return <div className="text-red-600 py-4">{loadError}</div>;
+  }
+
+  if (consejeros.length === 0) {
+    return (
+      <div className="text-gray-500">
+        No hay consejeros registrados. Los existentes en Firebase aparecerán aquí al cargar.
+      </div>
+    );
+  }
 
   return (
     <ul className="space-y-3">
