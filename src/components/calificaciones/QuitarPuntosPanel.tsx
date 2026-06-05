@@ -9,6 +9,8 @@ import {
   aplicarRestaPuntos,
   type OrigenMovimientoPuntos,
 } from "@/src/lib/actividadesCalificacion";
+import { aplicarRestaPuntosPrograma } from "@/src/lib/calificacionesPrograma";
+import type { ColeccionCalificacionesPrograma } from "@/src/constants/categoriasPrograma";
 import { sumarPuntos } from "@/src/lib/categoriasPuntos";
 import { MOTIVOS_RESTA_PUNTOS } from "@/src/lib/motivosRestaPuntos";
 
@@ -19,6 +21,9 @@ type QuitarPuntosPanelProps = {
   aplicadoPor?: string;
   onRestado?: () => void;
   className?: string;
+  /** Por defecto calificacionesConquis (Conquistadores). */
+  coleccionPuntos?: string;
+  programa?: "aventureros" | "ja";
 };
 
 function fechaHoyInput(): string {
@@ -32,6 +37,8 @@ export default function QuitarPuntosPanel({
   aplicadoPor,
   onRestado,
   className = "",
+  coleccionPuntos = "calificacionesConquis",
+  programa,
 }: QuitarPuntosPanelProps) {
   const [puntos, setPuntos] = useState<Record<string, unknown>>({});
   const [etiquetas, setEtiquetas] = useState<Record<string, string>>({});
@@ -43,7 +50,7 @@ export default function QuitarPuntosPanel({
 
   const recargar = useCallback(() => {
     if (!pin.trim()) return;
-    const ref = doc(db, "calificacionesConquis", pin.trim());
+    const ref = doc(db, coleccionPuntos, pin.trim());
     return onSnapshot(ref, (snap) => {
       if (!snap.exists()) {
         setPuntos({});
@@ -54,7 +61,7 @@ export default function QuitarPuntosPanel({
       setPuntos((data.puntos as Record<string, unknown>) || {});
       setEtiquetas((data.etiquetasActividades as Record<string, string>) || {});
     });
-  }, [pin]);
+  }, [pin, coleccionPuntos]);
 
   useEffect(() => {
     const unsub = recargar();
@@ -87,16 +94,28 @@ export default function QuitarPuntosPanel({
 
     setGuardando(true);
     try {
-      const res = await aplicarRestaPuntos({
-        pin: pin.trim(),
-        nombre: nombre.trim() || "Sin nombre",
-        cantidad: qty,
-        fecha,
-        motivo,
-        motivoDetalle: motivoDetalle.trim() || undefined,
-        origen,
-        aplicadoPor,
-      });
+      const res =
+        coleccionPuntos !== "calificacionesConquis" && programa
+          ? await aplicarRestaPuntosPrograma({
+              coleccion: coleccionPuntos as ColeccionCalificacionesPrograma,
+              programa,
+              pin: pin.trim(),
+              nombre: nombre.trim() || "Sin nombre",
+              cantidad: qty,
+              fecha,
+              motivo,
+              motivoDetalle: motivoDetalle.trim() || undefined,
+            })
+          : await aplicarRestaPuntos({
+              pin: pin.trim(),
+              nombre: nombre.trim() || "Sin nombre",
+              cantidad: qty,
+              fecha,
+              motivo,
+              motivoDetalle: motivoDetalle.trim() || undefined,
+              origen,
+              aplicadoPor,
+            });
       if (!res.ok) {
         toast.error(res.mensaje);
         return;

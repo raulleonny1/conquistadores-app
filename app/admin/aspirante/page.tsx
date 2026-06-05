@@ -22,6 +22,8 @@ import FichaMedicaUpload from "@/src/components/forms/FichaMedicaUpload";
 import { ArrowLeft, MessageCircle } from "lucide-react";
 import { toast } from "react-hot-toast";
 import { generarPinUnicoClub } from "@/src/lib/pinUnico";
+import { useClubActivo } from "@/src/hooks/useClubActivo";
+import { datosConClub, queryColeccionClub } from "@/src/lib/clubScope";
 
 type AspiranteDoc = {
   id: string;
@@ -57,6 +59,7 @@ function numeroWhatsappAspirante(a: Pick<AspiranteDoc, "telefono" | "whatsapp">)
 }
 
 export default function AspirantePage() {
+  const { clubId } = useClubActivo();
   const [form, setForm] = useState(formInicial);
   const [fichaArchivo, setFichaArchivo] = useState<File | null>(null);
   const [fichaMedicaUrl, setFichaMedicaUrl] = useState("");
@@ -68,7 +71,9 @@ export default function AspirantePage() {
 
 
   useEffect(() => {
-    const unsub = onSnapshot(collection(db, "aspirantesGuiaMayor"), (snap) => {
+    const q = queryColeccionClub("aspirantesGuiaMayor", clubId);
+    if (!q) return;
+    const unsub = onSnapshot(q, (snap) => {
       setAspirantes(
         snap.docs.map((docSnap) => ({
           id: docSnap.id,
@@ -77,7 +82,7 @@ export default function AspirantePage() {
       );
     });
     return () => unsub();
-  }, []);
+  }, [clubId]);
 
   const resetForm = () => {
     setForm(formInicial);
@@ -130,6 +135,11 @@ export default function AspirantePage() {
   const handleSave = async () => {
     if (!validarFormulario()) return;
 
+    if (!clubId && !editId) {
+      toast.error("Inicia sesión como administrador del club primero.");
+      return;
+    }
+
     setLoading(true);
     try {
       const docId = editId ?? (await generarPinUnicoClub());
@@ -162,12 +172,12 @@ export default function AspirantePage() {
         await updateDoc(doc(db, "aspirantesGuiaMayor", editId), payload);
         toast.success("Aspirante actualizado.");
       } else {
-        await setDoc(doc(db, "aspirantesGuiaMayor", docId), {
+        await setDoc(doc(db, "aspirantesGuiaMayor", docId), datosConClub({
           ...payload,
           pin: docId,
           fechaRegistro: formatFechaDDMMYYYY(new Date()),
-        });
-        await setDoc(doc(db, "tarjetaGuiaMayor", docId), {
+        }, clubId!));
+        await setDoc(doc(db, "tarjetaGuiaMayor", docId), datosConClub({
           aspiranteId: docId,
           aspiranteNombre: nombreCompletoAspirante(form),
           fechaInicio: new Date().toLocaleDateString(),
@@ -181,7 +191,7 @@ export default function AspirantePage() {
               firma: "",
             }))
           ),
-        });
+        }, clubId!));
         toast.success(`Aspirante registrado. PIN: ${docId}`);
       }
       resetForm();

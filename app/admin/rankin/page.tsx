@@ -25,6 +25,8 @@ import {
 } from "@/src/lib/rankingUnidades";
 import { canonicalizarUnidad } from "@/src/lib/unidades";
 import { nombreCompletoAspirante } from "@/src/constants/aspirante";
+import { useClubActivo } from "@/src/hooks/useClubActivo";
+import { queryColeccionClub } from "@/src/lib/clubScope";
 
 type Participante = ParticipanteRankingRaw;
 
@@ -74,6 +76,7 @@ function parseDate(fecha: string): number {
 
 export default function RankinPage() {
   const router = useRouter();
+  const { clubId } = useClubActivo();
   const [loading, setLoading] = useState(true);
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [search, setSearch] = useState("");
@@ -95,15 +98,27 @@ export default function RankinPage() {
   const [totalGeneral, setTotalGeneral] = useState(0);
 
   useEffect(() => {
+    if (!clubId) {
+      setParticipantes([]);
+      setLoading(false);
+      return;
+    }
+
     const loadParticipantes = async () => {
       setLoading(true);
       try {
+        const qConquis = queryColeccionClub("RegistroConquis", clubId);
+        const qAspirantes = queryColeccionClub("aspirantesGuiaMayor", clubId);
+        const qConsejeros = queryColeccionClub("consejeros", clubId);
+        const qUnidades = queryColeccionClub("unidades", clubId);
+        if (!qConquis || !qAspirantes || !qConsejeros || !qUnidades) return;
+
         const [conquisSnap, aspirantesSnap, consejerosSnap, unidadesSnap] =
           await Promise.all([
-          getDocs(collection(db, "RegistroConquis")),
-          getDocs(collection(db, "aspirantesGuiaMayor")),
-          getDocs(collection(db, "consejeros")),
-          getDocs(collection(db, "unidades")),
+          getDocs(qConquis),
+          getDocs(qAspirantes),
+          getDocs(qConsejeros),
+          getDocs(qUnidades),
         ]);
 
         const unidadesOficiales = unidadesSnap.docs
@@ -163,11 +178,14 @@ export default function RankinPage() {
           .filter((p) => Boolean(p.pin))
           .sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
 
+        const pinsClub = new Set(merged.map((p) => p.pin));
         const totalesSnapshot = await getDocs(collection(db, "calificacionesConquis"));
-        const docsCalif = totalesSnapshot.docs.map((d) => ({
-          id: d.id,
-          data: () => d.data() as Record<string, unknown>,
-        }));
+        const docsCalif = totalesSnapshot.docs
+          .filter((d) => pinsClub.has(d.id) || pinsClub.has(String(d.data().pin ?? "")))
+          .map((d) => ({
+            id: d.id,
+            data: () => d.data() as Record<string, unknown>,
+          }));
         const totalesMap: TotalesPorPin = indexarTotalesPorPin(docsCalif);
         const totalesUnidadMap = indexarTotalesPorUnidad(docsCalif, unidadesOficiales);
 
@@ -191,7 +209,7 @@ export default function RankinPage() {
     };
 
     loadParticipantes();
-  }, []);
+  }, [clubId]);
 
   const entradasRanking = useMemo(
     () => construirEntradasRanking(participantes, tipoFiltro),
@@ -361,6 +379,20 @@ export default function RankinPage() {
                 Por unidad
               </button>
             </div>
+            <button
+              type="button"
+              onClick={() => router.push("/admin/rankin-aventureros")}
+              className="rounded-lg bg-amber-100 px-3 py-1.5 text-xs font-bold text-amber-800 hover:bg-amber-200"
+            >
+              Aventureros
+            </button>
+            <button
+              type="button"
+              onClick={() => router.push("/admin/rankin-ja")}
+              className="rounded-lg bg-violet-100 px-3 py-1.5 text-xs font-bold text-violet-800 hover:bg-violet-200"
+            >
+              JA
+            </button>
             <button
             type="button"
             onClick={() => router.push("/admin")}

@@ -9,6 +9,8 @@ import { db } from "../../../src/firebase";
 import { collection, onSnapshot, query, where, addDoc, getDocs, updateDoc, doc, getDoc, setDoc } from "firebase/firestore";
 import { actividadesBase } from "./actividadesBase";
 import { tarjetaGuiaMayor } from "../../../src/data/tarjetaGuiaMayor";
+import { useClubActivo } from "@/src/hooks/useClubActivo";
+import { datosConClub, queryColeccionClub } from "@/src/lib/clubScope";
 
 type TarjetaDoc = {
   id: string;
@@ -19,6 +21,7 @@ type TarjetaDoc = {
 };
 
 const EvaluarGuiaMayorPage = () => {
+    const { clubId } = useClubActivo();
     const actividadesPlan = tarjetaGuiaMayor.flatMap((grupo) => grupo.actividades);
     const actividadesSet = new Set(actividadesPlan);
     const CATEGORIAS_BASE = [
@@ -84,14 +87,16 @@ const EvaluarGuiaMayorPage = () => {
         },
       }, { merge: true });
 
-      await addDoc(collection(db, "calificacionesSemanal"), {
-        pin: pinKey,
-        fecha: new Date().toLocaleDateString(),
-        origen: "evaluacion_guia_mayor",
-        evaluador,
-        puntos: { tareas: delta },
-        totalEvento: delta,
-      });
+      if (clubId) {
+        await addDoc(collection(db, "calificacionesSemanal"), datosConClub({
+          pin: pinKey,
+          fecha: new Date().toLocaleDateString(),
+          origen: "evaluacion_guia_mayor",
+          evaluador,
+          puntos: { tareas: delta },
+          totalEvento: delta,
+        }, clubId));
+      }
     };
 
     // Guardar actividad en evaluacionesGuiaMayor
@@ -111,14 +116,18 @@ const EvaluarGuiaMayorPage = () => {
       const hora = now.toLocaleTimeString();
 
       try {
-        await addDoc(collection(db, "evaluacionesGuiaMayor"), {
+        if (!clubId) {
+          alert("Sesión de club no válida.");
+          return;
+        }
+        await addDoc(collection(db, "evaluacionesGuiaMayor"), datosConClub({
           aspiranteId,
           actividad,
           completado: estado,
           evaluador: evaluador.trim(),
           fecha,
           hora,
-        });
+        }, clubId));
 
         setEvaluaciones((evals) => {
           const otros = evals.filter((ev) => ev.actividad !== actividad);
@@ -150,11 +159,13 @@ const EvaluarGuiaMayorPage = () => {
   const [evaluaciones, setEvaluaciones] = useState<any[]>([]);
 
   useEffect(() => {
-    const unsub = onSnapshot(collection(db, "aspirantesGuiaMayor"), snap => {
+    const q = queryColeccionClub("aspirantesGuiaMayor", clubId);
+    if (!q) return;
+    const unsub = onSnapshot(q, snap => {
       setAspirantes(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
     return () => unsub();
-  }, []);
+  }, [clubId]);
 
   // Detectar cambio de aspirante y cargar/crear tarjeta y actividades
   useEffect(() => {
@@ -182,13 +193,14 @@ const EvaluarGuiaMayorPage = () => {
       // Si no existe, crearla con docId = aspiranteId
       if (!tarjetaDoc) {
         const aspirante = aspirantes.find((a) => a.id === aspiranteId);
-        await setDoc(tarjetaRef, {
+        if (!clubId) return;
+        await setDoc(tarjetaRef, datosConClub({
           aspiranteId,
           nombre: aspirante?.nombre || "",
           estado: "en_proceso",
           progreso: 0,
           fechaInicio: new Date().toISOString().split("T")[0],
-        });
+        }, clubId));
         tarjetaDoc = {
           id: aspiranteId,
           estado: "en_proceso",
@@ -198,11 +210,11 @@ const EvaluarGuiaMayorPage = () => {
         };
         // Crear actividades base asociadas a la tarjeta
         for (const req of actividadesBase) {
-          await addDoc(collection(db, "actividadesTarjetaGuiaMayor"), {
+          await addDoc(collection(db, "actividadesTarjetaGuiaMayor"), datosConClub({
             tarjetaId: aspiranteId,
             requisito: req,
             completado: false,
-          });
+          }, clubId));
         }
       }
       setTarjeta(tarjetaDoc);

@@ -8,6 +8,8 @@ import { handleError } from '@/src/lib/errorHandler';
 import {
   generarPinUnicoClub,
 } from '@/src/lib/pinUnico';
+import { useClubActivo } from '@/src/hooks/useClubActivo';
+import { datosConClub, queryColeccionClub } from '@/src/lib/clubScope';
 
 type ConsejeroPageClientProps = {
   initialUnidadesRegistradas?: string[];
@@ -23,6 +25,7 @@ const clasesOficiales = [
 ];
 
 export default function ConsejeroPage({ initialUnidadesRegistradas }: ConsejeroPageClientProps) {
+  const { clubId } = useClubActivo();
   const [editarDocIdDesdeUrl, setEditarDocIdDesdeUrl] = useState<string | null>(null);
   const [editarAsociadoDesdeUrl, setEditarAsociadoDesdeUrl] = useState(false);
   const [form, setForm] = useState({
@@ -40,13 +43,15 @@ export default function ConsejeroPage({ initialUnidadesRegistradas }: ConsejeroP
   }, []);
 
   useEffect(() => {
-    if (initialUnidadesRegistradas) return;
-    import('firebase/firestore').then(({ getDocs, collection }) => {
-      getDocs(collection(db, 'unidades')).then(snapshot => {
+    if (initialUnidadesRegistradas || !clubId) return;
+    import('firebase/firestore').then(({ getDocs }) => {
+      const q = queryColeccionClub('unidades', clubId);
+      if (!q) return;
+      getDocs(q).then(snapshot => {
         setUnidadesRegistradas(snapshot.docs.map(doc => doc.data().nombre));
       });
     });
-  }, [initialUnidadesRegistradas]);
+  }, [initialUnidadesRegistradas, clubId]);
   const [refresh, setRefresh] = useState(0);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -68,8 +73,12 @@ export default function ConsejeroPage({ initialUnidadesRegistradas }: ConsejeroP
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     try {
+      if (!clubId) {
+        toast.error('Inicia sesión como administrador del club primero.');
+        return;
+      }
       const pin = await generarPinUnicoClub();
-      await addDoc(collection(db, 'consejeros'), {
+      await addDoc(collection(db, 'consejeros'), datosConClub({
         nombre: form.nombre.trim(),
         nacimiento: form.nacimiento.trim(),
         unidades: form.unidades,
@@ -77,7 +86,7 @@ export default function ConsejeroPage({ initialUnidadesRegistradas }: ConsejeroP
         asociadoNacimiento: form.asociadoNacimiento.trim(),
         pin,
         puedeCalificar: false,
-      });
+      }, clubId));
       toast.success(`Consejero registrado. PIN de acceso: ${pin}`);
       setForm({ nombre: '', nacimiento: '', unidades: [], consejeroAsociado: '', asociadoNacimiento: '' });
       setRefresh(r => r + 1);
@@ -188,6 +197,7 @@ function ConsejerosList({
   editarDocIdDesdeUrl?: string | null;
   editarAsociadoDesdeUrl?: boolean;
 }) {
+  const { clubId } = useClubActivo();
   const [consejeros, setConsejeros] = useState<Consejero[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -203,10 +213,13 @@ function ConsejerosList({
 
   useEffect(() => {
     const fetchConsejeros = async () => {
+      if (!clubId) return;
       setLoading(true);
       setLoadError(null);
       try {
-        const querySnapshot = await getDocs(collection(db, 'consejeros'));
+        const q = queryColeccionClub('consejeros', clubId);
+        if (!q) return;
+        const querySnapshot = await getDocs(q);
         const lista: Consejero[] = querySnapshot.docs.map((docSnap) => {
           const data = docSnap.data() as Omit<Consejero, 'id'>;
           return {
@@ -228,7 +241,7 @@ function ConsejerosList({
       }
     };
     fetchConsejeros();
-  }, [refresh]);
+  }, [refresh, clubId]);
 
   const handleDelete = async (id: string) => {
     if (!window.confirm('¿Eliminar este consejero?')) return;

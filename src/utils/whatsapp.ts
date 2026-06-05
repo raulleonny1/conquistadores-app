@@ -36,6 +36,36 @@ export function mensajePinConquistador(data: {
   return lineas.join(" ");
 }
 
+export function mensajePinAventurero(data: {
+  nombre: string;
+  apellido?: string;
+  pin: string;
+  clase?: string;
+  club?: string;
+}): string {
+  const nombreCompleto = [data.nombre, data.apellido].filter(Boolean).join(" ").trim();
+  const lineas = [`Hola ${nombreCompleto}, tu PIN de Aventureros es ${data.pin}.`];
+  if (data.clase) lineas.push(`Clase: ${data.clase}.`);
+  if (data.club) lineas.push(`Club: ${data.club}.`);
+  lineas.push("Los padres pueden ver tu avance en el portal /padres con este PIN.");
+  return lineas.join(" ");
+}
+
+export function mensajePinJA(data: {
+  nombre: string;
+  apellido?: string;
+  pin: string;
+  clase?: string;
+  grupo?: string;
+}): string {
+  const nombreCompleto = [data.nombre, data.apellido].filter(Boolean).join(" ").trim();
+  const lineas = [`Hola ${nombreCompleto}, tu PIN de Jóvenes Adventistas es ${data.pin}.`];
+  if (data.clase) lineas.push(`Clase: ${data.clase}.`);
+  if (data.grupo) lineas.push(`Grupo: ${data.grupo}.`);
+  lineas.push("Los padres pueden ver tu avance en el portal /padres con este PIN.");
+  return lineas.join(" ");
+}
+
 export function mensajePinAspirante(data: {
   nombre: string;
   apellido?: string;

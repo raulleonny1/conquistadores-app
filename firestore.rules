@@ -1,161 +1,221 @@
 rules_version = '2';
 
 service cloud.firestore {
-
   match /databases/{database}/documents {
 
-    // La app valida PIN en el cliente (sin Firebase Auth). Lectura/escritura abiertas
-
-    // en colecciones operativas; el PIN no es seguridad fuerte — usar Auth en el futuro.
-
-
-
-    match /unidades/{unitId} {
-
-      allow read, write: if true;
-
+    function isSignedIn() {
+      return request.auth != null;
     }
 
-
-
-    match /consejeros/{consejeroId} {
-
-      allow read, write: if true;
-
+    function clubExists(clubId) {
+      return exists(/databases/$(database)/documents/clubs/$(clubId));
     }
 
+    function clubData(clubId) {
+      return get(/databases/$(database)/documents/clubs/$(clubId)).data;
+    }
 
+    function isClubAdmin(clubId) {
+      return isSignedIn()
+        && clubExists(clubId)
+        && clubData(clubId).get('adminUid', '') == request.auth.uid;
+    }
+
+    function isAnonymous() {
+      return isSignedIn()
+        && request.auth.token.firebase.sign_in_provider == 'anonymous';
+    }
+
+    function canManageClub(clubId) {
+      return isClubAdmin(clubId) || (isAnonymous() && clubExists(clubId));
+    }
+
+    function hasValidClubId() {
+      return request.resource.data.keys().hasAll(['clubId'])
+        && request.resource.data.clubId is string
+        && request.resource.data.clubId.size() > 0
+        && clubExists(request.resource.data.clubId);
+    }
+
+    function docHasClubId() {
+      return resource.data.keys().hasAll(['clubId'])
+        && resource.data.clubId is string
+        && resource.data.clubId.size() > 0;
+    }
+
+    function unchangedClubId() {
+      return !request.resource.data.keys().hasAll(['clubId'])
+        || !resource.data.keys().hasAll(['clubId'])
+        || request.resource.data.clubId == resource.data.clubId;
+    }
+
+    function clubScopedRead() {
+      return isSignedIn() && docHasClubId();
+    }
+
+    function clubScopedCreate() {
+      return isSignedIn()
+        && hasValidClubId()
+        && canManageClub(request.resource.data.clubId);
+    }
+
+    function clubScopedUpdate() {
+      return isSignedIn()
+        && docHasClubId()
+        && unchangedClubId()
+        && canManageClub(resource.data.clubId);
+    }
+
+    function clubScopedDelete() {
+      return isSignedIn()
+        && docHasClubId()
+        && canManageClub(resource.data.clubId);
+    }
+
+    match /clubs/{clubId} {
+      allow get: if true;
+      allow list: if isSignedIn()
+        && (resource.data.get('adminUid', '') == request.auth.uid
+            || (request.auth.token.email != null
+                && resource.data.get('email', '') == request.auth.token.email));
+      allow create: if isSignedIn()
+        && request.resource.data.adminUid == request.auth.uid
+        && request.resource.data.keys().hasAll(['nombre', 'adminPin', 'programas']);
+      allow update: if isClubAdmin(clubId);
+      allow delete: if false;
+    }
+
+    match /unidades/{docId} {
+      allow read: if clubScopedRead();
+      allow create: if clubScopedCreate();
+      allow update: if clubScopedUpdate();
+      allow delete: if clubScopedDelete();
+    }
+
+    match /consejeros/{docId} {
+      allow read: if clubScopedRead();
+      allow create: if clubScopedCreate();
+      allow update: if clubScopedUpdate();
+      allow delete: if clubScopedDelete();
+    }
 
     match /aspirantesGuiaMayor/{docId} {
-
-      allow read, write: if true;
-
+      allow read: if clubScopedRead();
+      allow create: if clubScopedCreate();
+      allow update: if clubScopedUpdate();
+      allow delete: if clubScopedDelete();
     }
-
-
 
     match /directivaClub/{docId} {
-
-      allow read, write: if true;
-
+      allow read: if clubScopedRead();
+      allow create: if clubScopedCreate();
+      allow update: if clubScopedUpdate();
+      allow delete: if clubScopedDelete();
     }
-
-
 
     match /RegistroConquis/{docId} {
-
-      allow read, write: if true;
-
+      allow read: if clubScopedRead();
+      allow create: if clubScopedCreate();
+      allow update: if clubScopedUpdate();
+      allow delete: if clubScopedDelete();
     }
-
-
 
     match /calificaciones/{docId} {
-
-      allow read, write: if true;
-
+      allow read: if clubScopedRead();
+      allow create: if clubScopedCreate();
+      allow update: if clubScopedUpdate();
+      allow delete: if clubScopedDelete();
     }
-
-
-
-    match /calificacionesSemanal/{docId} {
-
-      allow read, write: if true;
-
-    }
-
-
-
-    match /calificacionesConquis/{docId} {
-
-      allow read, write: if true;
-
-    }
-
-
 
     match /eventos/{docId} {
-
-      allow read, write: if true;
-
+      allow read: if clubScopedRead();
+      allow create: if clubScopedCreate();
+      allow update: if clubScopedUpdate();
+      allow delete: if clubScopedDelete();
     }
-
-
-
-    match /config/{docId} {
-
-      allow read: if true;
-
-      allow write: if true;
-
-    }
-
-
-
-    match /retosEspeciales/{docId} {
-
-      allow read, write: if true;
-
-    }
-
-
-
-    match /frasesSemana/{docId} {
-
-      allow read, write: if true;
-
-    }
-
-
 
     match /especialidades/{docId} {
-
-      allow read, write: if true;
-
+      allow read: if clubScopedRead();
+      allow create: if clubScopedCreate();
+      allow update: if clubScopedUpdate();
+      allow delete: if clubScopedDelete();
     }
-
-
 
     match /evaluacionesGuiaMayor/{docId} {
-
-      allow read, write: if true;
-
+      allow read: if clubScopedRead();
+      allow create: if clubScopedCreate();
+      allow update: if clubScopedUpdate();
+      allow delete: if clubScopedDelete();
     }
-
-
 
     match /tarjetaGuiaMayor/{docId} {
-
-      allow read, write: if true;
-
+      allow read: if clubScopedRead();
+      allow create: if clubScopedCreate();
+      allow update: if clubScopedUpdate();
+      allow delete: if clubScopedDelete();
     }
-
-
 
     match /actividadesTarjetaGuiaMayor/{docId} {
-
-      allow read, write: if true;
-
+      allow read: if clubScopedRead();
+      allow create: if clubScopedCreate();
+      allow update: if clubScopedUpdate();
+      allow delete: if clubScopedDelete();
     }
 
+    match /aventureros/{docId} {
+      allow read: if clubScopedRead();
+      allow create: if clubScopedCreate();
+      allow update: if clubScopedUpdate();
+      allow delete: if clubScopedDelete();
+    }
 
+    match /jovenesJA/{docId} {
+      allow read: if clubScopedRead();
+      allow create: if clubScopedCreate();
+      allow update: if clubScopedUpdate();
+      allow delete: if clubScopedDelete();
+    }
+
+    match /frasesSemana/{docId} {
+      allow read: if isSignedIn() && clubExists(docId);
+      allow create, update: if isSignedIn() && clubExists(docId) && canManageClub(docId)
+        && request.resource.data.clubId == docId;
+      allow delete: if isSignedIn() && clubExists(docId) && canManageClub(docId);
+    }
+
+    match /calificacionesSemanal/{docId} {
+      allow read, write: if isSignedIn();
+    }
+
+    match /calificacionesConquis/{pin} {
+      allow read, write: if isSignedIn();
+    }
+
+    match /calificacionesAventureros/{pin} {
+      allow read, write: if isSignedIn();
+    }
+
+    match /calificacionesJA/{pin} {
+      allow read, write: if isSignedIn();
+    }
 
     match /fichasMedicas/{docId} {
-
-      allow read, write: if true;
-
+      allow read, write: if isSignedIn();
     }
 
+    match /retosEspeciales/{docId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update, delete: if isSignedIn();
+    }
 
+    match /config/{docId} {
+      allow read: if isSignedIn();
+      allow write: if false;
+    }
 
     match /{document=**} {
-
       allow read, write: if false;
-
     }
-
   }
-
 }
-
-

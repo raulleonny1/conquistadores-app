@@ -11,6 +11,9 @@ import {
 } from "firebase/firestore";
 import { ArrowLeft, PlusCircle, Trash2 } from "lucide-react";
 import { toast } from "react-hot-toast";
+import { useClubActivo } from "@/src/hooks/useClubActivo";
+import { datosConClub, queryColeccionClub } from "@/src/lib/clubScope";
+import { esCatalogoConquistadores } from "@/src/lib/actividadesCalificacion";
 
 type CalificacionCatalogo = {
   id: string;
@@ -20,12 +23,8 @@ type CalificacionCatalogo = {
   pin?: string;
 };
 
-function esCatalogoAdmin(data: Record<string, unknown>): boolean {
-  const pin = data.pin;
-  return pin === undefined || pin === null || String(pin).trim() === "";
-}
-
 export default function CalificacionesPage() {
+  const { clubId } = useClubActivo();
   const [nombre, setNombre] = useState("");
   const [puntos, setPuntos] = useState("");
   const [loading, setLoading] = useState(false);
@@ -35,12 +34,14 @@ export default function CalificacionesPage() {
   const [editPuntos, setEditPuntos] = useState("");
 
   useEffect(() => {
+    const q = queryColeccionClub("calificaciones", clubId);
+    if (!q) return;
     const unsub = onSnapshot(
-      collection(db, "calificaciones"),
+      q,
       (snapshot) => {
         const lista = snapshot.docs
           .map((d) => ({ id: d.id, ...d.data() } as CalificacionCatalogo))
-          .filter((c) => esCatalogoAdmin(c as Record<string, unknown>));
+          .filter((c) => esCatalogoConquistadores(c as Record<string, unknown>));
         lista.sort((a, b) => {
           const fa = a.fecha || "";
           const fb = b.fecha || "";
@@ -54,20 +55,25 @@ export default function CalificacionesPage() {
       }
     );
     return () => unsub();
-  }, []);
+  }, [clubId]);
 
   const handleAdd = async () => {
     if (!nombre.trim() || !puntos.trim()) {
       toast.error("Escribe nombre y puntos antes de agregar.");
       return;
     }
+    if (!clubId) {
+      toast.error("Sesión de club no válida.");
+      return;
+    }
     setLoading(true);
     try {
-      await addDoc(collection(db, "calificaciones"), {
+      await addDoc(collection(db, "calificaciones"), datosConClub({
         nombre: nombre.trim(),
         puntos: puntos.trim(),
         fecha: formatFechaDDMMYYYY(new Date()),
-      });
+        programa: "conquistadores",
+      }, clubId));
       setNombre("");
       setPuntos("");
       toast.success("Calificación agregada. Aparece abajo al instante.");
@@ -127,8 +133,8 @@ export default function CalificacionesPage() {
       </button>
       <h1 className="mb-2 text-2xl font-bold">Registrar calificaciones</h1>
       <p className="mb-6 text-sm text-slate-600">
-        Escribe nombre y puntos, pulsa agregar y se guarda en Firebase. El listado de abajo se
-        actualiza al instante.
+        Catálogo de actividades para Conquistadores, consejeros y aspirantes. Para Aventureros o JA
+        usa las pantallas de puntos de cada programa.
       </p>
 
       <form

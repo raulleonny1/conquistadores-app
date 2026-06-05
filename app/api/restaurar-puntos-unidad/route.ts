@@ -15,7 +15,7 @@ import {
   setDoc,
 } from "firebase/firestore";
 
-const ADMIN_PIN = "1844";
+import { validarPinAdminApi } from "@/src/lib/validarAdminApi";
 
 function idsDocumentoUnidadPosibles(nombre: string): string[] {
   const trimmed = nombre.trim();
@@ -42,13 +42,19 @@ function fusionarPuntos(
 
 /**
  * Reconstruye puntos de unidad: historial semanal (fuente) + docs huérfanos legacy.
- * POST { "pin": "1844" }
+ * POST { "pin": "...", "club": "codigo-club" }
  */
 export async function POST(request: Request) {
   try {
-    const body = (await request.json().catch(() => ({}))) as { pin?: string };
-    if (body.pin !== ADMIN_PIN) {
-      return NextResponse.json({ ok: false, error: "PIN admin requerido." }, { status: 401 });
+    const body = (await request.json().catch(() => ({}))) as {
+      pin?: string;
+      club?: string;
+    };
+    if (!(await validarPinAdminApi(body.club, body.pin))) {
+      return NextResponse.json(
+        { ok: false, error: "Código de club o PIN de administrador inválido." },
+        { status: 401 }
+      );
     }
 
     const unidadesSnap = await getDocs(collection(db, "unidades"));

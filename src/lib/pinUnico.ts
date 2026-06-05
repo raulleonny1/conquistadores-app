@@ -1,4 +1,5 @@
 import { db } from "@/src/firebase";
+import { obtenerClubIdSesion } from "@/src/lib/clubSession";
 import {
   collection,
   deleteDoc,
@@ -12,14 +13,20 @@ import {
 } from "firebase/firestore";
 import { toNumberPuntos } from "@/src/lib/categoriasPuntos";
 
-/** PINs del sistema (login admin / evaluador / director fijo). No asignar a miembros al azar. */
-export const PINS_RESERVADOS_SISTEMA = new Set(["1844", "*611", "1902"]);
+function clubIdActivo(explicito?: string): string | null {
+  return explicito?.trim() || obtenerClubIdSesion() || null;
+}
+
+/** PINs reservados a nivel global (evaluador / director fijo por club). */
+export const PINS_RESERVADOS_SISTEMA = new Set(["*611", "1902"]);
 
 const COLECCIONES_CON_PIN = [
   { id: "RegistroConquis", etiqueta: "Conquistador" },
   { id: "aspirantesGuiaMayor", etiqueta: "Aspirante" },
   { id: "consejeros", etiqueta: "Consejero" },
   { id: "directivaClub", etiqueta: "Directiva" },
+  { id: "aventureros", etiqueta: "Aventurero" },
+  { id: "jovenesJA", etiqueta: "Joven JA" },
 ] as const;
 
 export type ColeccionPin = (typeof COLECCIONES_CON_PIN)[number]["id"];
@@ -48,18 +55,22 @@ function nombreDesdeData(
   coleccion: ColeccionPin,
   data: Record<string, unknown>
 ): string {
-  if (coleccion === "RegistroConquis") {
+  if (coleccion === "RegistroConquis" || coleccion === "aventureros" || coleccion === "jovenesJA") {
     return [data.nombre, data.apellido].filter(Boolean).join(" ").trim();
   }
   return String(data.nombre ?? "").trim() || "Sin nombre";
 }
 
 /** Todos los PIN ya usados en el club (todas las colecciones + reservados del sistema). */
-export async function cargarPinsOcupadosClub(): Promise<Set<string>> {
+export async function cargarPinsOcupadosClub(clubId?: string): Promise<Set<string>> {
   const pins = new Set<string>(PINS_RESERVADOS_SISTEMA);
+  const cid = clubIdActivo(clubId);
+  if (!cid) return pins;
 
   for (const { id } of COLECCIONES_CON_PIN) {
-    const snap = await getDocs(collection(db, id));
+    const snap = await getDocs(
+      query(collection(db, id), where("clubId", "==", cid))
+    );
     for (const docSnap of snap.docs) {
       const pin = normalizarPin(String(docSnap.data().pin ?? ""));
       if (pin) pins.add(pin);
@@ -84,9 +95,9 @@ export function crearPinEnSet(pinsOcupados: Set<string>): string {
   return pin;
 }
 
-/** Nuevo PIN libre en todo el club. */
-export async function generarPinUnicoClub(): Promise<string> {
-  const ocupados = await cargarPinsOcupadosClub();
+/** Nuevo PIN libre en el club activo. */
+export async function generarPinUnicoClub(clubId?: string): Promise<string> {
+  const ocupados = await cargarPinsOcupadosClub(clubId);
   const pin = crearPinEnSet(ocupados);
   ocupados.add(pin);
   return pin;
@@ -95,9 +106,10 @@ export async function generarPinUnicoClub(): Promise<string> {
 /** Varios PIN únicos seguidos (p. ej. reset masivo en configuración). */
 export async function generarPinsUnicosEnLote(
   cantidad: number,
-  baseOcupados?: Set<string>
+  baseOcupados?: Set<string>,
+  clubId?: string
 ): Promise<string[]> {
-  const ocupados = new Set(baseOcupados ?? (await cargarPinsOcupadosClub()));
+  const ocupados = new Set(baseOcupados ?? (await cargarPinsOcupadosClub(clubId)));
   const lista: string[] = [];
   for (let i = 0; i < cantidad; i++) {
     const pin = crearPinEnSet(ocupados);
@@ -110,7 +122,8 @@ export async function generarPinsUnicosEnLote(
 /** Comprueba que el PIN no exista en otra persona (opcional: excluir un documento al editar). */
 export async function validarPinDisponible(
   pin: string,
-  excluir?: ExcluirDocumento[]
+  excluir?: ExcluirDocumento[],
+  clubId?: string
 ): Promise<ResultadoPinDisponible> {
   const p = normalizarPin(pin);
   if (!p) {
@@ -127,10 +140,18 @@ export async function validarPinDisponible(
   }
 
   const excluidos = excluir ?? [];
+  const cid = clubIdActivo(clubId);
+  if (!cid) {
+    return { ok: false, mensaje: "No hay un club activo en la sesión." };
+  }
 
   for (const { id: coleccion, etiqueta } of COLECCIONES_CON_PIN) {
     const snap = await getDocs(
-      query(collection(db, coleccion), where("pin", "==", p))
+      query(
+        collection(db, coleccion),
+        where("clubId", "==", cid),
+        where("pin", "==", p)
+      )
     );
     for (const docSnap of snap.docs) {
       const omitir = excluidos.some(

@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { collection, onSnapshot } from "firebase/firestore";
 import { db, formatFechaDDMMYYYY } from "@/src/firebase";
+import { useClubActivo } from "@/src/hooks/useClubActivo";
+import { queryColeccionClub } from "@/src/lib/clubScope";
 import { nombreCompletoAspirante } from "@/src/constants/aspirante";
 import {
   etiquetaDiasCumpleanos,
@@ -131,6 +133,7 @@ export default function CumpleanosProximos() {
   const [rawFichas, setRawFichas] = useState<DocRow[] | null>(null);
   const [errorCarga, setErrorCarga] = useState<string | null>(null);
   const syncHecho = useRef(false);
+  const { clubId } = useClubActivo();
 
   const manejarErrorSnapshot = (etiqueta: string) => (err: Error) => {
     console.error(`Cumpleaños — error leyendo ${etiqueta}:`, err);
@@ -150,48 +153,72 @@ export default function CumpleanosProximos() {
   }, []);
 
   useEffect(() => {
+    if (!clubId) {
+      setRawConquis([]);
+      return;
+    }
+    const q = queryColeccionClub("RegistroConquis", clubId);
+    if (!q) return;
     const unsub = onSnapshot(
-      collection(db, "RegistroConquis"),
+      q,
       (snap) => {
         setRawConquis(snap.docs.map((d) => ({ id: d.id, data: d.data() as Record<string, unknown> })));
       },
       manejarErrorSnapshot("conquistadores")
     );
     return () => unsub();
-  }, []);
+  }, [clubId]);
 
   useEffect(() => {
+    if (!clubId) {
+      setRawAspirantes([]);
+      return;
+    }
+    const q = queryColeccionClub("aspirantesGuiaMayor", clubId);
+    if (!q) return;
     const unsub = onSnapshot(
-      collection(db, "aspirantesGuiaMayor"),
+      q,
       (snap) => {
         setRawAspirantes(snap.docs.map((d) => ({ id: d.id, data: d.data() as Record<string, unknown> })));
       },
       manejarErrorSnapshot("aspirantes")
     );
     return () => unsub();
-  }, []);
+  }, [clubId]);
 
   useEffect(() => {
+    if (!clubId) {
+      setRawConsejeros([]);
+      return;
+    }
+    const q = queryColeccionClub("consejeros", clubId);
+    if (!q) return;
     const unsub = onSnapshot(
-      collection(db, "consejeros"),
+      q,
       (snap) => {
         setRawConsejeros(snap.docs.map((d) => ({ id: d.id, data: d.data() as Record<string, unknown> })));
       },
       manejarErrorSnapshot("consejeros")
     );
     return () => unsub();
-  }, []);
+  }, [clubId]);
 
   useEffect(() => {
+    if (!clubId) {
+      setRawDirectiva([]);
+      return;
+    }
+    const q = queryColeccionClub("directivaClub", clubId);
+    if (!q) return;
     const unsub = onSnapshot(
-      collection(db, "directivaClub"),
+      q,
       (snap) => {
         setRawDirectiva(snap.docs.map((d) => ({ id: d.id, data: d.data() as Record<string, unknown> })));
       },
       manejarErrorSnapshot("directiva")
     );
     return () => unsub();
-  }, []);
+  }, [clubId]);
 
   useEffect(() => {
     const unsub = onSnapshot(
@@ -236,7 +263,7 @@ export default function CumpleanosProximos() {
         `c_${id}`,
         nombre,
         "conquistador",
-        unidad ? `Unidad: ${unidad}` : "Club Caleb",
+        unidad ? `Unidad: ${unidad}` : "Club",
         data,
         undefined,
         indice

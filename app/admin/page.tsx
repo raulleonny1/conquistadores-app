@@ -24,6 +24,8 @@ import {
   UserCircle
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { rutaConClub } from '@/src/lib/rutasClub';
+import { useClubActivo } from '@/src/hooks/useClubActivo';
 
 import CumpleanosProximos from '@/src/components/admin/CumpleanosProximos';
 
@@ -45,6 +47,7 @@ function SortableMenuCard({
   onSelectTab: (id: string) => void;
 }) {
   const router = useRouter();
+  const { clubSlug } = useClubActivo();
   const {
     attributes,
     listeners,
@@ -73,9 +76,12 @@ function SortableMenuCard({
       aspirante: "/admin/aspirante",
       directiva: "/admin/directiva",
       rankin: "/admin/rankin",
+      notificacionesPadres: "/admin/notificaciones-padres",
+      rankinAventureros: "/admin/rankin-aventureros",
+      rankinJa: "/admin/rankin-ja",
     };
     const path = routes[item.id];
-    if (path) router.push(path);
+    if (path) router.push(rutaConClub(path, clubSlug));
     else onSelectTab(item.id);
   };
 
@@ -160,6 +166,15 @@ const AdminPage = () => {
       color: 'border-yellow-500 text-yellow-500',
       bgColor: 'bg-yellow-50',
       hoverColor: 'hover:shadow-yellow-200'
+    },
+    {
+      id: 'notificacionesPadres',
+      title: 'Notificar padres',
+      description: 'Envía resúmenes de avance por WhatsApp a padres y tutores.',
+      icon: <Users className="w-8 h-8 text-sky-600" />,
+      color: 'border-sky-500 text-sky-600',
+      bgColor: 'bg-sky-50',
+      hoverColor: 'hover:shadow-sky-200'
     },
     {
       id: 'frases',

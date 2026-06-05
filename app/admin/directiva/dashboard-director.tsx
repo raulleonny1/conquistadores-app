@@ -8,8 +8,11 @@ import { useMiembros } from "@/src/hooks/firebase/useMiembros";
 import { useUnidades } from "@/src/hooks/firebase/useUnidades";
 import { useEventos } from "@/src/hooks/firebase/useEventos";
 import { getDoc, doc } from "firebase/firestore";
+import { useClubActivo } from "@/src/hooks/useClubActivo";
+import { queryColeccionClub } from "@/src/lib/clubScope";
 
 export default function DashboardDirector() {
+  const { clubId } = useClubActivo();
   const { miembros } = useMiembros();
   const { unidades } = useUnidades();
   const { eventos } = useEventos();
@@ -21,8 +24,9 @@ export default function DashboardDirector() {
   const [director, setDirector] = useState<any | null>(null);
 
   useEffect(() => {
-    // Buscar director por PIN
-    const unsub = onSnapshot(collection(db, "directivaClub"), snap => {
+    const q = queryColeccionClub("directivaClub", clubId);
+    if (!q) return;
+    const unsub = onSnapshot(q, snap => {
       const found = snap.docs.find(doc => doc.data().cargo === "Director/a" && doc.data().pin === pinParam);
       if (found) {
         setDirector(found.data());
@@ -31,7 +35,7 @@ export default function DashboardDirector() {
       }
     });
     return () => unsub();
-  }, [pinParam]);
+  }, [pinParam, clubId]);
 
   const handleLogout = () => {
     router.push("/");
@@ -78,7 +82,7 @@ export default function DashboardDirector() {
             </div>
             <div>
               <h1 className="text-3xl md:text-5xl font-black tracking-tighter uppercase italic italic-shadow">
-                Caleb <span className="text-fuchsia-500 text-stroke">Club</span>
+                Conquis<span className="text-fuchsia-500 text-stroke">App</span>
               </h1>
               <p className="text-slate-400 font-bold tracking-[0.2em] text-xs uppercase">Conquistadores 2026</p>
             </div>

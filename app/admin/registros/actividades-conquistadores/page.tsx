@@ -21,7 +21,7 @@ import {
   aplicarCalificacionCatalogo,
   aplicarCalificacionCatalogoUnidad,
   dedupeConquistadoresRegistro,
-  esCatalogoAdminCalificaciones,
+  esCatalogoConquistadores,
   filtrarConquistadoresBusqueda,
   type CatalogoCalificacion,
   type ConquistadorRegistro,
@@ -29,6 +29,8 @@ import {
 import { indexarTotalesPorPin, toNumberPuntos } from "@/src/lib/categoriasPuntos";
 import { nombreGrupoCoincide } from "@/src/lib/unidades";
 import QuitarPuntosPanel from "@/src/components/calificaciones/QuitarPuntosPanel";
+import { useClubActivo } from "@/src/hooks/useClubActivo";
+import { queryColeccionClub } from "@/src/lib/clubScope";
 
 type Modo = "individual" | "grupo";
 
@@ -65,6 +67,7 @@ function fechaInputADDisplay(iso: string): string {
 
 export default function RegistroActividadesConquistadoresPage() {
   const router = useRouter();
+  const { clubId } = useClubActivo();
   const [modo, setModo] = useState<Modo>("individual");
   const [busqueda, setBusqueda] = useState("");
   const [conquistadores, setConquistadores] = useState<ConquistadorRegistro[]>([]);
@@ -81,14 +84,19 @@ export default function RegistroActividadesConquistadoresPage() {
   const [unidadesOficiales, setUnidadesOficiales] = useState<string[]>([]);
 
   useEffect(() => {
-    const unsubUnidades = onSnapshot(collection(db, "unidades"), (snap) => {
+    const qUnidades = queryColeccionClub("unidades", clubId);
+    const qConquis = queryColeccionClub("RegistroConquis", clubId);
+    const qCatalogo = queryColeccionClub("calificaciones", clubId);
+    if (!qUnidades || !qConquis || !qCatalogo) return;
+
+    const unsubUnidades = onSnapshot(qUnidades, (snap) => {
       const nombres = snap.docs
         .map((d) => (d.data() as { nombre?: string }).nombre?.trim() || "")
         .filter(Boolean);
       setUnidadesOficiales(nombres);
     });
 
-    const unsubConquis = onSnapshot(collection(db, "RegistroConquis"), (snap) => {
+    const unsubConquis = onSnapshot(qConquis, (snap) => {
       const lista: ConquistadorRegistro[] = snap.docs
         .map((d) => {
           const data = d.data() as {
@@ -114,11 +122,11 @@ export default function RegistroActividadesConquistadoresPage() {
       );
     });
 
-    const unsubCatalogo = onSnapshot(collection(db, "calificaciones"), (snap) => {
+    const unsubCatalogo = onSnapshot(qCatalogo, (snap) => {
       const items = snap.docs
         .map((d) => {
           const data = d.data() as { nombre?: string; puntos?: string | number; pin?: string };
-          if (!esCatalogoAdminCalificaciones(data as Record<string, unknown>)) return null;
+          if (!esCatalogoConquistadores(data as Record<string, unknown>)) return null;
           const pts = toNumberPuntos(data.puntos);
           const nombre = (data.nombre || "").trim();
           if (!nombre || pts <= 0) return null;
@@ -128,24 +136,31 @@ export default function RegistroActividadesConquistadoresPage() {
       setCatalogo(items);
     });
 
-    const unsubTotales = onSnapshot(collection(db, "calificacionesConquis"), (snap) => {
-      setTotalesPin(
-        indexarTotalesPorPin(
-          snap.docs.map((d) => ({
+    let unsubTotales = () => {};
+    const unsubConquisPins = onSnapshot(qConquis, (snapConquis) => {
+      const pinsClub = new Set(
+        snapConquis.docs.map((d) => String((d.data() as { pin?: string }).pin ?? d.id).trim())
+      );
+      unsubTotales();
+      unsubTotales = onSnapshot(collection(db, "calificacionesConquis"), (snap) => {
+        const docsFiltrados = snap.docs
+          .filter((d) => pinsClub.has(d.id) || pinsClub.has(String(d.data().pin ?? "")))
+          .map((d) => ({
             id: d.id,
             data: () => d.data() as Record<string, unknown>,
-          }))
-        )
-      );
+          }));
+        setTotalesPin(indexarTotalesPorPin(docsFiltrados));
+      });
     });
 
     return () => {
       unsubUnidades();
       unsubConquis();
       unsubCatalogo();
+      unsubConquisPins();
       unsubTotales();
     };
-  }, []);
+  }, [clubId]);
 
   const conquistadoresFiltrados = useMemo(
     () => filtrarConquistadoresBusqueda(conquistadores, busqueda),

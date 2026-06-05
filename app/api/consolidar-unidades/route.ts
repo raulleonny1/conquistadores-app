@@ -1,14 +1,19 @@
 import { NextResponse } from "next/server";
 import { consolidarUnidadesClub } from "@/src/lib/consolidarUnidades";
+import { validarPinAdminApi } from "@/src/lib/validarAdminApi";
 
-const ADMIN_PIN = "1844";
-
-/** POST { "pin": "1844" } — unifica «Unidad de Gacelas» → «Gacelas», etc. */
+/** POST { "pin": "...", "club": "codigo-club" } — unifica unidades duplicadas. */
 export async function POST(request: Request) {
   try {
-    const body = (await request.json().catch(() => ({}))) as { pin?: string };
-    if (body.pin !== ADMIN_PIN) {
-      return NextResponse.json({ ok: false, error: "PIN admin requerido." }, { status: 401 });
+    const body = (await request.json().catch(() => ({}))) as {
+      pin?: string;
+      club?: string;
+    };
+    if (!(await validarPinAdminApi(body.club, body.pin))) {
+      return NextResponse.json(
+        { ok: false, error: "Código de club o PIN de administrador inválido." },
+        { status: 401 }
+      );
     }
     const res = await consolidarUnidadesClub();
     return NextResponse.json({ ok: true, ...res });

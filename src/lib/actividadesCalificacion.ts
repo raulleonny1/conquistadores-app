@@ -16,10 +16,14 @@ export type OrigenMovimientoPuntos =
   | "admin_resta_grupo"
   | "admin_resta_aspirante"
   | "admin_resta_consejero"
+  | "admin_resta_aventureros"
+  | "admin_resta_ja"
   | "consejero_individual"
   | "consejero_grupal"
   | "consejero_resta_individual"
   | "consejero_resta_grupal";
+
+export type ProgramaCatalogo = "conquistadores" | "aventureros" | "ja";
 
 export type ResultadoMovimientoPuntos =
   | { ok: true; nuevoValorCategoria: number; totalPuntos: number }
@@ -333,6 +337,27 @@ export function clavePuntosCatalogo(catalogoId: string): string {
 export function esCatalogoAdminCalificaciones(data: Record<string, unknown>): boolean {
   const pin = data.pin;
   return pin === undefined || pin === null || String(pin).trim() === "";
+}
+
+export function programaCatalogoDoc(data: Record<string, unknown>): ProgramaCatalogo | "" {
+  const p = String(data.programa ?? "").trim();
+  if (p === "aventureros" || p === "ja" || p === "conquistadores") return p;
+  return "";
+}
+
+/** Catálogo del club Conquistadores (sin programa o explícito conquistadores). */
+export function esCatalogoConquistadores(data: Record<string, unknown>): boolean {
+  if (!esCatalogoAdminCalificaciones(data)) return false;
+  const p = programaCatalogoDoc(data);
+  return p === "" || p === "conquistadores";
+}
+
+export function esCatalogoPrograma(
+  data: Record<string, unknown>,
+  programa: "aventureros" | "ja"
+): boolean {
+  if (!esCatalogoAdminCalificaciones(data)) return false;
+  return programaCatalogoDoc(data) === programa;
 }
 
 export async function aplicarCalificacionCatalogo(params: {

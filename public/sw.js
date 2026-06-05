@@ -1,5 +1,5 @@
 /* Service worker mínimo: instalación PWA y actualizaciones. Sin caché offline agresiva. */
-const SW_VERSION = "club-caleb-v3-ios";
+const SW_VERSION = "conquistadoresapp-78f92-v1";
 const LOGO_NOTIFICATION = "/logo_completo.png?v=2";
 
 self.addEventListener("install", (event) => {
@@ -16,7 +16,7 @@ self.addEventListener("fetch", () => {
 
 self.addEventListener("push", (event) => {
   if (!event.data) return;
-  let payload = { title: "Club Caleb", body: "Nueva notificación", url: "/" };
+  let payload = { title: "ConquistadoresApp", body: "Nueva notificación", url: "/" };
   try {
     payload = { ...payload, ...event.data.json() };
   } catch {

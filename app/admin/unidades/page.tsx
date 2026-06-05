@@ -14,11 +14,12 @@ import {
 import { logInfo } from "@/src/lib/logger";
 import { consolidarUnidadesClub } from "@/src/lib/consolidarUnidades";
 import { toast } from "react-hot-toast";
-
-const unidadesRef = collection(db, "unidades");
+import { useClubActivo } from "@/src/hooks/useClubActivo";
+import { datosConClub, queryColeccionClub } from "@/src/lib/clubScope";
 
 export default function UnidadesPage() {
   const router = useRouter();
+  const { clubId } = useClubActivo();
 
   const [form, setForm] = useState({ nombre: "", banderin: "" });
   const [unidades, setUnidades] = useState<any[]>([]);
@@ -26,7 +27,9 @@ export default function UnidadesPage() {
   const [consolidando, setConsolidando] = useState(false);
 
   const cargarUnidades = async () => {
-    const snapshot = await getDocs(unidadesRef);
+    const q = queryColeccionClub("unidades", clubId);
+    if (!q) return;
+    const snapshot = await getDocs(q);
 
     const lista = snapshot.docs.map((d) => ({
       id: d.id,
@@ -37,8 +40,8 @@ export default function UnidadesPage() {
   };
 
   useEffect(() => {
-    cargarUnidades();
-  }, []);
+    if (clubId) cargarUnidades();
+  }, [clubId]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setForm({
@@ -57,8 +60,11 @@ export default function UnidadesPage() {
       await updateDoc(doc(db, "unidades", editId), { ...form, nombre });
       logInfo("Unidad actualizada: " + editId);
       setEditId(null);
+    } else if (!clubId) {
+      toast.error("Sesión de club no válida.");
+      return;
     } else {
-      const docRef = await addDoc(unidadesRef, { ...form, nombre });
+      const docRef = await addDoc(collection(db, "unidades"), datosConClub({ ...form, nombre }, clubId));
       logInfo("Unidad registrada: " + docRef.id);
     }
 

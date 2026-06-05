@@ -7,6 +7,8 @@ import { collection, addDoc, getDocs, deleteDoc, doc } from "firebase/firestore"
 import { especialidadesBase } from "@/src/data/especialidades";
 import { logInfo } from "@/src/lib/logger";
 import { toast } from "react-hot-toast";
+import { useClubActivo } from "@/src/hooks/useClubActivo";
+import { datosConClub, queryColeccionClub } from "@/src/lib/clubScope";
 import { Button } from "@/components/ui/button";
 import {
   ArrowLeft,
@@ -53,6 +55,7 @@ function estiloArea(area: string) {
 }
 
 export default function EspecialidadesPage() {
+  const { clubId } = useClubActivo();
   const [especialidades, setEspecialidades] = useState<Especialidad[]>([]);
   const [loading, setLoading] = useState(true);
   const [cargandoBase, setCargandoBase] = useState(false);
@@ -67,13 +70,15 @@ export default function EspecialidadesPage() {
   const [openCategorias, setOpenCategorias] = useState<Set<string>>(new Set());
 
   useEffect(() => {
-    cargarEspecialidades();
-  }, []);
+    if (clubId) cargarEspecialidades();
+  }, [clubId]);
 
   const cargarEspecialidades = async () => {
     setLoading(true);
     try {
-      const querySnapshot = await getDocs(collection(db, "especialidades"));
+      const q = queryColeccionClub("especialidades", clubId);
+      if (!q) return;
+      const querySnapshot = await getDocs(q);
       const datos: Especialidad[] = querySnapshot.docs.map((docSnap) => {
         const data = docSnap.data();
         return {
@@ -92,9 +97,15 @@ export default function EspecialidadesPage() {
   };
 
   const cargarEspecialidadesBase = async () => {
+    if (!clubId) {
+      toast.error("Sesión de club no válida.");
+      return;
+    }
     setCargandoBase(true);
     try {
-      const querySnapshot = await getDocs(collection(db, "especialidades"));
+      const q = queryColeccionClub("especialidades", clubId);
+      if (!q) return;
+      const querySnapshot = await getDocs(q);
       const existentes = querySnapshot.docs.map((docSnap) => docSnap.data());
       let agregados = 0;
 
@@ -106,7 +117,7 @@ export default function EspecialidadesPage() {
             e.especialidad === esp.especialidad
         );
         if (!yaExiste) {
-          const docRef = await addDoc(collection(db, "especialidades"), esp);
+          const docRef = await addDoc(collection(db, "especialidades"), datosConClub(esp, clubId));
           logInfo("Especialidad agregada: " + docRef.id);
           agregados++;
         }
@@ -214,13 +225,17 @@ export default function EspecialidadesPage() {
       return;
     }
 
+    if (!clubId) {
+      toast.error("Sesión de club no válida.");
+      return;
+    }
     try {
-      const docRef = await addDoc(collection(db, "especialidades"), {
+      const docRef = await addDoc(collection(db, "especialidades"), datosConClub({
         area: area.trim(),
         categoria: categoria.trim(),
         especialidad: especialidad.trim(),
         consejero: consejero.trim(),
-      });
+      }, clubId));
       setEspecialidades([
         ...especialidades,
         {

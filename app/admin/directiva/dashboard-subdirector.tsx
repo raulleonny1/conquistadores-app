@@ -5,9 +5,12 @@ import { Trophy, Calendar, Zap, LogOut, X, BookOpen, TrendingUp } from "lucide-r
 import { useEventos } from "@/src/hooks/firebase/useEventos";
 import { useRouter, useSearchParams } from "next/navigation";
 import { db } from "../../../src/firebase";
-import { collection, onSnapshot } from "firebase/firestore";
+import { onSnapshot } from "firebase/firestore";
+import { useClubActivo } from "@/src/hooks/useClubActivo";
+import { queryColeccionClub } from "@/src/lib/clubScope";
 
 export default function DashboardSubdirector() {
+  const { clubId } = useClubActivo();
   const { especialidades } = useEspecialidades();
   const { eventos } = useEventos();
   const searchParams = useSearchParams();
@@ -16,7 +19,9 @@ export default function DashboardSubdirector() {
   const [activeTab, setActiveTab] = useState<"especialidades" | "progreso" | "eventos" | null>(null);
   const [subdirector, setSubdirector] = useState<any | null>(null);
   useEffect(() => {
-    const unsub = onSnapshot(collection(db, "directivaClub"), snap => {
+    const q = queryColeccionClub("directivaClub", clubId);
+    if (!q) return;
+    const unsub = onSnapshot(q, snap => {
       const found = snap.docs.find(doc => doc.data().cargo === "Subdirector/a" && doc.data().pin === pinParam);
       if (found) {
         setSubdirector(found.data());
@@ -25,7 +30,7 @@ export default function DashboardSubdirector() {
       }
     });
     return () => unsub();
-  }, [pinParam]);
+  }, [pinParam, clubId]);
   const handleLogout = () => {
     router.push("/");
   };
@@ -68,7 +73,7 @@ export default function DashboardSubdirector() {
             </div>
             <div>
               <h1 className="text-3xl md:text-5xl font-black tracking-tighter uppercase italic italic-shadow">
-                Caleb <span className="text-fuchsia-500 text-stroke">Club</span>
+                Conquis<span className="text-fuchsia-500 text-stroke">App</span>
               </h1>
               <p className="text-slate-400 font-bold tracking-[0.2em] text-xs uppercase">Conquistadores 2026</p>
             </div>

@@ -2,6 +2,8 @@
 import React, { useState } from "react";
 import { db } from "../../../src/firebase";
 import { collection, setDoc, doc } from "firebase/firestore";
+import { useClubActivo } from "@/src/hooks/useClubActivo";
+import { datosConClub } from "@/src/lib/clubScope";
 import {
   ArrowLeft,
   Save,
@@ -23,6 +25,7 @@ const dias = [
 ];
 
 export default function FrasesSemanaPage() {
+  const { clubId } = useClubActivo();
   const [frases, setFrases] = useState(Array(7).fill({ frase: "", hora: "" }));
   const [editIndex, setEditIndex] = useState<number | null>(null);
 
@@ -32,10 +35,14 @@ export default function FrasesSemanaPage() {
   };
 
   const handleSave = async () => {
+    if (!clubId) {
+      alert("Sesión de club no válida.");
+      return;
+    }
     try {
-      await setDoc(doc(collection(db, "frasesSemana"), "actual"), {
+      await setDoc(doc(collection(db, "frasesSemana"), clubId), datosConClub({
         frases: dias.map((dia, idx) => ({ dia: dia.name, frase: frases[idx].frase, hora: frases[idx].hora }))
-      });
+      }, clubId));
       alert("Frases guardadas y notificadas a los conquistadores.");
     } catch (err) {
       alert("Error al guardar frases");

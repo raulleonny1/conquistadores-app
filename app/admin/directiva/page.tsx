@@ -5,6 +5,8 @@ import { formatFechaDDMMYYYY } from "@/src/utils/formatoFecha";
 import { collection, addDoc, onSnapshot, deleteDoc, doc, updateDoc } from "firebase/firestore";
 import { ArrowLeft } from "lucide-react";
 import { generarPinUnicoClub, validarPinDisponible } from "@/src/lib/pinUnico";
+import { useClubActivo } from "@/src/hooks/useClubActivo";
+import { datosConClub, queryColeccionClub } from "@/src/lib/clubScope";
 
 const cargos = [
   "Director/a",
@@ -30,6 +32,7 @@ function formatWhatsapp(num: string) {
 }
 
 export default function DirectivaPage() {
+  const { clubId } = useClubActivo();
   const [form, setForm] = useState({
     nombre: "",
     edad: "",
@@ -49,11 +52,13 @@ export default function DirectivaPage() {
   // Generar PIN aleatorio
   // Cargar directiva en tiempo real
   useEffect(() => {
-    const unsub = onSnapshot(collection(db, "directivaClub"), snap => {
+    const q = queryColeccionClub("directivaClub", clubId);
+    if (!q) return;
+    const unsub = onSnapshot(q, snap => {
       setDirectiva(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
     return () => unsub();
-  }, []);
+  }, [clubId]);
 
   const handleSave = async () => {
     setLoading(true);
@@ -87,11 +92,16 @@ export default function DirectivaPage() {
             return;
           }
         }
-        await addDoc(collection(db, "directivaClub"), {
+        if (!clubId) {
+          alert("Inicia sesión como administrador del club primero.");
+          setLoading(false);
+          return;
+        }
+        await addDoc(collection(db, "directivaClub"), datosConClub({
           ...form,
           pin,
           fechaRegistro: formatFechaDDMMYYYY(new Date())
-        });
+        }, clubId));
         alert("Directiva registrada correctamente. PIN: " + pin);
       }
       setForm({ nombre: "", edad: "", nacimiento: "", cargo: cargos[0], whatsapp: "" });

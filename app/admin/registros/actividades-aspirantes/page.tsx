@@ -20,12 +20,14 @@ import {
 import { nombreCompletoAspirante } from "@/src/constants/aspirante";
 import {
   aplicarCalificacionCatalogo,
-  esCatalogoAdminCalificaciones,
+  esCatalogoConquistadores,
   type CatalogoCalificacion,
 } from "@/src/lib/actividadesCalificacion";
 import { indexarTotalesPorPin, toNumberPuntos } from "@/src/lib/categoriasPuntos";
 import { nombreGrupoCoincide } from "@/src/lib/unidades";
 import QuitarPuntosPanel from "@/src/components/calificaciones/QuitarPuntosPanel";
+import { useClubActivo } from "@/src/hooks/useClubActivo";
+import { queryColeccionClub } from "@/src/lib/clubScope";
 
 type Modo = "individual" | "grupo";
 
@@ -60,6 +62,7 @@ function fechaInputADDisplay(iso: string): string {
 
 export default function RegistroActividadesAspirantesPage() {
   const router = useRouter();
+  const { clubId } = useClubActivo();
   const [modo, setModo] = useState<Modo>("individual");
   const [busqueda, setBusqueda] = useState("");
   const [aspirantes, setAspirantes] = useState<AspiranteRegistro[]>([]);
@@ -74,7 +77,11 @@ export default function RegistroActividadesAspirantesPage() {
   const [totalesPin, setTotalesPin] = useState<Record<string, number>>({});
 
   useEffect(() => {
-    const unsubAspirantes = onSnapshot(collection(db, "aspirantesGuiaMayor"), (snap) => {
+    const qAspirantes = queryColeccionClub("aspirantesGuiaMayor", clubId);
+    const qCatalogo = queryColeccionClub("calificaciones", clubId);
+    if (!qAspirantes || !qCatalogo) return;
+
+    const unsubAspirantes = onSnapshot(qAspirantes, (snap) => {
       const lista: AspiranteRegistro[] = snap.docs
         .map((d) => {
           const data = d.data() as {
@@ -97,11 +104,11 @@ export default function RegistroActividadesAspirantesPage() {
       setAspirantes(lista);
     });
 
-    const unsubCatalogo = onSnapshot(collection(db, "calificaciones"), (snap) => {
+    const unsubCatalogo = onSnapshot(qCatalogo, (snap) => {
       const items = snap.docs
         .map((d) => {
           const data = d.data() as { nombre?: string; puntos?: string | number; pin?: string };
-          if (!esCatalogoAdminCalificaciones(data as Record<string, unknown>)) return null;
+          if (!esCatalogoConquistadores(data as Record<string, unknown>)) return null;
           const pts = toNumberPuntos(data.puntos);
           const nombre = (data.nombre || "").trim();
           if (!nombre || pts <= 0) return null;
@@ -111,23 +118,30 @@ export default function RegistroActividadesAspirantesPage() {
       setCatalogo(items);
     });
 
-    const unsubTotales = onSnapshot(collection(db, "calificacionesConquis"), (snap) => {
-      setTotalesPin(
-        indexarTotalesPorPin(
-          snap.docs.map((d) => ({
+    let unsubTotales = () => {};
+    const unsubPins = onSnapshot(qAspirantes, (snapAsp) => {
+      const pinsClub = new Set(
+        snapAsp.docs.map((d) => String((d.data() as { pin?: string }).pin ?? d.id).trim())
+      );
+      unsubTotales();
+      unsubTotales = onSnapshot(collection(db, "calificacionesConquis"), (snap) => {
+        const docsFiltrados = snap.docs
+          .filter((d) => pinsClub.has(d.id) || pinsClub.has(String(d.data().pin ?? "")))
+          .map((d) => ({
             id: d.id,
             data: () => d.data() as Record<string, unknown>,
-          }))
-        )
-      );
+          }));
+        setTotalesPin(indexarTotalesPorPin(docsFiltrados));
+      });
     });
 
     return () => {
       unsubAspirantes();
       unsubCatalogo();
+      unsubPins();
       unsubTotales();
     };
-  }, []);
+  }, [clubId]);
 
   useEffect(() => {
     if (aspirantes.length > 0 && !pinSeleccionado) {

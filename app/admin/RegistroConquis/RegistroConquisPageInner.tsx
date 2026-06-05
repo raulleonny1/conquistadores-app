@@ -6,6 +6,9 @@ import { db } from "@/src/firebase";
 import { especialidadesBase } from "@/src/data/especialidades";
 import { handleError } from "@/src/lib/errorHandler";
 import { generarPinUnicoClub } from "@/src/lib/pinUnico";
+import { obtenerClubIdSesion } from "@/src/lib/clubSession";
+import { useClubActivo } from "@/src/hooks/useClubActivo";
+import { queryColeccionClub } from "@/src/lib/clubScope";
 import { toast } from "react-hot-toast";
 import Link from "next/link";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -66,6 +69,7 @@ type RegistroConquisPageInnerProps = {
 };
 
 export default function RegistroConquisPageInner({ unidades: initialUnidades, consejeros: initialConsejeros }: RegistroConquisPageInnerProps) {
+  const { clubId } = useClubActivo();
   const [conquis, setConquis] = useState<RegistroConquis[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -103,7 +107,12 @@ export default function RegistroConquisPageInner({ unidades: initialUnidades, co
   ];
 
   useEffect(() => {
-    const q = collection(db, "RegistroConquis");
+    const q = queryColeccionClub("RegistroConquis", clubId);
+    if (!q) {
+      setConquis([]);
+      setLoading(false);
+      return;
+    }
     const unsub = onSnapshot(q, (snapshot) => {
       const sortedConquis = snapshot.docs
         .map((doc) => {
@@ -136,12 +145,14 @@ export default function RegistroConquisPageInner({ unidades: initialUnidades, co
       setLoading(false);
     });
     return () => unsub();
-  }, []);
+  }, [clubId]);
   useEffect(() => {
     if (!initialUnidades?.length) {
       const loadUnidades = async () => {
         try {
-          const unidadesSnapshot = await getDocs(collection(db, "unidades"));
+          const qU = queryColeccionClub("unidades", clubId);
+          if (!qU) return;
+          const unidadesSnapshot = await getDocs(qU);
           setUnidades(
             unidadesSnapshot.docs.map((docSnap) => {
               const data = docSnap.data() as Partial<Unidad>;
@@ -154,10 +165,15 @@ export default function RegistroConquisPageInner({ unidades: initialUnidades, co
       };
       loadUnidades();
     }
-  }, [initialUnidades]);
+  }, [initialUnidades, clubId]);
 
   useEffect(() => {
-    const unsub = onSnapshot(collection(db, "consejeros"), (snapshot) => {
+    const qC = queryColeccionClub("consejeros", clubId);
+    if (!qC) {
+      setConsejeros([]);
+      return;
+    }
+    const unsub = onSnapshot(qC, (snapshot) => {
       setConsejeros(
         snapshot.docs.map((docSnap) => {
           const data = docSnap.data() as Partial<Consejero>;
@@ -166,7 +182,7 @@ export default function RegistroConquisPageInner({ unidades: initialUnidades, co
       );
     });
     return () => unsub();
-  }, []);
+  }, [clubId]);
 
   const catalogoUnidades = useMemo(
     () => unidades.map((u) => u.nombre).filter(Boolean),
@@ -260,9 +276,15 @@ export default function RegistroConquisPageInner({ unidades: initialUnidades, co
       } else {
         // Registrar
         const pin = await generarPinUnicoClub();
+        const clubId = obtenerClubIdSesion();
+        if (!clubId) {
+          toast.error("Inicia sesión como administrador del club primero.");
+          return;
+        }
         await addDoc(collection(db, "RegistroConquis"), {
           ...form,
           pin,
+          clubId,
           unidad: form.unidad
             ? canonicalizarUnidad(form.unidad, catalogoUnidades)
             : form.unidad,

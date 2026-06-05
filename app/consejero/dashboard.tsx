@@ -191,7 +191,7 @@ export default function ConsejeroDashboard({ consejeroId }: { consejeroId: strin
             <div className="rounded-lg bg-emerald-600 p-2">
               <Users className="h-6 w-6 text-white" />
             </div>
-            <span className="hidden text-xl font-bold tracking-tight text-emerald-900 sm:block">Club Caleb</span>
+            <span className="hidden text-xl font-bold tracking-tight text-emerald-900 sm:block">ConquistadoresApp</span>
           </div>
           <div className="flex items-center gap-4">
             <button

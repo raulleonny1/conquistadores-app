@@ -11,6 +11,8 @@ import {
   type ColeccionPin,
 } from "@/src/lib/pinUnico";
 import { nombreCompletoAspirante } from "@/src/constants/aspirante";
+import { useClubActivo } from "@/src/hooks/useClubActivo";
+import { queryColeccionClub } from "@/src/lib/clubScope";
 import {
   Settings,
   Users,
@@ -196,6 +198,7 @@ function UserTable({
 }
 
 export default function ConfiguracionAdmin() {
+  const { clubId } = useClubActivo();
   const [searchTerm, setSearchTerm] = useState("");
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
   const [loading, setLoading] = useState(true);
@@ -209,14 +212,21 @@ export default function ConfiguracionAdmin() {
   >([]);
 
   const cargarUsuarios = useCallback(async () => {
+    if (!clubId) return;
     setLoading(true);
     try {
+      const qConquis = queryColeccionClub("RegistroConquis", clubId);
+      const qAspirantes = queryColeccionClub("aspirantesGuiaMayor", clubId);
+      const qConsejeros = queryColeccionClub("consejeros", clubId);
+      const qDirectiva = queryColeccionClub("directivaClub", clubId);
+      if (!qConquis || !qAspirantes || !qConsejeros || !qDirectiva) return;
+
       const [conquisSnap, aspirantesSnap, consejerosSnap, directivaSnap] =
         await Promise.all([
-          getDocs(collection(db, "RegistroConquis")),
-          getDocs(collection(db, "aspirantesGuiaMayor")),
-          getDocs(collection(db, "consejeros")),
-          getDocs(collection(db, "directivaClub")),
+          getDocs(qConquis),
+          getDocs(qAspirantes),
+          getDocs(qConsejeros),
+          getDocs(qDirectiva),
         ]);
 
       const lista: Usuario[] = [
@@ -263,7 +273,7 @@ export default function ConfiguracionAdmin() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [clubId]);
 
   const cargarDuplicados = useCallback(async () => {
     const lista = await detectarPinsDuplicados();

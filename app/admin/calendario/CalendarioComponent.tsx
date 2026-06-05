@@ -3,8 +3,11 @@ import React, { useState, useEffect } from "react";
 import { db } from "@/src/firebase";
 import { collection, addDoc, onSnapshot, doc, deleteDoc, updateDoc } from "firebase/firestore";
 import RetoMiembroEditor from "./RetoMiembroEditor";
+import { useClubActivo } from "@/src/hooks/useClubActivo";
+import { datosConClub, queryColeccionClub } from "@/src/lib/clubScope";
 
 export default function CalendarioComponent() {
+  const { clubId } = useClubActivo();
     const [editId, setEditId] = useState<string | null>(null);
     // Manejar edición
     const handleEdit = (ev: any) => {
@@ -39,12 +42,13 @@ export default function CalendarioComponent() {
   const [selectedYear, setSelectedYear] = useState(today.getFullYear());
 
   useEffect(() => {
-    const q = collection(db, "eventos");
+    const q = queryColeccionClub("eventos", clubId);
+    if (!q) return;
     const unsub = onSnapshot(q, (snapshot) => {
       setEventos(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
     return () => unsub();
-  }, []);
+  }, [clubId]);
 
   const handleInput = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -70,7 +74,11 @@ export default function CalendarioComponent() {
         await updateDoc(doc(db, "eventos", editId), eventoForm);
         setEditId(null);
       } else {
-        await addDoc(collection(db, "eventos"), eventoForm);
+        if (!clubId) {
+          alert("Sesión de club no válida.");
+          return;
+        }
+        await addDoc(collection(db, "eventos"), datosConClub(eventoForm, clubId));
       }
       setShowForm(false);
       setForm({ nombre: "", fecha: "", hora: "", lugar: "", observacion: "" });
