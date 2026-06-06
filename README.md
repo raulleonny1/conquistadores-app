@@ -2,7 +2,7 @@
 
 Plataforma **multi-club** para ministerio joven: Conquistadores, Aventureros y Jóvenes Adventistas. Cada iglesia/club tiene datos aislados por `clubId`.
 
-**Repositorio:** [github.com/raulleonny1/conquistadoresapp](https://github.com/raulleonny1/conquistadoresapp)
+**Repositorio:** [github.com/raulleonny1/conquistadores-app](https://github.com/raulleonny1/conquistadores-app)
 
 > Proyecto independiente de [Club Caleb](https://github.com/raulleonny1/club-caleb). No mezclar despliegues ni remotos Git.
 

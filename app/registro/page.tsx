@@ -8,6 +8,7 @@ import { registrarClub } from "@/src/lib/clubs";
 import { guardarSesionClub } from "@/src/lib/clubSession";
 import { cerrarSesionAdmin, registrarAdminFirebase } from "@/src/lib/authClub";
 import type { ProgramaClub } from "@/src/types/club";
+import { PAIS_POR_DEFECTO, PAISES_MUNDO } from "@/src/constants/paises";
 
 const PROGRAMAS_OPCIONES: {
   id: ProgramaClub;
@@ -23,7 +24,7 @@ const PROGRAMAS_OPCIONES: {
 export default function RegistroClubPage() {
   const [nombre, setNombre] = useState("");
   const [ciudad, setCiudad] = useState("");
-  const [pais, setPais] = useState("Ecuador");
+  const [pais, setPais] = useState(PAIS_POR_DEFECTO);
   const [responsable, setResponsable] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -178,18 +179,24 @@ export default function RegistroClubPage() {
                 required
                 value={ciudad}
                 onChange={(e) => setCiudad(e.target.value)}
-                placeholder="Quito"
+                placeholder="Ej: Quito, Madrid, São Paulo…"
                 className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 outline-none focus:border-indigo-500"
               />
             </div>
             <div>
-              <label className="mb-1.5 block text-sm font-semibold">País</label>
-              <input
+              <label className="mb-1.5 block text-sm font-semibold">País *</label>
+              <select
+                required
                 value={pais}
                 onChange={(e) => setPais(e.target.value)}
-                placeholder="Ecuador"
                 className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 outline-none focus:border-indigo-500"
-              />
+              >
+                {PAISES_MUNDO.map((nombre) => (
+                  <option key={nombre} value={nombre} className="bg-slate-900 text-white">
+                    {nombre}
+                  </option>
+                ))}
+              </select>
             </div>
             <div className="sm:col-span-2">
               <label className="mb-1.5 block text-sm font-semibold">Responsable / Director *</label>

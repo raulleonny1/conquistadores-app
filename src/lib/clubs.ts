@@ -58,6 +58,7 @@ export async function registrarClub(
   const nombre = input.nombre.trim();
   if (!nombre) return { ok: false, mensaje: "Ingresa el nombre del club." };
   if (!input.ciudad.trim()) return { ok: false, mensaje: "Ingresa la ciudad." };
+  if (!input.pais.trim()) return { ok: false, mensaje: "Selecciona el país." };
   if (!input.responsable.trim()) return { ok: false, mensaje: "Ingresa el responsable." };
   if (!input.email.trim()) return { ok: false, mensaje: "Ingresa un correo de contacto." };
   if (input.programas.length === 0) {
