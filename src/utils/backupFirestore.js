@@ -1,7 +1,7 @@
 const { exec } = require("child_process");
 
 // Cambia por tu proyecto y ruta de backup
-const PROJECT_ID = "conquistadoresapp-78f92";
+const { projectId: PROJECT_ID } = require("../../firebase.config.json");
 const BACKUP_PATH = "./firestore-backup";
 
 exec(
