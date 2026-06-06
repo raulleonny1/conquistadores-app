@@ -170,6 +170,7 @@ const RUTAS_MENU: Record<string, string> = {
   calificaciones: "/admin/calificaciones",
   calendario: "/admin/calendario",
   directiva: "/admin/directiva",
+  especialidadesEnCurso: "/admin/especialidades-en-curso",
   rankin: "/admin/rankin",
   notificacionesPadres: "/admin/notificaciones-padres",
   rankinAventureros: "/admin/rankin-aventureros",
@@ -283,11 +284,6 @@ export default function AdminPage() {
             Ir a Configuración → Resetear PIN
           </Button>
         </div>
-      );
-    }
-    if (activeTab === "especialidadesEnCurso") {
-      return (
-        <p className="text-center text-sm text-white/50">Especialidades en curso (próximamente).</p>
       );
     }
     return null;

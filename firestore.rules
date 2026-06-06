@@ -59,7 +59,9 @@ service cloud.firestore {
     }
 
     function clubScopedRead() {
-      return isSignedIn() && docHasClubId();
+      return isSignedIn()
+        && docHasClubId()
+        && clubExists(resource.data.clubId);
     }
 
     function clubScopedCreate() {
@@ -193,6 +195,10 @@ service cloud.firestore {
     }
 
     match /calificacionesSemanal/{docId} {
+      allow read, write: if isSignedIn();
+    }
+
+    match /especialidadAvanceHistorial/{docId} {
       allow read, write: if isSignedIn();
     }
 

@@ -9,7 +9,11 @@ import { toast } from "react-hot-toast";
 import { useClubActivo } from "@/src/hooks/useClubActivo";
 import { datosConClub, queryColeccionClub } from "@/src/lib/clubScope";
 import { mensajeErrorFirestore, prepararEscrituraClub } from "@/src/lib/escrituraFirestore";
-import { sembrarEspecialidadesClub } from "@/src/lib/sembrarEspecialidades";
+import {
+  recargarEspecialidadesClub,
+  sembrarEspecialidadesClub,
+  TOTAL_ESPECIALIDADES_IASD,
+} from "@/src/lib/sembrarEspecialidades";
 import { rutaConClub } from "@/src/lib/rutasClub";
 import { Button } from "@/components/ui/button";
 import {
@@ -103,20 +107,51 @@ export default function EspecialidadesPage() {
     setLoading(false);
   };
 
-  const cargarEspecialidadesBase = async (silencioso = false) => {
+  const sincronizarFaltantes = async () => {
     const prep = await prepararEscrituraClub(clubId);
     if (!prep.ok) {
-      if (!silencioso) toast.error(prep.mensaje);
-      return 0;
+      toast.error(prep.mensaje);
+      return;
     }
     setCargandoBase(true);
     try {
       const agregados = await sembrarEspecialidadesClub(clubId);
+      toast.success(
+        agregados > 0
+          ? `Se agregaron ${agregados} especialidades faltantes del manual IASD.`
+          : "El catálogo ya incluye todas las especialidades del manual."
+      );
+      await cargarEspecialidades();
+    } catch (err) {
+      toast.error(mensajeErrorFirestore(err));
+    } finally {
+      setCargandoBase(false);
+    }
+  };
+
+  const recargarCatalogoIasd = async (silencioso = false) => {
+    if (!silencioso) {
+      const ok = window.confirm(
+        `¿Recargar el catálogo oficial IASD en Firebase?\n\n` +
+          `Se eliminarán las ${especialidades.length} especialidades actuales del club ` +
+          `y se guardarán ${TOTAL_ESPECIALIDADES_IASD} del manual (9 áreas oficiales).`
+      );
+      if (!ok) return;
+    }
+
+    const prep = await prepararEscrituraClub(clubId);
+    if (!prep.ok) {
+      if (!silencioso) toast.error(prep.mensaje);
+      return;
+    }
+
+    setCargandoBase(true);
+    try {
+      const { eliminados, agregados } = await recargarEspecialidadesClub(clubId);
       if (!silencioso) {
         toast.success(
-          agregados > 0
-            ? `Se agregaron ${agregados} especialidades del manual IASD.`
-            : "Todas las especialidades del manual ya estaban en Firebase."
+          `Firebase actualizado: ${eliminados} eliminadas, ${agregados} especialidades IASD guardadas.`,
+          { duration: 6000 }
         );
       } else if (agregados > 0) {
         toast.success(
@@ -125,10 +160,8 @@ export default function EspecialidadesPage() {
         );
       }
       await cargarEspecialidades();
-      return agregados;
     } catch (err) {
       if (!silencioso) toast.error(mensajeErrorFirestore(err));
-      return 0;
     } finally {
       setCargandoBase(false);
     }
@@ -138,7 +171,7 @@ export default function EspecialidadesPage() {
     if (!clubId || loading || sembradoInicial) return;
     if (especialidades.length === 0) {
       setSembradoInicial(true);
-      void cargarEspecialidadesBase(true);
+      void recargarCatalogoIasd(true);
     }
   }, [clubId, loading, especialidades.length, sembradoInicial]);
 
@@ -289,16 +322,27 @@ export default function EspecialidadesPage() {
             <ArrowLeft size={18} />
             Retornar a Admin
           </Link>
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => cargarEspecialidadesBase(false)}
-            disabled={cargandoBase}
-            className="border-emerald-300 text-emerald-800 hover:bg-emerald-50"
-          >
-            <Database size={18} />
-            {cargandoBase ? "Cargando..." : "Sincronizar manual IASD"}
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => recargarCatalogoIasd(false)}
+              disabled={cargandoBase}
+              className="border-emerald-300 text-emerald-800 hover:bg-emerald-50"
+            >
+              <Database size={18} />
+              {cargandoBase ? "Guardando en Firebase…" : "Recargar catálogo IASD"}
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={sincronizarFaltantes}
+              disabled={cargandoBase}
+              className="text-slate-600 hover:text-emerald-800"
+            >
+              Solo agregar faltantes
+            </Button>
+          </div>
         </div>
 
         <header className="mb-8">
@@ -496,7 +540,8 @@ export default function EspecialidadesPage() {
                 <Award className="mx-auto text-slate-300 mb-3" size={40} />
                 <p className="font-semibold text-slate-600">Sin especialidades</p>
                 <p className="text-sm text-slate-400 mt-1 max-w-xs mx-auto">
-                  El catálogo IASD se carga automáticamente la primera vez, o usa &quot;Sincronizar manual IASD&quot;.
+                  Usa &quot;Recargar catálogo IASD&quot; para guardar las {TOTAL_ESPECIALIDADES_IASD}{" "}
+                  especialidades oficiales en Firebase.
                 </p>
               </div>
             ) : (
