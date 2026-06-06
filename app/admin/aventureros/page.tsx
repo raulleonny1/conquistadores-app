@@ -16,6 +16,7 @@ import { toast } from "react-hot-toast";
 import { generarPinUnicoClub } from "@/src/lib/pinUnico";
 import { useClubActivo } from "@/src/hooks/useClubActivo";
 import { datosConClub, queryColeccionClub } from "@/src/lib/clubScope";
+import { mensajeErrorFirestore, prepararEscrituraClub } from "@/src/lib/escrituraFirestore";
 import { COLECCION_POR_PROGRAMA } from "@/src/constants/categoriasPrograma";
 import { indexarTotalesPorPin } from "@/src/lib/categoriasPuntos";
 import { CLASES_AVENTUREROS } from "@/src/constants/aventureros";
@@ -146,8 +147,9 @@ export default function AdminAventurerosPage() {
       toast.error("Nombre y apellido son obligatorios.");
       return;
     }
-    if (!clubId) {
-      toast.error("Sesión de club no válida.");
+    const prep = await prepararEscrituraClub(clubId);
+    if (!prep.ok) {
+      toast.error(prep.mensaje);
       return;
     }
 
@@ -179,8 +181,8 @@ export default function AdminAventurerosPage() {
         toast.success(`Aventurero registrado. PIN: ${pin}`);
         resetForm();
       }
-    } catch {
-      toast.error("No se pudo guardar. Revisa permisos y conexión.");
+    } catch (err) {
+      toast.error(mensajeErrorFirestore(err));
     }
     setLoading(false);
   };
@@ -201,12 +203,17 @@ export default function AdminAventurerosPage() {
 
   const handleDelete = async (id: string) => {
     if (!window.confirm("¿Eliminar este aventurero?")) return;
+    const prep = await prepararEscrituraClub(clubId);
+    if (!prep.ok) {
+      toast.error(prep.mensaje);
+      return;
+    }
     try {
       await deleteDoc(doc(db, "aventureros", id));
       if (insigniasEditId === id) setInsigniasEditId(null);
       toast.success("Registro eliminado.");
-    } catch {
-      toast.error("No se pudo eliminar.");
+    } catch (err) {
+      toast.error(mensajeErrorFirestore(err));
     }
   };
 

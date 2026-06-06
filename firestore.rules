@@ -21,13 +21,22 @@ service cloud.firestore {
         && clubData(clubId).get('adminUid', '') == request.auth.uid;
     }
 
+    function isClubEmailAdmin(clubId) {
+      return isSignedIn()
+        && clubExists(clubId)
+        && request.auth.token.email != null
+        && clubData(clubId).get('email', '') == request.auth.token.email;
+    }
+
     function isAnonymous() {
       return isSignedIn()
         && request.auth.token.firebase.sign_in_provider == 'anonymous';
     }
 
     function canManageClub(clubId) {
-      return isClubAdmin(clubId) || (isAnonymous() && clubExists(clubId));
+      return isClubAdmin(clubId)
+        || isClubEmailAdmin(clubId)
+        || (isAnonymous() && clubExists(clubId));
     }
 
     function hasValidClubId() {

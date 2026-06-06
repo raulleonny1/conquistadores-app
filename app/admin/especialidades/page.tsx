@@ -4,11 +4,13 @@ import React, { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { db } from "@/src/firebase";
 import { collection, addDoc, getDocs, deleteDoc, doc } from "firebase/firestore";
-import { especialidadesBase } from "@/src/data/especialidades";
-import { logInfo } from "@/src/lib/logger";
+import { AREAS_OFICIALES_IASD } from "@/src/data/especialidades";
 import { toast } from "react-hot-toast";
 import { useClubActivo } from "@/src/hooks/useClubActivo";
 import { datosConClub, queryColeccionClub } from "@/src/lib/clubScope";
+import { mensajeErrorFirestore, prepararEscrituraClub } from "@/src/lib/escrituraFirestore";
+import { sembrarEspecialidadesClub } from "@/src/lib/sembrarEspecialidades";
+import { rutaConClub } from "@/src/lib/rutasClub";
 import { Button } from "@/components/ui/button";
 import {
   ArrowLeft,
@@ -29,19 +31,21 @@ type Especialidad = {
   area: string;
   categoria: string;
   especialidad: string;
+  codigo?: string;
   consejero?: string;
 };
 
+/** Colores del Manual de Especialidades IASD (9 áreas oficiales). */
 const AREA_STYLES: Record<string, { badge: string; border: string; icon: string }> = {
-  Naturaleza: { badge: "bg-emerald-100 text-emerald-800", border: "border-emerald-200", icon: "🌿" },
-  "Aire Libre": { badge: "bg-sky-100 text-sky-800", border: "border-sky-200", icon: "⛺" },
-  Salud: { badge: "bg-rose-100 text-rose-800", border: "border-rose-200", icon: "❤️" },
-  "Habilidades Domésticas": { badge: "bg-orange-100 text-orange-800", border: "border-orange-200", icon: "🏠" },
-  Arte: { badge: "bg-violet-100 text-violet-800", border: "border-violet-200", icon: "🎨" },
-  Recreación: { badge: "bg-blue-100 text-blue-800", border: "border-blue-200", icon: "⚽" },
-  Agricultura: { badge: "bg-lime-100 text-lime-800", border: "border-lime-200", icon: "🌾" },
-  Misionero: { badge: "bg-indigo-100 text-indigo-800", border: "border-indigo-200", icon: "✝️" },
-  Espiritual: { badge: "bg-amber-100 text-amber-900", border: "border-amber-200", icon: "📖" },
+  ADRA: { badge: "bg-red-100 text-red-800", border: "border-red-200", icon: "🤝" },
+  "Artes y habilidades manuales": { badge: "bg-violet-100 text-violet-800", border: "border-violet-200", icon: "🎨" },
+  "Actividades agrícolas": { badge: "bg-lime-100 text-lime-800", border: "border-lime-200", icon: "🌾" },
+  "Actividades misioneras y comunitarias": { badge: "bg-indigo-100 text-indigo-800", border: "border-indigo-200", icon: "✝️" },
+  "Actividades profesionales": { badge: "bg-slate-100 text-slate-800", border: "border-slate-300", icon: "🔧" },
+  "Actividades recreativas": { badge: "bg-sky-100 text-sky-800", border: "border-sky-200", icon: "⛺" },
+  "Ciencia y salud": { badge: "bg-rose-100 text-rose-800", border: "border-rose-200", icon: "❤️" },
+  "Estudio de la naturaleza": { badge: "bg-emerald-100 text-emerald-800", border: "border-emerald-200", icon: "🌿" },
+  "Habilidades domésticas": { badge: "bg-orange-100 text-orange-800", border: "border-orange-200", icon: "🏠" },
 };
 
 function estiloArea(area: string) {
@@ -55,10 +59,11 @@ function estiloArea(area: string) {
 }
 
 export default function EspecialidadesPage() {
-  const { clubId } = useClubActivo();
+  const { clubId, clubSlug } = useClubActivo();
   const [especialidades, setEspecialidades] = useState<Especialidad[]>([]);
   const [loading, setLoading] = useState(true);
   const [cargandoBase, setCargandoBase] = useState(false);
+  const [sembradoInicial, setSembradoInicial] = useState(false);
   const [busqueda, setBusqueda] = useState("");
 
   const [area, setArea] = useState("");
@@ -70,6 +75,7 @@ export default function EspecialidadesPage() {
   const [openCategorias, setOpenCategorias] = useState<Set<string>>(new Set());
 
   useEffect(() => {
+    setSembradoInicial(false);
     if (clubId) cargarEspecialidades();
   }, [clubId]);
 
@@ -86,6 +92,7 @@ export default function EspecialidadesPage() {
           area: data.area ?? "",
           categoria: data.categoria ?? "",
           especialidad: data.especialidad ?? "",
+          codigo: data.codigo ?? "",
           consejero: data.consejero ?? "",
         };
       });
@@ -96,44 +103,44 @@ export default function EspecialidadesPage() {
     setLoading(false);
   };
 
-  const cargarEspecialidadesBase = async () => {
-    if (!clubId) {
-      toast.error("Sesión de club no válida.");
-      return;
+  const cargarEspecialidadesBase = async (silencioso = false) => {
+    const prep = await prepararEscrituraClub(clubId);
+    if (!prep.ok) {
+      if (!silencioso) toast.error(prep.mensaje);
+      return 0;
     }
     setCargandoBase(true);
     try {
-      const q = queryColeccionClub("especialidades", clubId);
-      if (!q) return;
-      const querySnapshot = await getDocs(q);
-      const existentes = querySnapshot.docs.map((docSnap) => docSnap.data());
-      let agregados = 0;
-
-      for (const esp of especialidadesBase) {
-        const yaExiste = existentes.some(
-          (e) =>
-            e.area === esp.area &&
-            e.categoria === esp.categoria &&
-            e.especialidad === esp.especialidad
+      const agregados = await sembrarEspecialidadesClub(clubId);
+      if (!silencioso) {
+        toast.success(
+          agregados > 0
+            ? `Se agregaron ${agregados} especialidades del manual IASD.`
+            : "Todas las especialidades del manual ya estaban en Firebase."
         );
-        if (!yaExiste) {
-          const docRef = await addDoc(collection(db, "especialidades"), datosConClub(esp, clubId));
-          logInfo("Especialidad agregada: " + docRef.id);
-          agregados++;
-        }
+      } else if (agregados > 0) {
+        toast.success(
+          `Catálogo IASD cargado en Firebase: ${agregados} especialidades.`,
+          { duration: 5000 }
+        );
       }
-
-      toast.success(
-        agregados > 0
-          ? `Se agregaron ${agregados} especialidades base.`
-          : "Todas las especialidades base ya estaban registradas."
-      );
       await cargarEspecialidades();
-    } catch {
-      toast.error("Error al cargar especialidades base.");
+      return agregados;
+    } catch (err) {
+      if (!silencioso) toast.error(mensajeErrorFirestore(err));
+      return 0;
+    } finally {
+      setCargandoBase(false);
     }
-    setCargandoBase(false);
   };
+
+  useEffect(() => {
+    if (!clubId || loading || sembradoInicial) return;
+    if (especialidades.length === 0) {
+      setSembradoInicial(true);
+      void cargarEspecialidadesBase(true);
+    }
+  }, [clubId, loading, especialidades.length, sembradoInicial]);
 
   const filtradas = useMemo(() => {
     const term = busqueda.trim().toLowerCase();
@@ -225,8 +232,9 @@ export default function EspecialidadesPage() {
       return;
     }
 
-    if (!clubId) {
-      toast.error("Sesión de club no válida.");
+    const prep = await prepararEscrituraClub(clubId);
+    if (!prep.ok) {
+      toast.error(prep.mensaje);
       return;
     }
     try {
@@ -275,7 +283,7 @@ export default function EspecialidadesPage() {
       <div className="mx-auto max-w-5xl px-4 py-8 pb-16">
         <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <Link
-            href="/admin/registros"
+            href={rutaConClub("/admin/registros", clubSlug)}
             className="inline-flex w-fit items-center gap-2 rounded-xl bg-white px-5 py-2.5 text-sm font-bold text-amber-800 shadow-sm border border-amber-200 hover:bg-amber-50 transition-colors"
           >
             <ArrowLeft size={18} />
@@ -284,12 +292,12 @@ export default function EspecialidadesPage() {
           <Button
             type="button"
             variant="outline"
-            onClick={cargarEspecialidadesBase}
+            onClick={() => cargarEspecialidadesBase(false)}
             disabled={cargandoBase}
             className="border-emerald-300 text-emerald-800 hover:bg-emerald-50"
           >
             <Database size={18} />
-            {cargandoBase ? "Cargando..." : "Cargar especialidades base"}
+            {cargandoBase ? "Cargando..." : "Sincronizar manual IASD"}
           </Button>
         </div>
 
@@ -303,7 +311,7 @@ export default function EspecialidadesPage() {
                 Especialidades
               </h1>
               <p className="text-slate-500 text-sm mt-0.5">
-                Catálogo por área y categoría · Firebase
+                Manual IASD · {AREAS_OFICIALES_IASD.length} áreas oficiales · Firebase
               </p>
             </div>
           </div>
@@ -373,9 +381,14 @@ export default function EspecialidadesPage() {
                   required
                 />
                 <datalist id="areas-list">
-                  {areas.map((a) => (
+                  {AREAS_OFICIALES_IASD.map((a) => (
                     <option key={a} value={a} />
                   ))}
+                  {areas
+                    .filter((a) => !AREAS_OFICIALES_IASD.includes(a as (typeof AREAS_OFICIALES_IASD)[number]))
+                    .map((a) => (
+                      <option key={a} value={a} />
+                    ))}
                 </datalist>
               </div>
 
@@ -483,7 +496,7 @@ export default function EspecialidadesPage() {
                 <Award className="mx-auto text-slate-300 mb-3" size={40} />
                 <p className="font-semibold text-slate-600">Sin especialidades</p>
                 <p className="text-sm text-slate-400 mt-1 max-w-xs mx-auto">
-                  Usa &quot;Cargar especialidades base&quot; o agrega una manualmente.
+                  El catálogo IASD se carga automáticamente la primera vez, o usa &quot;Sincronizar manual IASD&quot;.
                 </p>
               </div>
             ) : (
@@ -573,6 +586,11 @@ export default function EspecialidadesPage() {
                                               <p className="font-medium text-sm text-slate-800">
                                                 {esp.especialidad}
                                               </p>
+                                              {esp.codigo && (
+                                                <p className="text-[10px] font-mono text-slate-400 mt-0.5">
+                                                  {esp.codigo}
+                                                </p>
+                                              )}
                                               {esp.consejero && (
                                                 <p className="text-xs text-slate-400 flex items-center gap-1 mt-0.5">
                                                   <User size={12} />

@@ -7,6 +7,7 @@ import { ArrowLeft } from "lucide-react";
 import { generarPinUnicoClub, validarPinDisponible } from "@/src/lib/pinUnico";
 import { useClubActivo } from "@/src/hooks/useClubActivo";
 import { datosConClub, queryColeccionClub } from "@/src/lib/clubScope";
+import { mensajeErrorFirestore, prepararEscrituraClub } from "@/src/lib/escrituraFirestore";
 
 const cargos = [
   "Director/a",
@@ -61,6 +62,11 @@ export default function DirectivaPage() {
   }, [clubId]);
 
   const handleSave = async () => {
+    const prep = await prepararEscrituraClub(clubId);
+    if (!prep.ok) {
+      alert(prep.mensaje);
+      return;
+    }
     setLoading(true);
     try {
       if (editId) {
@@ -92,11 +98,6 @@ export default function DirectivaPage() {
             return;
           }
         }
-        if (!clubId) {
-          alert("Inicia sesión como administrador del club primero.");
-          setLoading(false);
-          return;
-        }
         await addDoc(collection(db, "directivaClub"), datosConClub({
           ...form,
           pin,
@@ -106,7 +107,7 @@ export default function DirectivaPage() {
       }
       setForm({ nombre: "", edad: "", nacimiento: "", cargo: cargos[0], whatsapp: "" });
     } catch (err) {
-      alert("Error al guardar directiva.");
+      alert(mensajeErrorFirestore(err));
     }
     setLoading(false);
   };

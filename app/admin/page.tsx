@@ -1,42 +1,179 @@
 "use client";
-import React, { useState } from 'react';
-import {
-  DndContext,
-  closestCenter
-} from '@dnd-kit/core';
+
+import React, { useMemo, useState } from "react";
+import Image from "next/image";
+import { DndContext, closestCenter, type DragEndEvent } from "@dnd-kit/core";
 import {
   arrayMove,
   SortableContext,
   useSortable,
-  verticalListSortingStrategy
-} from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
-import { 
-  Users, 
-  LayoutGrid, 
-  LogOut, 
-  ShieldCheck, 
+  rectSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import {
+  Users,
+  LogOut,
+  ShieldCheck,
   ChevronRight,
   ClipboardList,
-  Map,
   Settings,
   Calendar,
-  UserCircle
-} from 'lucide-react';
-import { useRouter } from 'next/navigation';
-import { rutaConClub } from '@/src/lib/rutasClub';
-import { useClubActivo } from '@/src/hooks/useClubActivo';
-
-import CumpleanosProximos from '@/src/components/admin/CumpleanosProximos';
+  Trophy,
+  MessageCircle,
+  Sparkles,
+  BarChart3,
+  Loader2,
+} from "lucide-react";
+import { useRouter } from "next/navigation";
+import { rutaConClub } from "@/src/lib/rutasClub";
+import { useClubActivo } from "@/src/hooks/useClubActivo";
+import {
+  LOGO_MINISTERIO_JOVEN,
+  PROGRAMAS_HOME,
+} from "@/src/constants/programLogos";
+import {
+  type AlcanceTarjetaRegistro,
+  nombreProgramaClub,
+  tarjetaVisibleParaClub,
+} from "@/src/lib/registrosPorPrograma";
+import { Button } from "@/components/ui/button";
+import CumpleanosProximos from "@/src/components/admin/CumpleanosProximos";
 
 type MenuItem = {
   id: string;
   title: string;
   description: string;
   icon: React.ReactNode;
-  color: string;
-  bgColor: string;
-  hoverColor: string;
+  borde: string;
+  fondo: string;
+  gradiente: string;
+  glow: string;
+  alcance: AlcanceTarjetaRegistro[];
+};
+
+const MENU_BASE: MenuItem[] = [
+  {
+    id: "registros",
+    title: "Registros",
+    description: "Miembros, unidades, puntos y rankings de tu programa.",
+    icon: <ClipboardList className="h-8 w-8 text-cyan-400" />,
+    borde: "border-cyan-400/40",
+    fondo: "bg-cyan-500/10",
+    gradiente: "from-cyan-500 via-sky-500 to-blue-500",
+    glow: "shadow-cyan-500/25",
+    alcance: ["comun"],
+  },
+  {
+    id: "directiva",
+    title: "Directiva del club",
+    description: "Director, secretaría, tesorería y cargos oficiales.",
+    icon: <Users className="h-8 w-8 text-fuchsia-400" />,
+    borde: "border-fuchsia-400/40",
+    fondo: "bg-fuchsia-500/10",
+    gradiente: "from-fuchsia-600 via-purple-500 to-violet-500",
+    glow: "shadow-fuchsia-500/25",
+    alcance: ["comun"],
+  },
+  {
+    id: "especialidadesEnCurso",
+    title: "Especialidades en curso",
+    description: "Visualiza y gestiona especialidades en proceso.",
+    icon: <ShieldCheck className="h-8 w-8 text-indigo-400" />,
+    borde: "border-indigo-400/40",
+    fondo: "bg-indigo-500/10",
+    gradiente: "from-indigo-600 via-violet-500 to-purple-500",
+    glow: "shadow-indigo-500/25",
+    alcance: ["conquistadores"],
+  },
+  {
+    id: "rankin",
+    title: "Ranking Conquistadores",
+    description: "Puntos, unidades y competencias en vivo.",
+    icon: <Trophy className="h-8 w-8 text-yellow-400" />,
+    borde: "border-yellow-400/40",
+    fondo: "bg-yellow-500/10",
+    gradiente: "from-yellow-500 via-amber-500 to-orange-500",
+    glow: "shadow-yellow-500/25",
+    alcance: ["conquistadores"],
+  },
+  {
+    id: "rankinAventureros",
+    title: "Ranking Aventureros",
+    description: "Clases, insignias y puntos aventureros.",
+    icon: <Trophy className="h-8 w-8 text-rose-400" />,
+    borde: "border-rose-400/40",
+    fondo: "bg-rose-500/10",
+    gradiente: "from-rose-500 via-pink-500 to-fuchsia-500",
+    glow: "shadow-rose-500/25",
+    alcance: ["aventureros"],
+  },
+  {
+    id: "rankinJa",
+    title: "Ranking JA",
+    description: "Actividades y puntos de Jóvenes Adventistas.",
+    icon: <Trophy className="h-8 w-8 text-violet-400" />,
+    borde: "border-violet-400/40",
+    fondo: "bg-violet-500/10",
+    gradiente: "from-violet-500 via-purple-500 to-indigo-500",
+    glow: "shadow-violet-500/25",
+    alcance: ["ja"],
+  },
+  {
+    id: "notificacionesPadres",
+    title: "Notificar padres",
+    description: "Resúmenes de avance por WhatsApp a familias.",
+    icon: <MessageCircle className="h-8 w-8 text-sky-400" />,
+    borde: "border-sky-400/40",
+    fondo: "bg-sky-500/10",
+    gradiente: "from-sky-500 via-cyan-500 to-blue-500",
+    glow: "shadow-sky-500/25",
+    alcance: ["comun"],
+  },
+  {
+    id: "frases",
+    title: "Frases de la semana",
+    description: "Inspira al club con mensajes motivadores.",
+    icon: <Calendar className="h-8 w-8 text-teal-400" />,
+    borde: "border-teal-400/40",
+    fondo: "bg-teal-500/10",
+    gradiente: "from-teal-500 via-emerald-500 to-green-500",
+    glow: "shadow-teal-500/25",
+    alcance: ["comun"],
+  },
+  {
+    id: "calendario",
+    title: "Calendario",
+    description: "Eventos, campamentos y reuniones del club.",
+    icon: <Calendar className="h-8 w-8 text-emerald-400" />,
+    borde: "border-emerald-400/40",
+    fondo: "bg-emerald-500/10",
+    gradiente: "from-emerald-600 via-green-500 to-teal-500",
+    glow: "shadow-emerald-500/25",
+    alcance: ["comun"],
+  },
+  {
+    id: "calificaciones",
+    title: "Calificaciones",
+    description: "Catálogo de actividades y puntos del programa.",
+    icon: <BarChart3 className="h-8 w-8 text-pink-400" />,
+    borde: "border-pink-400/40",
+    fondo: "bg-pink-500/10",
+    gradiente: "from-pink-500 via-rose-500 to-fuchsia-500",
+    glow: "shadow-pink-500/25",
+    alcance: ["conquistadores", "aventureros", "ja"],
+  },
+];
+
+const RUTAS_MENU: Record<string, string> = {
+  registros: "/admin/registros",
+  frases: "/admin/frases",
+  calificaciones: "/admin/calificaciones",
+  calendario: "/admin/calendario",
+  directiva: "/admin/directiva",
+  rankin: "/admin/rankin",
+  notificacionesPadres: "/admin/notificaciones-padres",
+  rankinAventureros: "/admin/rankin-aventureros",
+  rankinJa: "/admin/rankin-ja",
 };
 
 function SortableMenuCard({
@@ -48,44 +185,22 @@ function SortableMenuCard({
 }) {
   const router = useRouter();
   const { clubSlug } = useClubActivo();
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id: item.id });
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
+    useSortable({ id: item.id });
 
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
-    opacity: isDragging ? 0.5 : 1,
-  };
-
-  const navigateForItem = () => {
-    const routes: Record<string, string> = {
-      registros: "/admin/registros",
-      frases: "/admin/frases",
-      RegistroConquis: "/admin/RegistroConquis",
-      unidades: "/admin/unidades",
-      consejero: "/admin/consejero",
-      especialidades: "/admin/especialidades",
-      calificaciones: "/admin/calificaciones",
-      calendario: "/admin/calendario",
-      aspirante: "/admin/aspirante",
-      directiva: "/admin/directiva",
-      rankin: "/admin/rankin",
-      notificacionesPadres: "/admin/notificaciones-padres",
-      rankinAventureros: "/admin/rankin-aventureros",
-      rankinJa: "/admin/rankin-ja",
-    };
-    const path = routes[item.id];
-    if (path) router.push(rutaConClub(path, clubSlug));
-    else onSelectTab(item.id);
+    opacity: isDragging ? 0.6 : 1,
   };
 
   let dragStarted = false;
+
+  const navigate = () => {
+    const path = RUTAS_MENU[item.id];
+    if (path) router.push(rutaConClub(path, clubSlug));
+    else onSelectTab(item.id);
+  };
 
   return (
     <div
@@ -100,256 +215,199 @@ function SortableMenuCard({
         dragStarted = true;
       }}
       onPointerUp={() => {
-        if (!dragStarted) navigateForItem();
+        if (!dragStarted) navigate();
       }}
-      className={`group relative bg-white p-8 rounded-3xl border-2 ${item.color.split(" ")[0]} transition-all duration-500 cursor-pointer overflow-hidden shadow-sm hover:shadow-xl hover:-translate-y-2 flex flex-col items-center text-center`}
+      className={`group relative cursor-pointer overflow-hidden rounded-[2rem] border ${item.borde} ${item.fondo} bg-white/4 p-6 text-center transition-all duration-300 hover:-translate-y-2 hover:bg-white/6 hover:shadow-2xl ${item.glow}`}
     >
       <div
-        className={`absolute -bottom-10 -right-10 w-24 h-24 rounded-full ${item.bgColor} opacity-0 group-hover:opacity-100 transition-all duration-500 scale-150`}
+        className={`pointer-events-none absolute -right-8 -top-8 h-32 w-32 rounded-full bg-linear-to-br ${item.gradiente} opacity-20 blur-2xl transition-opacity group-hover:opacity-40`}
       />
-      <div
-        className={`relative z-10 p-4 rounded-2xl ${item.bgColor} ${item.color.split(" ")[1]} mb-6 transition-transform duration-500 group-hover:scale-110 group-hover:rotate-3`}
-      >
+      <div className="relative mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-white/10 ring-1 ring-white/15 transition-transform group-hover:scale-110">
         {item.icon}
       </div>
-      <h3 className="relative z-10 text-xl font-bold text-slate-800 mb-3">{item.title}</h3>
-      <p className="relative z-10 text-sm text-slate-500 leading-relaxed mb-6">
-        {item.description}
-      </p>
-      <div
-        className={`relative z-10 flex items-center gap-1 font-bold text-xs uppercase tracking-widest ${item.color.split(" ")[1]}`}
-      >
-        Gestionar <ChevronRight className="w-3 h-3" />
+      <h3 className="relative text-lg font-black text-white">{item.title}</h3>
+      <p className="relative mt-2 text-sm leading-relaxed text-white/55">{item.description}</p>
+      <div className="relative mt-5 flex items-center justify-center gap-1 text-xs font-bold uppercase tracking-widest text-white/75 group-hover:text-white">
+        Gestionar <ChevronRight className="h-3 w-3 transition-transform group-hover:translate-x-0.5" />
       </div>
     </div>
   );
 }
 
-const AdminPage = () => {
+export default function AdminPage() {
   const router = useRouter();
+  const { clubSlug, clubNombre, programas, listo } = useClubActivo();
   const [activeTab, setActiveTab] = useState<string | null>(null);
-  const [showConfig, setShowConfig] = useState(false);
 
-  const [menuItems, setMenuItems] = useState([
-    {
-      id: 'registros',
-      title: 'Registros',
-      description: 'Tarjeta para guardar y visualizar todos los registros.',
-      icon: <ClipboardList className="w-8 h-8 text-teal-600" />,
-      color: 'border-teal-500 text-teal-600',
-      bgColor: 'bg-teal-50',
-      hoverColor: 'hover:shadow-teal-200'
-    },
-    {
-      id: 'directiva',
-      title: 'Directiva del club',
-      description: 'Gestión y registro de la directiva del club.',
-      icon: <Users className="w-8 h-8 text-fuchsia-600" />,
-      color: 'border-fuchsia-500 text-fuchsia-600',
-      bgColor: 'bg-fuchsia-50',
-      hoverColor: 'hover:shadow-fuchsia-200'
-    },
-    {
-      id: 'especialidadesEnCurso',
-      title: 'Especialidades en curso',
-      description: 'Visualiza y gestiona las especialidades que están en proceso.',
-      icon: <ShieldCheck className="w-8 h-8 text-indigo-600" />,
-      color: 'border-indigo-500 text-indigo-600',
-      bgColor: 'bg-indigo-50',
-      hoverColor: 'hover:shadow-indigo-200'
-    },
-    {
-      id: 'rankin',
-      title: 'Rankin',
-      description: 'Consulta el ranking de miembros, unidades o actividades.',
-      icon: <Settings className="w-8 h-8 text-yellow-500" />,
-      color: 'border-yellow-500 text-yellow-500',
-      bgColor: 'bg-yellow-50',
-      hoverColor: 'hover:shadow-yellow-200'
-    },
-    {
-      id: 'notificacionesPadres',
-      title: 'Notificar padres',
-      description: 'Envía resúmenes de avance por WhatsApp a padres y tutores.',
-      icon: <Users className="w-8 h-8 text-sky-600" />,
-      color: 'border-sky-500 text-sky-600',
-      bgColor: 'bg-sky-50',
-      hoverColor: 'hover:shadow-sky-200'
-    },
-    {
-      id: 'frases',
-      title: 'Frases para la semana',
-      description: 'Inspira a tu club con frases motivadoras cada semana.',
-      icon: <Calendar className="w-8 h-8 text-cyan-600" />,
-      color: 'border-cyan-500 text-cyan-600',
-      bgColor: 'bg-cyan-50',
-      hoverColor: 'hover:shadow-cyan-200'
-    },
-    {
-      id: 'calendario',
-      title: 'Calendario de Actividades',
-      description: 'Gestiona y consulta el calendario de eventos, campamentos y reuniones.',
-      icon: <Calendar className="w-8 h-8 text-emerald-600" />,
-      color: 'border-emerald-500 text-emerald-600',
-      bgColor: 'bg-emerald-50',
-      hoverColor: 'hover:shadow-emerald-200'
-    },
-    {
-      id: 'calificaciones',
-      title: 'Calificaciones',
-      description: 'Registro y consulta de calificaciones de los miembros.',
-      icon: <Settings className="w-8 h-8 text-pink-600" />,
-      color: 'border-pink-500 text-pink-600',
-      bgColor: 'bg-pink-50',
-      hoverColor: 'hover:shadow-pink-200'
+  const menuFiltrado = useMemo(
+    () => MENU_BASE.filter((item) => tarjetaVisibleParaClub(item.alcance, programas)),
+    [programas]
+  );
+
+  const [menuItems, setMenuItems] = useState(MENU_BASE);
+
+  const menuVisible = useMemo(() => {
+    const ids = new Set(menuFiltrado.map((m) => m.id));
+    return menuItems.filter((m) => ids.has(m.id));
+  }, [menuItems, menuFiltrado]);
+
+  const etiquetaPrograma = nombreProgramaClub(programas);
+  const logoPrograma = programas[0]
+    ? PROGRAMAS_HOME.find((p) => p.id === programas[0])
+    : null;
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const oldIndex = menuItems.findIndex((i) => i.id === active.id);
+    const newIndex = menuItems.findIndex((i) => i.id === over.id);
+    if (oldIndex >= 0 && newIndex >= 0) {
+      setMenuItems(arrayMove(menuItems, oldIndex, newIndex));
     }
-    // Las tarjetas de registro (aspirante, RegistroConquis, unidades, consejero, especialidades, calificaciones, calendario) solo deben aparecer en /admin/registros
-  ]);
+  };
 
-          const handleLogout = () => {
-            router.push('/');
-          };
-
-          // Renderiza el contenido según el tab activo
   const renderTabContent = () => {
-    if (activeTab === 'unidades') {
+    if (activeTab === "configuracion") {
       return (
-        <div className="text-center py-8 text-purple-700 font-semibold">Gestión de unidades (próximamente)</div>
-      );
-    }
-    // Eliminado: las tarjetas de registro ahora están en /admin/registros
-    // ...existing code...
-    if (activeTab === 'unidades') {
-      return (
-        <div className="text-center py-8 text-purple-700 font-semibold">Gestión de unidades (próximamente)</div>
-      );
-    }
-    if (activeTab === 'especialidades') {
-      return (
-        <div className="text-center py-8 text-amber-600 font-semibold">Gestión de especialidades (próximamente)</div>
-      );
-    }
-    if (activeTab === 'actividades') {
-      return (
-        <div className="text-center py-8 text-emerald-600 font-semibold">Plan de actividades (próximamente)</div>
-      );
-    }
-    if (activeTab === 'configuracion') {
-      return (
-        <div className="max-w-lg mx-auto bg-white border-l-4 border-yellow-500 rounded-xl shadow p-6 flex flex-col items-start mb-4">
-          <h2 className="text-xl font-bold text-yellow-700 mb-2">Configuración</h2>
-          <p className="text-yellow-800 mb-4">
+        <div className="mx-auto max-w-lg rounded-[2rem] border border-amber-400/30 bg-amber-500/10 p-8 text-left">
+          <h2 className="text-xl font-black text-amber-200">Configuración</h2>
+          <p className="mt-3 text-sm text-white/60">
             El cambio de PIN (con migración de puntos e historial) solo se hace en la pantalla
             dedicada de configuración.
           </p>
-          <button
+          <Button
             type="button"
-            onClick={() => router.push('/admin/configuracion')}
-            className="bg-indigo-600 text-white px-4 py-2 rounded font-bold shadow hover:bg-indigo-800 transition"
+            onClick={() => router.push(rutaConClub("/admin/configuracion", clubSlug))}
+            className="mt-6 rounded-2xl bg-linear-to-r from-indigo-500 to-violet-600 font-bold"
           >
             Ir a Configuración → Resetear PIN
-          </button>
+          </Button>
         </div>
       );
     }
-    if (activeTab === 'RegistroConquis') {
-      router.push('/admin/RegistroConquis');
-      return null;
+    if (activeTab === "especialidadesEnCurso") {
+      return (
+        <p className="text-center text-sm text-white/50">Especialidades en curso (próximamente).</p>
+      );
     }
-    // Las tarjetas de registro han sido removidas de este panel. Ahora solo están en /admin/registros.
     return null;
   };
 
-          return (
-            <div className="min-h-screen bg-slate-50 font-sans text-slate-900 overflow-x-hidden">
-              {/* Fondo Decorativo con gradientes suaves */}
-              <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
-                <div className="absolute -top-[10%] -left-[10%] w-[40%] h-[40%] rounded-full bg-purple-200/40 blur-3xl"></div>
-                <div className="absolute top-[60%] -right-[5%] w-[35%] h-[35%] rounded-full bg-amber-100/50 blur-3xl"></div>
-              </div>
+  if (!listo) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[#07060f] text-white">
+        <Loader2 className="h-10 w-10 animate-spin text-fuchsia-400" />
+      </div>
+    );
+  }
 
-              {/* Navbar Superior */}
-              <header className="z-10 bg-white/80 backdrop-blur-md border-b border-slate-200 px-6 py-4 flex justify-between items-center sticky top-0">
-                <div className="flex items-center gap-3">
-                  <div className="bg-purple-700 p-2 rounded-lg shadow-lg">
-                    {/* Reemplazo visual del logo del club */}
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
-                    </svg>
-                  </div>
-                  <h1 className="font-bold text-xl tracking-tight text-slate-800">Conquis<span className="text-purple-700">App</span></h1>
-                </div>
-                <div className="flex items-center gap-4">
-                  <button onClick={() => router.push('/admin/configuracion')} className="group flex items-center justify-center bg-slate-100 hover:bg-yellow-100 text-yellow-600 p-2 rounded-full transition-all duration-300" style={{ position: 'absolute', top: 16, right: 16, zIndex: 50 }}>
-                    <Settings className="w-7 h-7" />
-                  </button>
-                  <button onClick={handleLogout} className="group flex items-center gap-2 bg-slate-100 hover:bg-red-50 text-slate-600 hover:text-red-600 px-4 py-2 rounded-full transition-all duration-300 font-medium text-sm">
-                    <span>Cerrar Sesión</span>
-                    <LogOut className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                  </button>
-                </div>
-              </header>
+  return (
+    <div className="min-h-screen overflow-x-hidden bg-[#07060f] text-white">
+      <div className="pointer-events-none fixed inset-0 -z-10" aria-hidden>
+        <div className="absolute -left-32 top-0 h-[500px] w-[500px] animate-pulse rounded-full bg-fuchsia-600/25 blur-[120px]" />
+        <div className="absolute -right-32 top-1/4 h-[600px] w-[600px] rounded-full bg-cyan-500/20 blur-[130px]" />
+        <div className="absolute bottom-0 left-1/3 h-[400px] w-[400px] rounded-full bg-violet-600/20 blur-[100px]" />
+        <div
+          className="absolute inset-0 opacity-[0.03]"
+          style={{
+            backgroundImage:
+              "linear-gradient(rgba(255,255,255,.8) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.8) 1px, transparent 1px)",
+            backgroundSize: "64px 64px",
+          }}
+        />
+      </div>
 
-              {/* Hero Section */}
-              <main className="relative z-10 max-w-6xl mx-auto px-6 py-12">
-                <div className="text-center mb-16">
-                  <h2 className="text-4xl font-extrabold text-slate-800 mb-4 tracking-tight">
-                    Panel Administrativo
-                  </h2>
-                  <p className="text-lg text-slate-500 max-w-2xl mx-auto">
-                    Bienvenido al centro de gestión del <span className="text-purple-700 font-semibold underline decoration-amber-400 decoration-2 underline-offset-4">Club de Conquistadores</span>. 
-                    Acceso exclusivo para directiva y secretaría.
-                  </p>
-                </div>
-
-                <CumpleanosProximos />
-
-                {/* Rejilla de Menú */}
-                <DndContext
-                  collisionDetection={closestCenter}
-                  onDragEnd={event => {
-                    const { active, over } = event;
-                    if (active.id !== over?.id) {
-                      const oldIndex = menuItems.findIndex(i => i.id === active.id);
-                      const newIndex = menuItems.findIndex(i => i.id === over?.id);
-                      setMenuItems(arrayMove(menuItems, oldIndex, newIndex));
-                    }
-                  }}
-                >
-                  <SortableContext
-                    items={menuItems.map(i => i.id)}
-                    strategy={verticalListSortingStrategy}
-                  >
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-                      {menuItems.map((item) => (
-                        <SortableMenuCard
-                          key={item.id}
-                          item={item}
-                          onSelectTab={setActiveTab}
-                        />
-                      ))}
-                    </div>
-                  </SortableContext>
-                </DndContext>
-
-                {/* Contenido del tab activo */}
-                {activeTab && activeTab !== 'miembros' && activeTab !== 'registros' && (
-                  <div className="mt-12">
-                    {renderTabContent()}
-                  </div>
-                )}
-
-                {/* Accesos Rápidos Inferiores */}
-
-              </main>
-
-              {/* Footer / Nota */}
-              <footer className="mt-auto py-8 text-center text-slate-400 text-xs">
-                © 2026 Club de Conquistadores • Sirviendo con Honor
-              </footer>
+      <header className="sticky top-0 z-50 border-b border-white/5 bg-[#07060f]/80 backdrop-blur-xl">
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-5 py-4">
+          <div className="flex items-center gap-3">
+            <Image
+              src={logoPrograma?.logo ?? LOGO_MINISTERIO_JOVEN}
+              alt="Club"
+              width={40}
+              height={40}
+              className="h-10 w-10 rounded-xl bg-white/10 p-1 object-contain ring-1 ring-white/15"
+              unoptimized
+            />
+            <div className="leading-tight">
+              <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-fuchsia-400">
+                Panel admin
+              </p>
+              <p className="text-lg font-black">
+                {clubNombre || clubSlug || "ConquisApp"}
+              </p>
             </div>
-          );
-        };
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => router.push(rutaConClub("/admin/configuracion", clubSlug))}
+              className="rounded-xl border border-white/10 bg-white/5 p-2.5 text-white/70 transition hover:bg-white/10 hover:text-white"
+              title="Configuración"
+            >
+              <Settings className="h-5 w-5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => router.push("/")}
+              className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-xs font-bold text-white/70 transition hover:bg-white/10 hover:text-white"
+            >
+              <LogOut className="h-4 w-4" />
+              Cerrar sesión
+            </button>
+          </div>
+        </div>
+      </header>
 
-        export default AdminPage;
+      <main className="relative z-10 mx-auto max-w-6xl px-5 py-12 sm:py-16">
+        <div className="mb-12 text-center">
+          <p className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-[0.3em] text-cyan-400">
+            <Sparkles className="h-4 w-4" />
+            {etiquetaPrograma}
+          </p>
+          <h1 className="mt-4 text-4xl font-black sm:text-5xl">
+            Centro de{" "}
+            <span className="bg-linear-to-r from-fuchsia-400 via-violet-400 to-cyan-400 bg-clip-text text-transparent">
+              gestión
+            </span>
+          </h1>
+          <p className="mx-auto mt-4 max-w-2xl text-white/50">
+            Bienvenido al panel del club. Acceso para directiva y secretaría — arrastra las tarjetas
+            para ordenar tu menú.
+          </p>
+          {programas.length > 0 && (
+            <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+              <span className="rounded-full border border-white/10 bg-white/5 px-4 py-1.5 text-xs font-bold text-white/70">
+                {menuVisible.length} módulos
+              </span>
+              <span
+                className={`rounded-full border ${logoPrograma?.borde ?? "border-violet-400/30"} ${logoPrograma?.fondo ?? "bg-violet-500/10"} px-4 py-1.5 text-xs font-bold`}
+              >
+                Club de {etiquetaPrograma}
+              </span>
+            </div>
+          )}
+        </div>
 
+        <CumpleanosProximos />
+
+        <DndContext collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+          <SortableContext items={menuVisible.map((i) => i.id)} strategy={rectSortingStrategy}>
+            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+              {menuVisible.map((item) => (
+                <SortableMenuCard key={item.id} item={item} onSelectTab={setActiveTab} />
+              ))}
+            </div>
+          </SortableContext>
+        </DndContext>
+
+        {activeTab && activeTab !== "miembros" && activeTab !== "registros" && (
+          <div className="mt-12">{renderTabContent()}</div>
+        )}
+      </main>
+
+      <footer className="relative z-10 py-10 text-center text-xs text-white/30">
+        © {new Date().getFullYear()} ConquisApp · Sirviendo con honor
+      </footer>
+    </div>
+  );
+}

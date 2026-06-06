@@ -9,22 +9,29 @@ import {
   obtenerClubNombreSesion,
   obtenerClubSlugSesion,
 } from "@/src/lib/clubSession";
+import type { ProgramaClub } from "@/src/types/club";
 
 export function useClubActivo() {
   const params = useSearchParams();
   const clubSlugUrl = params.get("club");
   const [synced, setSynced] = useState(false);
+  const [programas, setProgramas] = useState<ProgramaClub[]>([]);
 
   useEffect(() => {
-    if (!clubSlugUrl) {
+    const slug = clubSlugUrl || obtenerClubSlugSesion();
+    if (!slug) {
       setSynced(true);
+      setProgramas([]);
       return;
     }
     let cancelado = false;
     (async () => {
-      const club = await buscarClubPorSlug(clubSlugUrl);
+      const club = await buscarClubPorSlug(slug);
       if (!cancelado && club?.activo) {
         guardarSesionClub(club);
+        setProgramas(club.programas ?? []);
+      } else if (!cancelado) {
+        setProgramas([]);
       }
       if (!cancelado) setSynced(true);
     })();
@@ -37,6 +44,6 @@ export function useClubActivo() {
     const slug = clubSlugUrl || obtenerClubSlugSesion() || "";
     const id = slug || obtenerClubIdSesion() || "";
     const nombre = obtenerClubNombreSesion() || "";
-    return { clubId: id, clubSlug: slug, clubNombre: nombre, listo: synced };
-  }, [clubSlugUrl, synced]);
+    return { clubId: id, clubSlug: slug, clubNombre: nombre, programas, listo: synced };
+  }, [clubSlugUrl, synced, programas]);
 }

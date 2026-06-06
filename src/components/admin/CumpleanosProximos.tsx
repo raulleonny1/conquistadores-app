@@ -24,6 +24,7 @@ import { sincronizarFechasNacimientoClub } from "@/src/lib/sincronizarFechasNaci
 import Link from "next/link";
 import { Cake, Loader2, Pencil } from "lucide-react";
 import { urlEditarPersona } from "@/src/lib/cumpleanos";
+import { rutaConClub } from "@/src/lib/rutasClub";
 
 const VENTANA_DIAS = 14;
 
@@ -114,9 +115,9 @@ function PersonaCard({
 }) {
   return (
     <>
-      <p className="font-bold text-slate-800">{p.nombre}</p>
-      <p className="text-xs text-slate-500">{p.detalle}</p>
-      <p className="mt-1 text-xs font-semibold text-pink-700">
+      <p className="font-bold text-white">{p.nombre}</p>
+      <p className="text-xs text-white/50">{p.detalle}</p>
+      <p className="mt-1 text-xs font-semibold text-pink-300">
         {fechaDisplay(p.fechaTexto)} · {etiquetaDiasCumpleanos(p.diasHasta)}
       </p>
     </>
@@ -133,7 +134,7 @@ export default function CumpleanosProximos() {
   const [rawFichas, setRawFichas] = useState<DocRow[] | null>(null);
   const [errorCarga, setErrorCarga] = useState<string | null>(null);
   const syncHecho = useRef(false);
-  const { clubId } = useClubActivo();
+  const { clubId, clubSlug } = useClubActivo();
 
   const manejarErrorSnapshot = (etiqueta: string) => (err: Error) => {
     console.error(`Cumpleaños — error leyendo ${etiqueta}:`, err);
@@ -403,14 +404,15 @@ export default function CumpleanosProximos() {
   };
 
   return (
-    <section className="mb-10 rounded-2xl border border-pink-200 bg-gradient-to-br from-pink-50 via-white to-amber-50 p-6 shadow-sm text-left">
-      <div className="mb-4 flex flex-wrap items-center gap-3">
-        <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-pink-500 text-white shadow-md">
+    <section className="relative mb-10 overflow-hidden rounded-[2rem] border border-pink-400/25 bg-white/5 p-6 text-left backdrop-blur-sm">
+      <div className="pointer-events-none absolute -right-12 -top-12 h-40 w-40 rounded-full bg-pink-500/20 blur-3xl" />
+      <div className="relative mb-4 flex flex-wrap items-center gap-3">
+        <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-linear-to-br from-pink-500 to-rose-500 text-white shadow-lg shadow-pink-500/30">
           <Cake className="h-6 w-6" />
         </div>
         <div>
-          <h3 className="text-lg font-bold text-slate-800">Cumpleaños próximos</h3>
-          <p className="text-sm text-slate-600">
+          <h3 className="text-lg font-black text-white">Cumpleaños próximos</h3>
+          <p className="text-sm text-white/55">
             Secretaría: todos los registrados del club — conquistadores, aspirantes, consejeros,
             asociados y directiva ({totalRegistrados} personas). Cumpleaños en los próximos{" "}
             {VENTANA_DIAS} días.
@@ -419,34 +421,34 @@ export default function CumpleanosProximos() {
       </div>
 
       {estaCargando ? (
-        <p className="flex items-center gap-2 text-sm text-slate-500">
+        <p className="relative flex items-center gap-2 text-sm text-white/50">
           <Loader2 className="h-4 w-4 animate-spin" />
           Cargando registros del club…
         </p>
       ) : (
         <>
           {errorCarga && (
-            <p className="mb-4 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+            <p className="relative mb-4 rounded-xl border border-amber-400/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
               {errorCarga}
             </p>
           )}
           {lista.length === 0 ? (
-            <p className="mb-4 rounded-xl bg-white/80 px-4 py-3 text-sm text-slate-600">
+            <p className="relative mb-4 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white/55">
               No hay cumpleaños en los próximos {VENTANA_DIAS} días entre quienes tienen fecha de
               nacimiento guardada.
             </p>
           ) : (
-            <div className="mb-6 grid gap-4 md:grid-cols-2">
+            <div className="relative mb-6 grid gap-4 md:grid-cols-2">
               {hoy.length > 0 && (
-                <div className="rounded-xl border border-pink-300 bg-pink-100/60 p-4">
-                  <p className="mb-2 text-xs font-bold uppercase tracking-wide text-pink-800">
+                <div className="rounded-2xl border border-pink-400/30 bg-pink-500/10 p-4">
+                  <p className="mb-2 text-xs font-bold uppercase tracking-wide text-pink-300">
                     Hoy
                   </p>
                   <ul className="space-y-2">
                     {hoy.map((p) => (
                       <li
                         key={p.id}
-                        className="rounded-lg bg-white px-3 py-2 text-sm shadow-sm"
+                        className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm"
                       >
                         <PersonaCard p={p} fechaDisplay={fechaDisplay} />
                       </li>
@@ -456,28 +458,28 @@ export default function CumpleanosProximos() {
               )}
 
               <div
-                className={`rounded-xl border border-amber-200 bg-white/80 p-4 ${
+                className={`rounded-2xl border border-amber-400/25 bg-amber-500/5 p-4 ${
                   hoy.length === 0 ? "md:col-span-2" : ""
                 }`}
               >
-                <p className="mb-2 text-xs font-bold uppercase tracking-wide text-amber-800">
+                <p className="mb-2 text-xs font-bold uppercase tracking-wide text-amber-300">
                   Próximos días
                 </p>
                 {proximos.length === 0 ? (
-                  <p className="text-sm text-slate-500">Nadie más en esta ventana aparte de hoy.</p>
+                  <p className="text-sm text-white/50">Nadie más en esta ventana aparte de hoy.</p>
                 ) : (
                   <ul className="max-h-56 space-y-2 overflow-y-auto">
                     {proximos.map((p) => (
                       <li
                         key={p.id}
-                        className="flex items-start justify-between gap-2 rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 text-sm"
+                        className="flex items-start justify-between gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm"
                       >
                         <div className="min-w-0">
-                          <p className="font-semibold text-slate-800">{p.nombre}</p>
-                          <p className="text-xs text-slate-500">{p.detalle}</p>
-                          <p className="text-xs text-slate-600">{fechaDisplay(p.fechaTexto)}</p>
+                          <p className="font-semibold text-white">{p.nombre}</p>
+                          <p className="text-xs text-white/50">{p.detalle}</p>
+                          <p className="text-xs text-white/60">{fechaDisplay(p.fechaTexto)}</p>
                         </div>
-                        <span className="shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-800">
+                        <span className="shrink-0 rounded-full bg-amber-500/20 px-2 py-0.5 text-xs font-bold text-amber-200">
                           {etiquetaDiasCumpleanos(p.diasHasta)}
                         </span>
                       </li>
@@ -489,8 +491,8 @@ export default function CumpleanosProximos() {
           )}
 
           {sinFechaUnicas.length > 0 && (
-            <details className="rounded-xl border border-slate-200 bg-white/90 p-4">
-              <summary className="cursor-pointer text-sm font-bold text-slate-700">
+            <details className="relative rounded-2xl border border-white/10 bg-white/5 p-4">
+              <summary className="cursor-pointer text-sm font-bold text-white/75">
                 Sin fecha de nacimiento ({sinFechaUnicas.length}) — clic en el nombre para abrir su
                 registro y poner la fecha
               </summary>
@@ -499,11 +501,11 @@ export default function CumpleanosProximos() {
                   {sinFechaUnicas.map((p) => (
                     <li key={p.id}>
                       <Link
-                        href={urlEditarPersona(
-                          p.tipo,
-                          p.editRegistroId ?? p.id
+                        href={rutaConClub(
+                          urlEditarPersona(p.tipo, p.editRegistroId ?? p.id),
+                          clubSlug
                         )}
-                        className="inline-flex items-center gap-1 rounded-lg border border-indigo-200 bg-white px-2.5 py-1.5 text-xs font-medium text-indigo-800 shadow-sm transition hover:border-indigo-400 hover:bg-indigo-50"
+                        className="inline-flex items-center gap-1 rounded-lg border border-indigo-400/30 bg-indigo-500/10 px-2.5 py-1.5 text-xs font-medium text-indigo-200 transition hover:border-indigo-400/50 hover:bg-indigo-500/20"
                         title="Editar registro y agregar fecha de nacimiento"
                       >
                         <Pencil className="h-3 w-3 shrink-0" />

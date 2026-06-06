@@ -28,9 +28,13 @@ export type EventoDoc = FirestoreDocBase & {
 };
 
 export type EspecialidadDoc = FirestoreDocBase & {
+  area?: string;
+  categoria?: string;
+  especialidad?: string;
   nombre?: string;
   titulo?: string;
-  categoria?: string;
+  codigo?: string;
+  consejero?: string;
   clubId?: string;
 };
 

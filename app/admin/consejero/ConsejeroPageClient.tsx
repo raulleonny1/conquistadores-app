@@ -1,41 +1,59 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
-import { toast } from 'react-hot-toast';
-import { db } from '../../../src/firebase';
-import { collection, addDoc, doc, getDocs, updateDoc } from 'firebase/firestore';
-import { handleError } from '@/src/lib/errorHandler';
+import React, { useState, useEffect } from "react";
+import Image from "next/image";
+import { useRouter } from "next/navigation";
+import { toast } from "react-hot-toast";
+import { db } from "@/src/firebase";
+import { collection, addDoc, doc, getDocs, updateDoc } from "firebase/firestore";
+import { handleError } from "@/src/lib/errorHandler";
+import { generarPinUnicoClub } from "@/src/lib/pinUnico";
+import { useClubActivo } from "@/src/hooks/useClubActivo";
+import { datosConClub, queryColeccionClub } from "@/src/lib/clubScope";
+import { mensajeErrorFirestore, prepararEscrituraClub } from "@/src/lib/escrituraFirestore";
+import { rutaConClub } from "@/src/lib/rutasClub";
+import { LOGO_CONQUISTADORES } from "@/src/constants/programLogos";
+import { Button } from "@/components/ui/button";
 import {
-  generarPinUnicoClub,
-} from '@/src/lib/pinUnico';
-import { useClubActivo } from '@/src/hooks/useClubActivo';
-import { datosConClub, queryColeccionClub } from '@/src/lib/clubScope';
+  ArrowLeft,
+  CheckCircle2,
+  Loader2,
+  LogOut,
+  Pencil,
+  Plus,
+  Shield,
+  Sparkles,
+  Trash2,
+  UserCheck,
+  Users,
+} from "lucide-react";
+
+const inputClass =
+  "w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white placeholder:text-white/30 outline-none transition focus:border-emerald-400/50 focus:ring-2 focus:ring-emerald-400/20 [color-scheme:dark]";
+const labelClass = "text-sm font-semibold text-white/80";
 
 type ConsejeroPageClientProps = {
   initialUnidadesRegistradas?: string[];
 };
 
-const clasesOficiales = [
-  { nombre: "Amigo", edad: "10" },
-  { nombre: "Compañero", edad: "11" },
-  { nombre: "Explorador", edad: "12" },
-  { nombre: "Pionero", edad: "13" },
-  { nombre: "Excursionista", edad: "14" },
-  { nombre: "Guía", edad: "15" }
-];
-
 export default function ConsejeroPage({ initialUnidadesRegistradas }: ConsejeroPageClientProps) {
-  const { clubId } = useClubActivo();
+  const router = useRouter();
+  const { clubId, clubSlug, clubNombre, listo } = useClubActivo();
   const [editarDocIdDesdeUrl, setEditarDocIdDesdeUrl] = useState<string | null>(null);
   const [editarAsociadoDesdeUrl, setEditarAsociadoDesdeUrl] = useState(false);
   const [form, setForm] = useState({
-    nombre: '',
-    nacimiento: '',
+    nombre: "",
+    nacimiento: "",
     unidades: [] as string[],
-    consejeroAsociado: '',
-    asociadoNacimiento: '',
+    consejeroAsociado: "",
+    asociadoNacimiento: "",
   });
-  const [unidadesRegistradas, setUnidadesRegistradas] = useState<string[]>(initialUnidadesRegistradas ?? []);
+  const [unidadesRegistradas, setUnidadesRegistradas] = useState<string[]>(
+    initialUnidadesRegistradas ?? []
+  );
+  const [guardando, setGuardando] = useState(false);
+  const [refresh, setRefresh] = useState(0);
+
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     setEditarDocIdDesdeUrl(params.get("editar"));
@@ -44,15 +62,14 @@ export default function ConsejeroPage({ initialUnidadesRegistradas }: ConsejeroP
 
   useEffect(() => {
     if (initialUnidadesRegistradas || !clubId) return;
-    import('firebase/firestore').then(({ getDocs }) => {
-      const q = queryColeccionClub('unidades', clubId);
+    import("firebase/firestore").then(({ getDocs }) => {
+      const q = queryColeccionClub("unidades", clubId);
       if (!q) return;
-      getDocs(q).then(snapshot => {
-        setUnidadesRegistradas(snapshot.docs.map(doc => doc.data().nombre));
+      getDocs(q).then((snapshot) => {
+        setUnidadesRegistradas(snapshot.docs.map((d) => d.data().nombre));
       });
     });
   }, [initialUnidadesRegistradas, clubId]);
-  const [refresh, setRefresh] = useState(0);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -72,106 +89,294 @@ export default function ConsejeroPage({ initialUnidadesRegistradas }: ConsejeroP
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    const prep = await prepararEscrituraClub(clubId);
+    if (!prep.ok) {
+      toast.error(prep.mensaje);
+      return;
+    }
+    setGuardando(true);
     try {
-      if (!clubId) {
-        toast.error('Inicia sesión como administrador del club primero.');
-        return;
-      }
       const pin = await generarPinUnicoClub();
-      await addDoc(collection(db, 'consejeros'), datosConClub({
-        nombre: form.nombre.trim(),
-        nacimiento: form.nacimiento.trim(),
-        unidades: form.unidades,
-        consejeroAsociado: form.consejeroAsociado.trim(),
-        asociadoNacimiento: form.asociadoNacimiento.trim(),
-        pin,
-        puedeCalificar: false,
-      }, clubId));
+      await addDoc(
+        collection(db, "consejeros"),
+        datosConClub(
+          {
+            nombre: form.nombre.trim(),
+            nacimiento: form.nacimiento.trim(),
+            unidades: form.unidades,
+            consejeroAsociado: form.consejeroAsociado.trim(),
+            asociadoNacimiento: form.asociadoNacimiento.trim(),
+            pin,
+            puedeCalificar: false,
+          },
+          clubId
+        )
+      );
       toast.success(`Consejero registrado. PIN de acceso: ${pin}`);
-      setForm({ nombre: '', nacimiento: '', unidades: [], consejeroAsociado: '', asociadoNacimiento: '' });
-      setRefresh(r => r + 1);
+      setForm({
+        nombre: "",
+        nacimiento: "",
+        unidades: [],
+        consejeroAsociado: "",
+        asociadoNacimiento: "",
+      });
+      setRefresh((r) => r + 1);
     } catch (error) {
-      handleError(error, 'Error al registrar en Firebase');
+      toast.error(mensajeErrorFirestore(error));
+      handleError(error, "Error al registrar en Firebase");
+    } finally {
+      setGuardando(false);
     }
   };
 
-  return (
-    <div className="bg-white rounded-2xl shadow-xl p-8 w-full max-w-md flex flex-col items-center mx-auto mt-12">
-      <button
-        onClick={() => window.location.href = '/admin/registros'}
-        className="mb-4 bg-green-700 text-white px-6 py-2 rounded-full font-semibold shadow hover:bg-green-900 transition self-start"
-      >
-        Regresar al menú principal
-      </button>
-      <h2 className="text-3xl font-bold text-green-700 mb-6">Registro de Consejero</h2>
-      <form onSubmit={handleSubmit} className="space-y-4 w-full">
-        <input
-          name="nombre"
-          value={form.nombre}
-          onChange={handleChange}
-          placeholder="Nombre del consejero"
-          className="w-full p-2 rounded border"
-          required
-        />
-        <input
-          id="campo-nacimiento"
-          name="nacimiento"
-          type="date"
-          value={form.nacimiento}
-          onChange={handleChange}
-          className="w-full p-2 rounded border"
-          title="Fecha de nacimiento del consejero"
-        />
-        <input
-          name="consejeroAsociado"
-          value={form.consejeroAsociado}
-          onChange={handleChange}
-          placeholder="Consejero asociado"
-          className="w-full p-2 rounded border"
-        />
-        <input
-          id="campo-nacimiento-asociado"
-          name="asociadoNacimiento"
-          type="date"
-          value={form.asociadoNacimiento}
-          onChange={handleChange}
-          className="w-full p-2 rounded border"
-          title="Fecha de nacimiento del consejero asociado"
-        />
-        <div className="mb-4">
-          <label className="block font-semibold mb-2 text-green-700">Unidades que puede asesorar:</label>
-          <div className="flex flex-wrap gap-2">
-            {unidadesRegistradas.map((unidad) => (
-              <label key={unidad} className="flex items-center gap-2 bg-green-50 px-3 py-1 rounded-full border border-green-200 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={form.unidades.includes(unidad)}
-                  onChange={() => handleUnidadToggle(unidad)}
-                  className="accent-green-600"
-                />
-                <span className="text-green-700 font-medium">{unidad}</span>
-              </label>
-            ))}
-          </div>
-        </div>
-        <p className="text-xs text-green-800">
-          El PIN de 4 dígitos se genera automáticamente al guardar (inicio de sesión en la página principal).
-        </p>
-        <button type="submit" className="bg-green-700 text-white px-6 py-2 rounded-full font-semibold shadow hover:bg-green-900 transition">
-          Guardar
-        </button>
-      </form>
+  if (!listo) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[#07060f] text-white">
+        <Loader2 className="h-10 w-10 animate-spin text-emerald-400" />
+      </div>
+    );
+  }
 
-      <div className="mt-8 w-full">
-        <h3 className="text-xl font-bold text-green-700 mb-4">Consejeros Registrados</h3>
-        <ConsejerosList
-          refresh={refresh}
-          unidadesRegistradas={unidadesRegistradas}
-          editarDocIdDesdeUrl={editarDocIdDesdeUrl}
-          editarAsociadoDesdeUrl={editarAsociadoDesdeUrl}
+  return (
+    <div className="min-h-screen overflow-x-hidden bg-[#07060f] text-white">
+      <div className="pointer-events-none fixed inset-0 -z-10" aria-hidden>
+        <div className="absolute -left-32 top-0 h-[500px] w-[500px] animate-pulse rounded-full bg-emerald-600/20 blur-[120px]" />
+        <div className="absolute -right-32 top-1/4 h-[600px] w-[600px] rounded-full bg-teal-500/15 blur-[130px]" />
+        <div className="absolute bottom-0 left-1/3 h-[400px] w-[400px] rounded-full bg-green-600/10 blur-[100px]" />
+        <div
+          className="absolute inset-0 opacity-[0.03]"
+          style={{
+            backgroundImage:
+              "linear-gradient(rgba(255,255,255,.8) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.8) 1px, transparent 1px)",
+            backgroundSize: "64px 64px",
+          }}
         />
       </div>
+
+      <header className="sticky top-0 z-50 border-b border-white/5 bg-[#07060f]/80 backdrop-blur-xl">
+        <div className="mx-auto flex max-w-4xl items-center justify-between gap-4 px-5 py-4">
+          <button
+            type="button"
+            onClick={() => router.push(rutaConClub("/admin/registros", clubSlug))}
+            className="inline-flex items-center gap-2 text-sm font-semibold text-white/60 transition-colors hover:text-white"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Registros
+          </button>
+          <div className="flex items-center gap-2">
+            <div className="hidden items-center gap-2 rounded-full border border-emerald-400/30 bg-emerald-500/10 px-4 py-2 sm:flex">
+              <Image
+                src={LOGO_CONQUISTADORES}
+                alt=""
+                width={22}
+                height={22}
+                className="h-5 w-5 object-contain"
+                unoptimized
+              />
+              <span className="text-xs font-bold text-white/80">
+                {clubNombre || clubSlug || "Club"}
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                window.location.href = "/";
+              }}
+              className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-xs font-bold text-white/70 transition hover:bg-white/10 hover:text-white"
+            >
+              <LogOut className="h-4 w-4" />
+              Cerrar sesión
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <main className="px-5 py-10 sm:py-14">
+        <div className="mx-auto max-w-4xl">
+          <div className="mb-10 text-center sm:text-left">
+            <p className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-[0.3em] text-emerald-400">
+              <Sparkles className="h-4 w-4" />
+              Liderazgo del club
+            </p>
+            <h1 className="mt-3 text-4xl font-black sm:text-5xl">
+              <span className="bg-linear-to-r from-emerald-400 via-teal-400 to-green-400 bg-clip-text text-transparent">
+                Consejeros
+              </span>
+            </h1>
+            <p className="mt-3 max-w-2xl text-white/50">
+              Registra consejeros, asigna unidades y controla quién puede calificar puntos.
+            </p>
+          </div>
+
+          <section className="relative mb-10 overflow-hidden rounded-[2rem] border border-emerald-400/30 bg-white/4 p-6 shadow-2xl shadow-emerald-500/10 sm:p-8">
+            <div className="pointer-events-none absolute -right-10 -top-10 h-40 w-40 rounded-full bg-linear-to-br from-emerald-500 via-teal-500 to-green-500 opacity-20 blur-3xl" />
+            <div className="relative mb-6 flex items-center gap-3">
+              <div className="rounded-2xl bg-white/10 p-3 ring-1 ring-white/15">
+                <Plus className="h-10 w-10 text-emerald-400" />
+              </div>
+              <div>
+                <h2 className="text-xl font-black">Registrar consejero</h2>
+                <p className="text-sm text-white/50">
+                  El PIN de 4 dígitos se genera automáticamente al guardar.
+                </p>
+              </div>
+            </div>
+
+            <form onSubmit={handleSubmit} className="relative grid grid-cols-1 gap-4 md:grid-cols-2">
+              <div className="flex flex-col gap-1.5">
+                <label htmlFor="nombre" className={labelClass}>
+                  Nombre del consejero
+                </label>
+                <input
+                  id="nombre"
+                  name="nombre"
+                  value={form.nombre}
+                  onChange={handleChange}
+                  placeholder="Nombre completo"
+                  className={inputClass}
+                  required
+                />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <label htmlFor="campo-nacimiento" className={labelClass}>
+                  Fecha de nacimiento
+                </label>
+                <input
+                  id="campo-nacimiento"
+                  name="nacimiento"
+                  type="date"
+                  value={form.nacimiento}
+                  onChange={handleChange}
+                  className={inputClass}
+                  title="Fecha de nacimiento del consejero"
+                />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <label htmlFor="consejeroAsociado" className={labelClass}>
+                  Consejero asociado
+                </label>
+                <input
+                  id="consejeroAsociado"
+                  name="consejeroAsociado"
+                  value={form.consejeroAsociado}
+                  onChange={handleChange}
+                  placeholder="Nombre del asociado (opcional)"
+                  className={inputClass}
+                />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <label htmlFor="campo-nacimiento-asociado" className={labelClass}>
+                  Nacimiento del asociado
+                </label>
+                <input
+                  id="campo-nacimiento-asociado"
+                  name="asociadoNacimiento"
+                  type="date"
+                  value={form.asociadoNacimiento}
+                  onChange={handleChange}
+                  className={inputClass}
+                  title="Fecha de nacimiento del consejero asociado"
+                />
+              </div>
+
+              <div className="md:col-span-2">
+                <label className={labelClass}>Unidades que puede asesorar</label>
+                {unidadesRegistradas.length === 0 ? (
+                  <p className="mt-2 text-sm text-white/45">
+                    No hay unidades registradas.{" "}
+                    <button
+                      type="button"
+                      onClick={() => router.push(rutaConClub("/admin/unidades", clubSlug))}
+                      className="font-semibold text-emerald-300 underline hover:text-emerald-200"
+                    >
+                      Crear unidades primero
+                    </button>
+                  </p>
+                ) : (
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {unidadesRegistradas.map((unidad) => (
+                      <UnidadPill
+                        key={unidad}
+                        nombre={unidad}
+                        checked={form.unidades.includes(unidad)}
+                        onToggle={() => handleUnidadToggle(unidad)}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2 md:col-span-2">
+                <Button
+                  type="submit"
+                  disabled={guardando}
+                  className="rounded-2xl bg-linear-to-r from-emerald-500 via-teal-500 to-green-500 font-bold text-white hover:opacity-90"
+                >
+                  {guardando ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Guardando…
+                    </>
+                  ) : (
+                    <>
+                      <UserCheck className="mr-2 h-4 w-4" />
+                      Guardar consejero
+                    </>
+                  )}
+                </Button>
+              </div>
+            </form>
+          </section>
+
+          <section className="overflow-hidden rounded-[2rem] border border-white/10 bg-white/4 p-6 sm:p-8">
+            <div className="mb-6 flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500/15 ring-1 ring-emerald-400/25">
+                <Users className="h-5 w-5 text-emerald-300" />
+              </div>
+              <div>
+                <h3 className="text-xl font-black">Consejeros registrados</h3>
+                <p className="text-sm text-white/45">Edita, elimina o autoriza calificaciones.</p>
+              </div>
+            </div>
+            <ConsejerosList
+              refresh={refresh}
+              unidadesRegistradas={unidadesRegistradas}
+              editarDocIdDesdeUrl={editarDocIdDesdeUrl}
+              editarAsociadoDesdeUrl={editarAsociadoDesdeUrl}
+            />
+          </section>
+        </div>
+      </main>
     </div>
+  );
+}
+
+function UnidadPill({
+  nombre,
+  checked,
+  onToggle,
+}: {
+  nombre: string;
+  checked: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <label
+      className={`inline-flex cursor-pointer items-center gap-2 rounded-full border px-3.5 py-1.5 text-sm font-semibold transition ${
+        checked
+          ? "border-emerald-400/50 bg-emerald-500/20 text-emerald-200"
+          : "border-white/10 bg-white/5 text-white/60 hover:border-emerald-400/30 hover:bg-emerald-500/10"
+      }`}
+    >
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={onToggle}
+        className="sr-only"
+      />
+      {checked && <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />}
+      {nombre}
+    </label>
   );
 }
 
@@ -203,13 +408,14 @@ function ConsejerosList({
   const [loadError, setLoadError] = useState<string | null>(null);
   const [editId, setEditId] = useState<string | null>(null);
   const editarDesdeUrlAplicado = React.useRef(false);
-  const [editForm, setEditForm] = useState<{
-    nombre: string;
-    nacimiento: string;
-    unidades: string[];
-    consejeroAsociado: string;
-    asociadoNacimiento: string;
-  }>({ nombre: '', nacimiento: '', unidades: [], consejeroAsociado: '', asociadoNacimiento: '' });
+  const [editForm, setEditForm] = useState({
+    nombre: "",
+    nacimiento: "",
+    unidades: [] as string[],
+    consejeroAsociado: "",
+    asociadoNacimiento: "",
+  });
+  const [guardandoEdicion, setGuardandoEdicion] = useState(false);
 
   useEffect(() => {
     const fetchConsejeros = async () => {
@@ -217,24 +423,23 @@ function ConsejerosList({
       setLoading(true);
       setLoadError(null);
       try {
-        const q = queryColeccionClub('consejeros', clubId);
+        const q = queryColeccionClub("consejeros", clubId);
         if (!q) return;
         const querySnapshot = await getDocs(q);
         const lista: Consejero[] = querySnapshot.docs.map((docSnap) => {
-          const data = docSnap.data() as Omit<Consejero, 'id'>;
+          const data = docSnap.data() as Omit<Consejero, "id">;
           return {
             id: docSnap.id,
             ...data,
-            pin: String(data.pin ?? '').trim(),
+            pin: String(data.pin ?? "").trim(),
             unidades: Array.isArray(data.unidades) ? data.unidades : [],
           };
         });
-
-        lista.sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
+        lista.sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
         setConsejeros(lista);
       } catch (error) {
-        handleError(error, 'Error al cargar consejeros');
-        setLoadError('No se pudieron cargar los consejeros. Recarga la página.');
+        handleError(error, "Error al cargar consejeros");
+        setLoadError("No se pudieron cargar los consejeros. Recarga la página.");
         setConsejeros([]);
       } finally {
         setLoading(false);
@@ -244,15 +449,21 @@ function ConsejerosList({
   }, [refresh, clubId]);
 
   const handleDelete = async (id: string) => {
-    if (!window.confirm('¿Eliminar este consejero?')) return;
+    if (!window.confirm("¿Eliminar este consejero?")) return;
+    const prep = await prepararEscrituraClub(clubId);
+    if (!prep.ok) {
+      toast.error(prep.mensaje);
+      return;
+    }
     try {
-      await import('firebase/firestore').then(({ doc, deleteDoc }) =>
-        deleteDoc(doc(db, 'consejeros', id))
+      await import("firebase/firestore").then(({ doc, deleteDoc }) =>
+        deleteDoc(doc(db, "consejeros", id))
       );
-      setConsejeros(consejeros.filter(c => c.id !== id));
-      toast.success('Consejero eliminado');
+      setConsejeros(consejeros.filter((c) => c.id !== id));
+      toast.success("Consejero eliminado");
     } catch (error) {
-      handleError(error, 'Error al eliminar');
+      toast.error(mensajeErrorFirestore(error));
+      handleError(error, "Error al eliminar");
     }
   };
 
@@ -260,10 +471,10 @@ function ConsejerosList({
     setEditId(c.id || null);
     setEditForm({
       nombre: c.nombre,
-      nacimiento: c.nacimiento || '',
+      nacimiento: c.nacimiento || "",
       unidades: c.unidades,
-      consejeroAsociado: c.consejeroAsociado || '',
-      asociadoNacimiento: c.asociadoNacimiento || '',
+      consejeroAsociado: c.consejeroAsociado || "",
+      asociadoNacimiento: c.asociadoNacimiento || "",
     });
     setTimeout(() => {
       document.getElementById("campo-nacimiento")?.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -302,9 +513,14 @@ function ConsejerosList({
 
   const togglePuedeCalificar = async (c: Consejero) => {
     if (!c.id) return;
+    const prep = await prepararEscrituraClub(clubId);
+    if (!prep.ok) {
+      toast.error(prep.mensaje);
+      return;
+    }
     const activar = c.puedeCalificar !== true;
     try {
-      await updateDoc(doc(db, 'consejeros', c.id), { puedeCalificar: activar });
+      await updateDoc(doc(db, "consejeros", c.id), { puedeCalificar: activar });
       setConsejeros((prev) =>
         prev.map((x) => (x.id === c.id ? { ...x, puedeCalificar: activar } : x))
       );
@@ -314,15 +530,22 @@ function ConsejerosList({
           : `Calificación desactivada para ${c.nombre}. Solo admin asigna puntos.`
       );
     } catch (error) {
-      handleError(error, 'No se pudo actualizar el permiso de calificar');
+      toast.error(mensajeErrorFirestore(error));
+      handleError(error, "No se pudo actualizar el permiso de calificar");
     }
   };
 
   const handleEditSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!editId) return;
+    const prep = await prepararEscrituraClub(clubId);
+    if (!prep.ok) {
+      toast.error(prep.mensaje);
+      return;
+    }
+    setGuardandoEdicion(true);
     try {
-      await updateDoc(doc(db, 'consejeros', editId), {
+      await updateDoc(doc(db, "consejeros", editId), {
         nombre: editForm.nombre.trim(),
         nacimiento: editForm.nacimiento.trim(),
         unidades: editForm.unidades,
@@ -331,126 +554,216 @@ function ConsejerosList({
       });
       setEditId(null);
       setEditForm({
-        nombre: '',
-        nacimiento: '',
+        nombre: "",
+        nacimiento: "",
         unidades: [],
-        consejeroAsociado: '',
-        asociadoNacimiento: '',
+        consejeroAsociado: "",
+        asociadoNacimiento: "",
       });
       setConsejeros(
-        consejeros.map((c) =>
-          c.id === editId ? { ...c, ...editForm, pin: c.pin } : c
-        )
+        consejeros.map((c) => (c.id === editId ? { ...c, ...editForm, pin: c.pin } : c))
       );
-      toast.success('Consejero actualizado.');
+      toast.success("Consejero actualizado.");
     } catch (error) {
-      handleError(error, 'Error al editar');
+      toast.error(mensajeErrorFirestore(error));
+      handleError(error, "Error al editar");
+    } finally {
+      setGuardandoEdicion(false);
     }
   };
 
   if (loading) {
-    return <div className="text-green-700 py-4">Cargando consejeros…</div>;
+    return (
+      <div className="flex items-center justify-center gap-2 py-12 text-white/50">
+        <Loader2 className="h-5 w-5 animate-spin text-emerald-400" />
+        Cargando consejeros…
+      </div>
+    );
   }
 
   if (loadError) {
-    return <div className="text-red-600 py-4">{loadError}</div>;
+    return (
+      <div className="rounded-2xl border border-red-400/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+        {loadError}
+      </div>
+    );
   }
 
   if (consejeros.length === 0) {
     return (
-      <div className="text-gray-500">
-        No hay consejeros registrados. Los existentes en Firebase aparecerán aquí al cargar.
+      <div className="py-12 text-center">
+        <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-white/5 ring-1 ring-white/10">
+          <Shield className="h-8 w-8 text-white/30" />
+        </div>
+        <p className="font-semibold text-white/60">No hay consejeros registrados</p>
+        <p className="mt-1 text-sm text-white/40">Usa el formulario de arriba para agregar el primero.</p>
       </div>
     );
   }
 
   return (
-    <ul className="space-y-3">
+    <ul className="space-y-4">
       {consejeros.map((c) => (
-        <li key={c.id} className="bg-green-50 border border-green-200 rounded-lg p-4">
+        <li
+          key={c.id}
+          className={`rounded-2xl border p-5 transition ${
+            editId === c.id
+              ? "border-emerald-400/40 bg-emerald-500/10"
+              : "border-emerald-400/20 bg-emerald-500/5 hover:border-emerald-400/35 hover:bg-emerald-500/8"
+          }`}
+        >
           {editId === c.id ? (
-            <form onSubmit={handleEditSubmit} className="space-y-2">
-              <input
-                name="nombre"
-                value={editForm.nombre}
-                onChange={handleEditChange}
-                className="w-full p-2 rounded border"
-                required
-              />
-              <input
-                id="campo-nacimiento"
-                name="nacimiento"
-                type="date"
-                value={editForm.nacimiento}
-                onChange={handleEditChange}
-                className="w-full p-2 rounded border"
-              />
-              <input
-                name="consejeroAsociado"
-                value={editForm.consejeroAsociado}
-                onChange={handleEditChange}
-                placeholder="Consejero asociado"
-                className="w-full p-2 rounded border"
-              />
-              <input
-                id="campo-nacimiento-asociado"
-                name="asociadoNacimiento"
-                type="date"
-                value={editForm.asociadoNacimiento}
-                onChange={handleEditChange}
-                className="w-full p-2 rounded border"
-                title="Nacimiento del asociado"
-              />
-              <div>
-                <label className="block font-semibold mb-2 text-green-700">Unidades:</label>
-                <div className="flex flex-wrap gap-2">
+            <form onSubmit={handleEditSubmit} className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <div className="flex flex-col gap-1.5">
+                <label className={labelClass}>Nombre</label>
+                <input
+                  name="nombre"
+                  value={editForm.nombre}
+                  onChange={handleEditChange}
+                  className={inputClass}
+                  required
+                />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <label className={labelClass}>Nacimiento</label>
+                <input
+                  id="campo-nacimiento"
+                  name="nacimiento"
+                  type="date"
+                  value={editForm.nacimiento}
+                  onChange={handleEditChange}
+                  className={inputClass}
+                />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <label className={labelClass}>Consejero asociado</label>
+                <input
+                  name="consejeroAsociado"
+                  value={editForm.consejeroAsociado}
+                  onChange={handleEditChange}
+                  placeholder="Consejero asociado"
+                  className={inputClass}
+                />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <label className={labelClass}>Nacimiento asociado</label>
+                <input
+                  id="campo-nacimiento-asociado"
+                  name="asociadoNacimiento"
+                  type="date"
+                  value={editForm.asociadoNacimiento}
+                  onChange={handleEditChange}
+                  className={inputClass}
+                  title="Nacimiento del asociado"
+                />
+              </div>
+              <div className="md:col-span-2">
+                <label className={labelClass}>Unidades</label>
+                <div className="mt-2 flex flex-wrap gap-2">
                   {unidadesRegistradas.map((unidad) => (
-                    <label key={unidad} className="flex items-center gap-2 bg-green-50 px-3 py-1 rounded-full border border-green-200 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={editForm.unidades.includes(unidad)}
-                        onChange={() => handleEditUnidadToggle(unidad)}
-                        className="accent-green-600"
-                      />
-                      <span className="text-green-700 font-medium">{unidad}</span>
-                    </label>
+                    <UnidadPill
+                      key={unidad}
+                      nombre={unidad}
+                      checked={editForm.unidades.includes(unidad)}
+                      onToggle={() => handleEditUnidadToggle(unidad)}
+                    />
                   ))}
                 </div>
               </div>
-              <div className="flex gap-2">
-                <button type="submit" className="bg-green-700 text-white px-4 py-1 rounded-full font-semibold shadow hover:bg-green-900 transition">Guardar</button>
-                <button type="button" onClick={() => setEditId(null)} className="bg-gray-400 text-white px-4 py-1 rounded-full font-semibold shadow hover:bg-gray-600 transition">Cancelar</button>
+              <div className="flex flex-wrap gap-2 md:col-span-2">
+                <Button
+                  type="submit"
+                  disabled={guardandoEdicion}
+                  className="rounded-2xl bg-linear-to-r from-emerald-500 to-teal-500 font-bold"
+                >
+                  {guardandoEdicion ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Guardando…
+                    </>
+                  ) : (
+                    "Guardar cambios"
+                  )}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setEditId(null)}
+                  className="rounded-2xl border-white/15 bg-white/5 text-white hover:bg-white/10"
+                >
+                  Cancelar
+                </Button>
               </div>
             </form>
           ) : (
             <>
-              <div className="font-bold text-green-700">{c.nombre}</div>
-              <div className="mt-2 text-green-800 text-sm">Unidades: {Array.isArray(c.unidades) ? c.unidades.join(', ') : ''}</div>
-              <div className="mt-2 text-green-800 text-sm">Consejero asociado: {c.consejeroAsociado || 'Sin asignar'}</div>
-              <div className="mt-2 rounded-lg bg-green-100 px-2 py-1 text-sm font-mono font-bold text-green-900">
-                PIN: {c.pin || '…'}
+              <div className="flex flex-wrap items-start justify-between gap-4">
+                <div>
+                  <p className="text-lg font-bold text-white">{c.nombre}</p>
+                  <div className="mt-2 space-y-1 text-xs text-white/55">
+                    <p>
+                      Unidades:{" "}
+                      <span className="text-white/75">
+                        {Array.isArray(c.unidades) && c.unidades.length > 0
+                          ? c.unidades.join(", ")
+                          : "Sin asignar"}
+                      </span>
+                    </p>
+                    <p>
+                      Asociado:{" "}
+                      <span className="text-white/75">{c.consejeroAsociado || "Sin asignar"}</span>
+                    </p>
+                    {c.nacimiento && (
+                      <p>
+                        Nacimiento: <span className="text-white/75">{c.nacimiento}</span>
+                      </p>
+                    )}
+                  </div>
+                </div>
+                <span className="rounded-xl border border-emerald-400/30 bg-emerald-500/15 px-3 py-1.5 font-mono text-sm font-bold text-emerald-200">
+                  PIN: {c.pin || "…"}
+                </span>
               </div>
-              <div className="mt-3 rounded-lg border border-blue-200 bg-blue-50/80 p-3">
-                <p className="mb-2 text-xs font-semibold text-blue-900">
-                  Permiso para calificar (puntos a conquistadores y aspirantes)
+
+              <div className="mt-4 rounded-2xl border border-sky-400/25 bg-sky-500/10 p-4">
+                <p className="mb-2 text-xs font-bold uppercase tracking-wide text-sky-300">
+                  Permiso para calificar
+                </p>
+                <p className="mb-3 text-xs text-white/50">
+                  Puntos a conquistadores y aspirantes de sus unidades.
                 </p>
                 <button
                   type="button"
                   onClick={() => togglePuedeCalificar(c)}
-                  className={`w-full rounded-full px-4 py-2 text-sm font-bold shadow transition ${
+                  className={`w-full rounded-xl px-4 py-2.5 text-sm font-bold transition ${
                     c.puedeCalificar === true
-                      ? 'bg-blue-700 text-white hover:bg-blue-800'
-                      : 'bg-white text-blue-800 ring-2 ring-blue-300 hover:bg-blue-100'
+                      ? "bg-sky-600 text-white hover:bg-sky-500"
+                      : "border border-sky-400/30 bg-white/5 text-sky-200 hover:bg-sky-500/15"
                   }`}
                 >
                   {c.puedeCalificar === true
-                    ? 'Calificar: ACTIVADO — clic para desactivar'
-                    : 'Calificar: desactivado — clic para autorizar'}
+                    ? "Calificar: ACTIVADO — clic para desactivar"
+                    : "Calificar: desactivado — clic para autorizar"}
                 </button>
               </div>
-              <div className="mt-2 flex flex-wrap gap-2">
-                <button onClick={() => handleEdit(c)} className="bg-yellow-500 text-white px-3 py-1 rounded-full font-semibold shadow hover:bg-yellow-700 transition">Editar</button>
-                <button onClick={() => handleDelete(c.id!)} className="bg-red-600 text-white px-3 py-1 rounded-full font-semibold shadow hover:bg-red-800 transition">Eliminar</button>
+
+              <div className="mt-4 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleEdit(c)}
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-500/90 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-500"
+                >
+                  <Pencil className="h-3.5 w-3.5" />
+                  Editar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleDelete(c.id!)}
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-red-400/30 bg-red-500/10 px-4 py-2 text-sm font-bold text-red-200 hover:bg-red-500/20"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  Eliminar
+                </button>
               </div>
             </>
           )}

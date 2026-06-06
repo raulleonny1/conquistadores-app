@@ -19,11 +19,28 @@ import {
 } from "@/src/constants/aspirante";
 import { buildWhatsappUrl, mensajePinAspirante } from "@/src/utils/whatsapp";
 import FichaMedicaUpload from "@/src/components/forms/FichaMedicaUpload";
-import { ArrowLeft, MessageCircle } from "lucide-react";
+import Image from "next/image";
+import { useRouter } from "next/navigation";
+import {
+  ArrowLeft,
+  Loader2,
+  LogOut,
+  MessageCircle,
+  Pencil,
+  Sparkles,
+  Star,
+  Trash2,
+  UserPlus,
+  Users,
+} from "lucide-react";
 import { toast } from "react-hot-toast";
+import { Button } from "@/components/ui/button";
+import { LOGO_CONQUISTADORES } from "@/src/constants/programLogos";
 import { generarPinUnicoClub } from "@/src/lib/pinUnico";
+import { rutaConClub } from "@/src/lib/rutasClub";
 import { useClubActivo } from "@/src/hooks/useClubActivo";
 import { datosConClub, queryColeccionClub } from "@/src/lib/clubScope";
+import { mensajeErrorFirestore, prepararEscrituraClub } from "@/src/lib/escrituraFirestore";
 
 type AspiranteDoc = {
   id: string;
@@ -59,7 +76,12 @@ function numeroWhatsappAspirante(a: Pick<AspiranteDoc, "telefono" | "whatsapp">)
 }
 
 export default function AspirantePage() {
-  const { clubId } = useClubActivo();
+  const router = useRouter();
+  const { clubId, clubSlug, clubNombre } = useClubActivo();
+
+  const inputClass =
+    "w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white placeholder:text-white/30 outline-none transition focus:border-amber-400/50 focus:ring-2 focus:ring-amber-400/20";
+  const labelClass = "text-sm font-semibold text-white/80";
   const [form, setForm] = useState(formInicial);
   const [fichaArchivo, setFichaArchivo] = useState<File | null>(null);
   const [fichaMedicaUrl, setFichaMedicaUrl] = useState("");
@@ -135,8 +157,9 @@ export default function AspirantePage() {
   const handleSave = async () => {
     if (!validarFormulario()) return;
 
-    if (!clubId && !editId) {
-      toast.error("Inicia sesión como administrador del club primero.");
+    const prep = await prepararEscrituraClub(clubId);
+    if (!prep.ok) {
+      toast.error(prep.mensaje);
       return;
     }
 
@@ -195,8 +218,8 @@ export default function AspirantePage() {
         toast.success(`Aspirante registrado. PIN: ${docId}`);
       }
       resetForm();
-    } catch {
-      toast.error("Error al guardar en Firebase.");
+    } catch (err) {
+      toast.error(mensajeErrorFirestore(err));
     }
     setLoading(false);
   };
@@ -268,227 +291,224 @@ export default function AspirantePage() {
 
   const handleDelete = async (id: string) => {
     if (!window.confirm("¿Eliminar este aspirante?")) return;
-    await deleteDoc(doc(db, "aspirantesGuiaMayor", id));
-    toast.success("Aspirante eliminado.");
+    const prep = await prepararEscrituraClub(clubId);
+    if (!prep.ok) {
+      toast.error(prep.mensaje);
+      return;
+    }
+    try {
+      await deleteDoc(doc(db, "aspirantesGuiaMayor", id));
+      toast.success("Aspirante eliminado.");
+    } catch (err) {
+      toast.error(mensajeErrorFirestore(err));
+    }
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 font-sans text-slate-900">
-      <div className="max-w-3xl mx-auto mt-10 px-4 pb-16">
-        <div className="flex flex-wrap justify-between gap-4 mb-6">
+    <div className="min-h-screen overflow-x-hidden bg-[#07060f] text-white">
+      <div className="pointer-events-none fixed inset-0 -z-10" aria-hidden>
+        <div className="absolute -left-32 top-0 h-[500px] w-[500px] animate-pulse rounded-full bg-amber-600/20 blur-[120px]" />
+        <div className="absolute -right-32 top-1/4 h-[600px] w-[600px] rounded-full bg-orange-500/15 blur-[130px]" />
+        <div className="absolute bottom-0 left-1/3 h-[400px] w-[400px] rounded-full bg-yellow-600/10 blur-[100px]" />
+        <div
+          className="absolute inset-0 opacity-[0.03]"
+          style={{
+            backgroundImage:
+              "linear-gradient(rgba(255,255,255,.8) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.8) 1px, transparent 1px)",
+            backgroundSize: "64px 64px",
+          }}
+        />
+      </div>
+
+      <header className="sticky top-0 z-50 border-b border-white/5 bg-[#07060f]/80 backdrop-blur-xl">
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-5 py-4">
           <button
             type="button"
-            onClick={() => {
-              window.location.href = "/admin/registros";
-            }}
-            className="bg-indigo-600 text-white font-bold px-6 py-2 rounded-xl hover:bg-indigo-800 transition-all"
+            onClick={() => router.push(rutaConClub("/admin/registros", clubSlug))}
+            className="inline-flex items-center gap-2 text-sm font-semibold text-white/60 transition-colors hover:text-white"
           >
-            <ArrowLeft className="inline mr-2" />
-            Retornar a Admin
+            <ArrowLeft className="h-4 w-4" />
+            Registros
           </button>
-          <button
-            type="button"
-            onClick={() => {
-              window.location.href = "/";
-            }}
-            className="bg-red-600 text-white font-bold px-6 py-2 rounded-xl hover:bg-red-800 transition-all"
-          >
-            Cerrar sesión
-          </button>
+          <div className="flex items-center gap-2">
+            <div className="hidden items-center gap-2 rounded-full border border-amber-400/30 bg-amber-500/10 px-4 py-2 sm:flex">
+              <Image
+                src={LOGO_CONQUISTADORES}
+                alt=""
+                width={22}
+                height={22}
+                className="h-5 w-5 object-contain"
+                unoptimized
+              />
+              <span className="text-xs font-bold text-white/80">
+                {clubNombre || clubSlug || "Club"}
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                window.location.href = "/";
+              }}
+              className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-xs font-bold text-white/70 transition hover:bg-white/10 hover:text-white"
+            >
+              <LogOut className="h-4 w-4" />
+              Cerrar sesión
+            </button>
+          </div>
         </div>
+      </header>
 
-        <section className="bg-white rounded-3xl shadow-xl p-8">
-          <h2 className="text-2xl font-bold mb-2 text-indigo-700">
-            Registrar Aspirante a Guía Mayor
-          </h2>
-          <p className="text-sm text-slate-500 mb-6">
-            Los datos se guardan en Firebase para consultas futuras.
-          </p>
+      <main className="px-5 py-10 sm:py-14">
+        <div className="mx-auto max-w-4xl">
+          <div className="mb-10 text-center sm:text-left">
+            <p className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-[0.3em] text-amber-400">
+              <Sparkles className="h-4 w-4" />
+              Camino a Guía Mayor
+            </p>
+            <h1 className="mt-3 text-4xl font-black sm:text-5xl">
+              <span className="bg-linear-to-r from-amber-400 via-orange-500 to-yellow-500 bg-clip-text text-transparent">
+                Aspirante a Guía Mayor
+              </span>
+            </h1>
+            <p className="mt-3 max-w-2xl text-white/50">
+              Los datos se guardan en Firebase para consultas futuras.
+            </p>
+            <div className="mt-6 flex flex-wrap gap-3">
+              <span className="rounded-full border border-white/10 bg-white/5 px-4 py-1.5 text-xs font-bold text-white/70">
+                <Users className="mr-1.5 inline h-3.5 w-3.5" />
+                {aspirantes.length} aspirantes
+              </span>
+              <span className="rounded-full border border-amber-400/30 bg-amber-500/10 px-4 py-1.5 text-xs font-bold text-amber-200">
+                <Star className="mr-1.5 inline h-3.5 w-3.5" />
+                {CARGO_ASPIRANTE}
+              </span>
+            </div>
+          </div>
 
-          <form
-            className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6"
-            onSubmit={(e) => {
-              e.preventDefault();
-              handleSave();
-            }}
-          >
-            <div className="flex flex-col gap-1">
-              <label htmlFor="nombre" className="text-sm font-semibold text-slate-700">
-                Nombre
-              </label>
-              <input
-                id="nombre"
-                name="nombre"
-                value={form.nombre}
-                onChange={handleChange}
-                placeholder="Nombre"
-                className="border border-slate-200 p-2 rounded-xl"
-                required
+          <section className="relative mb-10 overflow-hidden rounded-[2rem] border border-amber-400/30 bg-white/4 p-6 shadow-2xl shadow-amber-500/10 sm:p-8">
+            <div className="pointer-events-none absolute -right-10 -top-10 h-40 w-40 rounded-full bg-linear-to-br from-amber-500 via-orange-500 to-yellow-500 opacity-20 blur-3xl" />
+            <div className="relative mb-6 flex items-center gap-3">
+              <div className="rounded-2xl bg-white/10 p-3 ring-1 ring-white/15">
+                <Star className="h-10 w-10 text-amber-400" />
+              </div>
+              <div>
+                <h2 className="text-xl font-black">
+                  {editId ? "Editar aspirante" : "Registrar aspirante"}
+                </h2>
+                <p className="text-sm text-white/50">
+                  {editId ? "Actualiza los datos y guarda los cambios." : "Completa el formulario para generar PIN."}
+                </p>
+              </div>
+            </div>
+
+            <form
+              className="relative grid grid-cols-1 gap-4 md:grid-cols-2"
+              onSubmit={(e) => {
+                e.preventDefault();
+                handleSave();
+              }}
+            >
+              <div className="flex flex-col gap-1.5">
+                <label htmlFor="nombre" className={labelClass}>Nombre</label>
+                <input id="nombre" name="nombre" value={form.nombre} onChange={handleChange} placeholder="Nombre" className={inputClass} required />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <label htmlFor="apellido" className={labelClass}>Apellido</label>
+                <input id="apellido" name="apellido" value={form.apellido} onChange={handleChange} placeholder="Apellido" className={inputClass} required />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <label htmlFor="nacimiento" className={labelClass}>Fecha de nacimiento</label>
+                <input id="campo-nacimiento" name="nacimiento" type="date" value={form.nacimiento} onChange={handleChange} className={`${inputClass} [color-scheme:dark]`} required />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <label htmlFor="edad" className={labelClass}>Edad</label>
+                <input id="edad" name="edad" type="number" value={form.edad} readOnly className={`${inputClass} bg-white/10 opacity-80`} />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <label htmlFor="genero" className={labelClass}>Género</label>
+                <select id="genero" name="genero" value={form.genero} onChange={handleChange} className={inputClass} required>
+                  <option value="" className="bg-slate-900">Selecciona género</option>
+                  <option value="Hombre" className="bg-slate-900">Hombre</option>
+                  <option value="Mujer" className="bg-slate-900">Mujer</option>
+                </select>
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <label htmlFor="cargo" className={labelClass}>Cargo</label>
+                <select id="cargo" name="cargo" value={form.cargo} disabled className={`${inputClass} bg-white/10 opacity-80`}>
+                  <option value={CARGO_ASPIRANTE} className="bg-slate-900">{CARGO_ASPIRANTE}</option>
+                </select>
+              </div>
+              <div className="flex flex-col gap-1.5 md:col-span-2">
+                <label htmlFor="telefono" className={labelClass}>WhatsApp</label>
+                <input id="telefono" name="telefono" type="tel" value={form.telefono} onChange={handleChange} placeholder="WhatsApp (ej. 0991234567 o +593991234567)" className={inputClass} />
+                <p className="text-xs text-white/45">
+                  Opcional al registrar; puedes agregarlo después en Editar para enviar el PIN y datos del aspirante.
+                </p>
+              </div>
+              <div className="flex flex-col gap-1.5 md:col-span-2">
+                <label htmlFor="asociacion" className={labelClass}>Asociación / Misión</label>
+                <select id="asociacion" name="asociacion" value={form.asociacion} onChange={handleChange} className={inputClass} required>
+                  <option value="" className="bg-slate-900">Selecciona asociación / misión</option>
+                  {ASOCIACIONES_MISION.map((a) => (
+                    <option key={a} value={a} className="bg-slate-900">{a}</option>
+                  ))}
+                </select>
+              </div>
+
+              <FichaMedicaUpload
+                archivoSeleccionado={fichaArchivo}
+                onArchivoChange={setFichaArchivo}
+                urlActual={fichaMedicaUrl}
+                nombreActual={fichaMedicaNombre}
+                opcional
               />
-            </div>
 
-            <div className="flex flex-col gap-1">
-              <label htmlFor="apellido" className="text-sm font-semibold text-slate-700">
-                Apellido
-              </label>
-              <input
-                id="apellido"
-                name="apellido"
-                value={form.apellido}
-                onChange={handleChange}
-                placeholder="Apellido"
-                className="border border-slate-200 p-2 rounded-xl"
-                required
-              />
-            </div>
-
-            <div className="flex flex-col gap-1">
-              <label htmlFor="nacimiento" className="text-sm font-semibold text-slate-700">
-                Fecha de nacimiento
-              </label>
-              <input
-                id="campo-nacimiento"
-                name="nacimiento"
-                type="date"
-                value={form.nacimiento}
-                onChange={handleChange}
-                className="border border-slate-200 p-2 rounded-xl"
-                required
-              />
-            </div>
-
-            <div className="flex flex-col gap-1">
-              <label htmlFor="edad" className="text-sm font-semibold text-slate-700">
-                Edad
-              </label>
-              <input
-                id="edad"
-                name="edad"
-                type="number"
-                value={form.edad}
-                readOnly
-                className="border border-slate-200 p-2 rounded-xl bg-slate-100"
-              />
-            </div>
-
-            <div className="flex flex-col gap-1">
-              <label htmlFor="genero" className="text-sm font-semibold text-slate-700">
-                Género
-              </label>
-              <select
-                id="genero"
-                name="genero"
-                value={form.genero}
-                onChange={handleChange}
-                className="border border-slate-200 p-2 rounded-xl"
-                required
-              >
-                <option value="">Selecciona género</option>
-                <option value="Hombre">Hombre</option>
-                <option value="Mujer">Mujer</option>
-              </select>
-            </div>
-
-            <div className="flex flex-col gap-1">
-              <label htmlFor="cargo" className="text-sm font-semibold text-slate-700">
-                Cargo
-              </label>
-              <select
-                id="cargo"
-                name="cargo"
-                value={form.cargo}
-                disabled
-                className="border border-slate-200 p-2 rounded-xl bg-slate-100 text-slate-700"
-              >
-                <option value={CARGO_ASPIRANTE}>{CARGO_ASPIRANTE}</option>
-              </select>
-            </div>
-
-            <div className="flex flex-col gap-1 md:col-span-2">
-              <label htmlFor="telefono" className="text-sm font-semibold text-slate-700">
-                WhatsApp
-              </label>
-              <input
-                id="telefono"
-                name="telefono"
-                type="tel"
-                value={form.telefono}
-                onChange={handleChange}
-                placeholder="WhatsApp (ej. 0991234567 o +593991234567)"
-                className="border border-slate-200 p-2 rounded-xl"
-              />
-              <p className="text-xs text-slate-500">
-                Opcional al registrar; puedes agregarlo después en Editar para enviar el PIN y datos
-                del aspirante.
-              </p>
-            </div>
-
-            <div className="flex flex-col gap-1 md:col-span-2">
-              <label htmlFor="asociacion" className="text-sm font-semibold text-slate-700">
-                Asociación / Misión
-              </label>
-              <select
-                id="asociacion"
-                name="asociacion"
-                value={form.asociacion}
-                onChange={handleChange}
-                className="border border-slate-200 p-2 rounded-xl"
-                required
-              >
-                <option value="">Selecciona asociación / misión</option>
-                {ASOCIACIONES_MISION.map((a) => (
-                  <option key={a} value={a}>
-                    {a}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <FichaMedicaUpload
-              archivoSeleccionado={fichaArchivo}
-              onArchivoChange={setFichaArchivo}
-              urlActual={fichaMedicaUrl}
-              nombreActual={fichaMedicaNombre}
-              opcional
-            />
-
-            <div className="md:col-span-2 flex flex-wrap gap-2 items-center">
-              <button
-                type="submit"
-                disabled={loading}
-                className="bg-indigo-700 text-white px-6 py-2 rounded-xl font-bold hover:bg-indigo-900 transition-all disabled:opacity-60"
-              >
-                {loading ? "Guardando..." : editId ? "Actualizar Aspirante" : "Guardar Aspirante"}
-              </button>
-              {editId && whatsappUrlFromForm() && (
-                <a
-                  href={whatsappUrlFromForm()}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 bg-green-600 text-white px-5 py-2 rounded-xl font-bold hover:bg-green-800 transition-all"
+              <div className="flex flex-wrap items-center gap-2 md:col-span-2">
+                <Button
+                  type="submit"
+                  disabled={loading}
+                  className="rounded-2xl bg-linear-to-r from-amber-500 via-orange-500 to-yellow-500 font-bold text-white hover:opacity-90"
                 >
-                  <MessageCircle className="w-4 h-4" />
-                  Enviar información por WhatsApp
-                </a>
-              )}
-              {editId && (
-                <button
-                  type="button"
-                  onClick={resetForm}
-                  className="bg-gray-400 text-white px-6 py-2 rounded-xl font-bold hover:bg-gray-500"
-                >
-                  Cancelar edición
-                </button>
-              )}
-            </div>
-          </form>
+                  {loading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Guardando…
+                    </>
+                  ) : editId ? (
+                    "Actualizar Aspirante"
+                  ) : (
+                    <>
+                      <UserPlus className="mr-2 h-4 w-4" />
+                      Guardar Aspirante
+                    </>
+                  )}
+                </Button>
+                {editId && whatsappUrlFromForm() && (
+                  <a
+                    href={whatsappUrlFromForm()}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 rounded-2xl bg-emerald-600 px-5 py-2.5 text-sm font-bold text-white transition hover:bg-emerald-500"
+                  >
+                    <MessageCircle className="h-4 w-4" />
+                    WhatsApp
+                  </a>
+                )}
+                {editId && (
+                  <Button type="button" variant="outline" onClick={resetForm} className="rounded-2xl border-white/15 bg-white/5 text-white hover:bg-white/10">
+                    Cancelar edición
+                  </Button>
+                )}
+              </div>
+            </form>
+          </section>
 
-          <div className="mt-10">
-            <h3 className="font-bold mb-4 text-indigo-700">Aspirantes registrados</h3>
+          <section className="overflow-hidden rounded-[2rem] border border-white/10 bg-white/4 p-6 sm:p-8">
+            <h3 className="mb-6 text-xl font-black">Aspirantes registrados</h3>
             {aspirantes.length === 0 ? (
-              <p className="text-slate-500 text-sm">No hay aspirantes registrados.</p>
+              <p className="text-sm text-white/50">No hay aspirantes registrados.</p>
             ) : (
-              <ul className="space-y-3">
+              <ul className="space-y-4">
                 {aspirantes.map((a) => {
                   const nombre = nombreCompletoAspirante(a);
                   const numero = numeroWhatsappAspirante(a);
@@ -496,19 +516,19 @@ export default function AspirantePage() {
                   return (
                     <li
                       key={a.id}
-                      className="bg-indigo-50 rounded-xl p-4 flex flex-col gap-3 border border-indigo-200"
+                      className="flex flex-col gap-4 rounded-2xl border border-amber-400/20 bg-amber-500/5 p-5 transition hover:border-amber-400/35 hover:bg-amber-500/8"
                     >
                       <div>
-                        <span className="font-bold text-indigo-800">{nombre}</span>
-                        <div className="mt-1 text-xs text-slate-500 space-y-0.5">
+                        <span className="text-lg font-bold text-white">{nombre}</span>
+                        <div className="mt-2 space-y-1 text-xs text-white/55">
                           <p>Edad: {a.edad || "—"} · Género: {a.genero || "—"}</p>
                           <p>Asociación: {a.asociacion || "—"} · Cargo: {a.cargo || CARGO_ASPIRANTE}</p>
                           <p>
                             WhatsApp:{" "}
                             {numero ? (
-                              <span className="text-slate-700">{numero}</span>
+                              <span className="text-white/80">{numero}</span>
                             ) : (
-                              <span className="text-amber-700">Sin número — usa Editar para agregarlo</span>
+                              <span className="text-amber-400/90">Sin número — usa Editar para agregarlo</span>
                             )}
                           </p>
                           {a.fichaMedicaUrl && (
@@ -517,7 +537,7 @@ export default function AspirantePage() {
                                 href={a.fichaMedicaUrl}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="text-indigo-600 underline"
+                                className="font-semibold text-amber-300 underline hover:text-amber-200"
                               >
                                 Ver ficha médica
                               </a>
@@ -526,7 +546,7 @@ export default function AspirantePage() {
                         </div>
                       </div>
                       <div className="flex flex-wrap items-center gap-2">
-                        <span className="bg-indigo-100 text-indigo-800 px-3 py-1 rounded-lg font-mono text-sm">
+                        <span className="rounded-xl border border-amber-400/30 bg-amber-500/15 px-3 py-1.5 font-mono text-sm font-bold text-amber-200">
                           PIN: {a.pin}
                         </span>
                         {waUrl ? (
@@ -534,16 +554,16 @@ export default function AspirantePage() {
                             href={waUrl}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 bg-green-600 text-white px-4 py-2 rounded-xl text-sm font-bold hover:bg-green-800"
+                            className="inline-flex items-center gap-1 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-500"
                           >
-                            <MessageCircle className="w-4 h-4" />
-                            Enviar por WhatsApp
+                            <MessageCircle className="h-4 w-4" />
+                            WhatsApp
                           </a>
                         ) : (
                           <button
                             type="button"
                             onClick={() => handleEdit(a)}
-                            className="bg-slate-200 text-slate-700 px-4 py-2 rounded-xl text-sm font-semibold hover:bg-slate-300"
+                            className="rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm font-semibold text-white/80 hover:bg-white/10"
                             title="Edita el registro y agrega WhatsApp"
                           >
                             Agregar WhatsApp
@@ -552,15 +572,17 @@ export default function AspirantePage() {
                         <button
                           type="button"
                           onClick={() => handleEdit(a)}
-                          className="bg-yellow-500 text-white px-3 py-1 rounded-lg text-sm font-bold hover:bg-yellow-700"
+                          className="inline-flex items-center gap-1 rounded-xl bg-amber-500/90 px-3 py-2 text-sm font-bold text-white hover:bg-amber-500"
                         >
+                          <Pencil className="h-3.5 w-3.5" />
                           Editar
                         </button>
                         <button
                           type="button"
                           onClick={() => handleDelete(a.id)}
-                          className="bg-red-600 text-white px-3 py-1 rounded-lg text-sm font-bold hover:bg-red-800"
+                          className="inline-flex items-center gap-1 rounded-xl bg-red-600/90 px-3 py-2 text-sm font-bold text-white hover:bg-red-600"
                         >
+                          <Trash2 className="h-3.5 w-3.5" />
                           Eliminar
                         </button>
                       </div>
@@ -569,9 +591,9 @@ export default function AspirantePage() {
                 })}
               </ul>
             )}
-          </div>
-        </section>
-      </div>
+          </section>
+        </div>
+      </main>
     </div>
   );
 }
