@@ -9,7 +9,7 @@ import {
   setDoc,
   where,
 } from "firebase/firestore";
-import type { Club, ProgramaClub, RegistroClubInput } from "@/src/types/club";
+import type { CargoDirectiva, Club, ProgramaClub, RegistroClubInput } from "@/src/types/club";
 
 export function slugificarNombre(nombre: string): string {
   return nombre
@@ -43,6 +43,7 @@ export async function buscarClubPorSlug(slug: string): Promise<Club | null> {
     ciudad: String(data.ciudad ?? ""),
     pais: String(data.pais ?? ""),
     responsable: String(data.responsable ?? ""),
+    cargo: data.cargo ? (String(data.cargo) as CargoDirectiva) : undefined,
     email: String(data.email ?? ""),
     whatsapp: String(data.whatsapp ?? ""),
     programas: (data.programas ?? []) as ProgramaClub[],
@@ -59,16 +60,20 @@ export async function registrarClub(
   if (!nombre) return { ok: false, mensaje: "Ingresa el nombre del club." };
   if (!input.ciudad.trim()) return { ok: false, mensaje: "Ingresa la ciudad." };
   if (!input.pais.trim()) return { ok: false, mensaje: "Selecciona el país." };
-  if (!input.responsable.trim()) return { ok: false, mensaje: "Ingresa el responsable." };
+  if (!input.responsable.trim()) return { ok: false, mensaje: "Ingresa tu nombre." };
+  if (!input.cargo) return { ok: false, mensaje: "Selecciona tu cargo en la directiva." };
   if (!input.email.trim()) return { ok: false, mensaje: "Ingresa un correo de contacto." };
-  if (input.programas.length === 0) {
-    return { ok: false, mensaje: "Selecciona al menos un programa del ministerio joven." };
+  if (!input.programa) {
+    return { ok: false, mensaje: "Selecciona el programa del club." };
   }
 
   const slug = slugificarNombre(nombre);
   if (!slug) return { ok: false, mensaje: "El nombre del club no es válido." };
 
-  await ensureFirebaseSession();
+  // Tras registrarAdminFirebase el usuario ya tiene sesión con correo; no forzar anónimo.
+  if (!input.adminUid) {
+    await ensureFirebaseSession();
+  }
   const existente = await getDoc(doc(db, "clubs", slug));
   if (existente.exists()) {
     return {
@@ -85,9 +90,10 @@ export async function registrarClub(
     ciudad: input.ciudad.trim(),
     pais: input.pais.trim() || "Ecuador",
     responsable: input.responsable.trim(),
+    cargo: input.cargo,
     email: input.email.trim().toLowerCase(),
     whatsapp: input.whatsapp.trim(),
-    programas: input.programas,
+    programas: [input.programa],
     adminPin,
     activo: true,
     creadoEn,
@@ -96,7 +102,20 @@ export async function registrarClub(
     clubData.adminUid = input.adminUid;
   }
 
-  await setDoc(doc(db, "clubs", slug), clubData);
+  try {
+    await setDoc(doc(db, "clubs", slug), clubData);
+  } catch (err: unknown) {
+    console.error("[registrarClub] Firestore", err);
+    const code = (err as { code?: string }).code;
+    if (code === "permission-denied") {
+      return {
+        ok: false,
+        mensaje:
+          "No se pudo guardar el club (permisos de Firestore). Despliega firestore.rules en Firebase.",
+      };
+    }
+    return { ok: false, mensaje: "No se pudo guardar el club. Intenta de nuevo." };
+  }
 
   const club: Club = {
     id: slug,
@@ -105,9 +124,10 @@ export async function registrarClub(
     ciudad: input.ciudad.trim(),
     pais: input.pais.trim() || "Ecuador",
     responsable: input.responsable.trim(),
+    cargo: input.cargo,
     email: input.email.trim().toLowerCase(),
     whatsapp: input.whatsapp.trim(),
-    programas: input.programas,
+    programas: [input.programa],
     adminPin,
     activo: true,
     creadoEn,
@@ -160,6 +180,7 @@ export async function buscarClubPorAdminPin(pin: string): Promise<Club | null> {
     ciudad: String(data.ciudad ?? ""),
     pais: String(data.pais ?? ""),
     responsable: String(data.responsable ?? ""),
+    cargo: data.cargo ? (String(data.cargo) as CargoDirectiva) : undefined,
     email: String(data.email ?? ""),
     whatsapp: String(data.whatsapp ?? ""),
     programas: (data.programas ?? []) as ProgramaClub[],

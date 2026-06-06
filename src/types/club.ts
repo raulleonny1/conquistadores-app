@@ -1,5 +1,11 @@
 export type ProgramaClub = "conquistadores" | "aventureros" | "ja";
 
+export type CargoDirectiva =
+  | "Director/a"
+  | "Subdirector/a"
+  | "Secretario/a"
+  | "Tesorero/a";
+
 export type Club = {
   id: string;
   slug: string;
@@ -7,6 +13,7 @@ export type Club = {
   ciudad: string;
   pais: string;
   responsable: string;
+  cargo?: CargoDirectiva;
   email: string;
   whatsapp: string;
   programas: ProgramaClub[];
@@ -20,9 +27,10 @@ export type RegistroClubInput = {
   ciudad: string;
   pais: string;
   responsable: string;
+  cargo: CargoDirectiva;
   email: string;
   whatsapp: string;
-  programas: ProgramaClub[];
+  programa: ProgramaClub;
   password: string;
   adminUid?: string;
 };

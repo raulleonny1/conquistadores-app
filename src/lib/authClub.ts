@@ -1,5 +1,7 @@
 import {
   createUserWithEmailAndPassword,
+  EmailAuthProvider,
+  linkWithCredential,
   signInWithEmailAndPassword,
   signOut,
   type User,
@@ -16,29 +18,54 @@ export type ResultadoAuthClub =
   | { ok: true }
   | { ok: false; mensaje: string };
 
+function mensajeErrorRegistroAuth(code?: string): string {
+  switch (code) {
+    case "auth/email-already-in-use":
+    case "auth/credential-already-in-use":
+      return "Ese correo ya está registrado.";
+    case "auth/weak-password":
+      return "La contraseña debe tener al menos 6 caracteres.";
+    case "auth/invalid-email":
+      return "Correo electrónico no válido.";
+    case "auth/configuration-not-found":
+      return "Firebase Authentication no está configurado. En Firebase Console → Authentication, pulsa «Comenzar» y activa «Correo/contraseña» y «Anónimo».";
+    case "auth/operation-not-allowed":
+      return "El registro con correo no está habilitado. En Firebase Console → Authentication → Sign-in method, activa «Correo/contraseña».";
+    case "auth/network-request-failed":
+      return "Sin conexión. Revisa tu internet e intenta de nuevo.";
+    case "auth/too-many-requests":
+      return "Demasiados intentos. Espera un momento e intenta de nuevo.";
+    default:
+      return "No se pudo crear la cuenta. Intenta de nuevo.";
+  }
+}
+
 export async function registrarAdminFirebase(
   email: string,
   password: string
 ): Promise<{ ok: true; uid: string } | { ok: false; mensaje: string }> {
+  const emailNorm = email.trim().toLowerCase();
+
   try {
-    const cred = await createUserWithEmailAndPassword(
-      auth,
-      email.trim().toLowerCase(),
-      password
-    );
+    const actual = auth.currentUser;
+
+    // La app inicia sesión anónima al cargar; vinculamos esa sesión al correo nuevo.
+    if (actual?.isAnonymous) {
+      const credential = EmailAuthProvider.credential(emailNorm, password);
+      const cred = await linkWithCredential(actual, credential);
+      return { ok: true, uid: cred.user.uid };
+    }
+
+    if (actual) {
+      await signOut(auth);
+    }
+
+    const cred = await createUserWithEmailAndPassword(auth, emailNorm, password);
     return { ok: true, uid: cred.user.uid };
   } catch (err: unknown) {
     const code = (err as { code?: string }).code;
-    if (code === "auth/email-already-in-use") {
-      return { ok: false, mensaje: "Ese correo ya está registrado." };
-    }
-    if (code === "auth/weak-password") {
-      return { ok: false, mensaje: "La contraseña debe tener al menos 6 caracteres." };
-    }
-    if (code === "auth/invalid-email") {
-      return { ok: false, mensaje: "Correo electrónico no válido." };
-    }
-    return { ok: false, mensaje: "No se pudo crear la cuenta. Intenta de nuevo." };
+    console.error("[registrarAdminFirebase]", code, err);
+    return { ok: false, mensaje: mensajeErrorRegistroAuth(code) };
   }
 }
 
